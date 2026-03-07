@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Daily Focus</title>
+<meta name="description" content="오늘 할 일 관리 + Claude Code 토큰 사용량 실시간 확인">
+<title>Daily Focus — 오늘의 작업 & Claude 현황</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -277,13 +279,19 @@ body {
     <!-- Progress -->
     <div class="card">
       <div class="prog-hd">
-        <span class="prog-label">오늘 완료율</span>
-        <span class="prog-pct" id="progPct">0%</span>
+        <div>
+          <span class="prog-label">오늘 완료율</span>
+          <span id="progRefreshTime" style="font-size:10px;color:var(--muted);margin-left:8px;font-family:'Courier New',monospace"></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <button onclick="loadToday()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0;line-height:1" title="새로고침">↻</button>
+          <span class="prog-pct" id="progPct">-</span>
+        </div>
       </div>
       <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
       <div class="prog-stats">
-        <div class="stat">작업 <b id="stTasks">0/0</b></div>
-        <div class="stat">예상 시간 <b id="stTime">0/0분</b></div>
+        <div class="stat">작업 <b id="stTasks">-/-</b></div>
+        <div class="stat">예상 시간 <b id="stTime">-</b></div>
         <div class="stat">남은 <b id="stLeft">-</b></div>
       </div>
     </div>
@@ -580,20 +588,32 @@ async function saveMin(inp, id) {
 
 // ── Today ────────────────────────────────────────────────────
 async function loadToday() {
-  const r = await fetch('/api/today');
-  const { tasks, stats } = await r.json();
-  const pct = stats.total > 0 ? Math.round(stats.done/stats.total*100) : 0;
+  try {
+    const r = await fetch('/api/today');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const { tasks, stats } = await r.json();
+    const pct = stats.total > 0 ? Math.round(stats.done / stats.total * 100) : 0;
 
-  document.getElementById('progPct').textContent  = pct + '%';
-  document.getElementById('progFill').style.width = pct + '%';
-  document.getElementById('stTasks').textContent  = `${stats.done}/${stats.total}`;
-  document.getElementById('stTime').textContent   = `${stats.done_minutes}/${stats.total_minutes}분`;
-  const left = stats.total_minutes - stats.done_minutes;
-  document.getElementById('stLeft').textContent   = left > 0 ? `${left}분` : '완료!';
+    document.getElementById('progPct').textContent  = pct + '%';
+    document.getElementById('progFill').style.width = pct + '%';
+    document.getElementById('stTasks').textContent  = `${stats.done}/${stats.total}`;
+    document.getElementById('stTime').textContent   = `${stats.done_minutes}/${stats.total_minutes}분`;
+    const left = stats.total_minutes - stats.done_minutes;
+    document.getElementById('stLeft').textContent   = left > 0 ? `${left}분` : '완료!';
 
-  renderAccordion(tasks);
-  loadCheckins();
-  checkCarry();
+    // 마지막 갱신 시각
+    const now = new Date();
+    document.getElementById('progRefreshTime').textContent =
+      `${p2(now.getHours())}:${p2(now.getMinutes())}:${p2(now.getSeconds())} 기준`;
+
+    renderAccordion(tasks);
+    loadCheckins();
+    checkCarry();
+  } catch(err) {
+    document.getElementById('progPct').textContent = '오류';
+    document.getElementById('progRefreshTime').textContent = '데이터 로드 실패 — 새로고침';
+    console.error('loadToday 실패:', err);
+  }
 }
 
 async function addTask() {
@@ -679,13 +699,20 @@ async function syncLogs() {
     const r = await fetch('/api/sync-logs', {method:'POST'});
     const data = await r.json();
     msg.style.display = 'block';
-    if (data.error) { msg.style.color='var(--danger)'; msg.textContent='오류: '+data.error; }
-    else {
-      msg.style.color='var(--muted)';
-      msg.textContent=`${data.imported.length}개 임포트, ${data.skipped.length}개 중복 스킵`;
-      await loadToday();
+    if (data.error) {
+      msg.style.color = 'var(--danger)';
+      msg.textContent = '동기화 오류: ' + data.error;
+    } else {
+      msg.style.color = 'var(--muted)';
+      msg.textContent = `${data.imported.length}개 임포트, ${data.skipped.length}개 중복 스킵`;
     }
-  } catch { msg.style.display='block'; msg.style.color='var(--danger)'; msg.textContent='서버 오류'; }
+  } catch(e) {
+    msg.style.display = 'block';
+    msg.style.color = 'var(--danger)';
+    msg.textContent = '서버 오류 — 서버가 실행 중인지 확인하세요';
+  }
+  // 에러 여부와 관계없이 항상 할 일 목록 갱신
+  await loadToday();
   btn.disabled = false; btn.textContent = '↻ 동기화';
 }
 
