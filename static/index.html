@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Focus</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0d1117;
+  --surface:   #161b22;
+  --surface2:  #1c2330;
+  --border:    #30363d;
+  --text:      #e6edf3;
+  --text2:     #c9d1d9;
+  --muted:     #8b949e;
+  --accent:    #4493f8;
+  --accent-h:  #2f81f7;
+  --success:   #3fb950;
+  --warning:   #d29922;
+  --danger:    #f85149;
+  --claude:    #e8914a;
+  --claude-bg: #130d06;
+  --r: 10px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+.wrap { max-width: 880px; margin: 0 auto; padding: 28px 20px; }
+
+/* ── Header ── */
+.hd { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; }
+.date-big { font-size: 22px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; }
+.date-sm  { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.hd-right { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; }
+.next-ci  { font-size: 12px; color: var(--muted); }
+.tabs { display: inline-flex; gap: 2px; background: var(--surface); padding: 3px; border-radius: 8px; border: 1px solid var(--border); }
+.tab { padding: 5px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--muted); border: none; background: none; transition: all .15s; }
+.tab.on { background: var(--accent); color: #fff; }
+.tab:hover:not(.on) { color: var(--text); }
+
+/* ── Card ── */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 18px; margin-bottom: 12px; }
+
+/* ── Progress ── */
+.prog-hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.prog-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.prog-pct   { font-size: 26px; font-weight: 800; color: var(--accent); letter-spacing: -1px; }
+.prog-bar  { height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; }
+.prog-fill { height: 100%; background: var(--accent); border-radius: 99px; transition: width .6s ease; }
+.prog-stats { display: flex; gap: 20px; margin-top: 12px; flex-wrap: wrap; }
+.stat { font-size: 12px; color: var(--muted); }
+.stat b { color: var(--text2); font-weight: 600; }
+
+/* ── Claude Usage ── */
+.claude-card {
+  background: var(--claude-bg);
+  border: 1px solid #e8914a28;
+  border-radius: var(--r);
+  padding: 18px;
+  margin-bottom: 12px;
+}
+.claude-hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.claude-title {
+  font-size: 11px; font-weight: 700; color: var(--claude);
+  text-transform: uppercase; letter-spacing: .1em;
+  display: flex; align-items: center; gap: 6px;
+}
+.claude-title::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--claude); box-shadow: 0 0 6px var(--claude); }
+.claude-hd-right { display: flex; align-items: center; gap: 10px; }
+.claude-time { font-size: 11px; color: var(--muted); font-family: 'Courier New', monospace; }
+.claude-link { font-size: 11px; color: var(--muted); text-decoration: none; }
+.claude-link:hover { color: var(--claude); }
+
+/* 메인 프로그레스 */
+.claude-main { margin-bottom: 16px; }
+.claude-main-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.claude-used-label { font-size: 13px; color: var(--text2); }
+.claude-used-label b { color: var(--claude); font-size: 24px; font-weight: 800; letter-spacing: -1px; font-family: 'Courier New', monospace; }
+.claude-remain { font-size: 13px; font-weight: 700; font-family: 'Courier New', monospace; }
+.claude-remain.ok   { color: #4ade80; }
+.claude-remain.warn { color: var(--warning); }
+.claude-remain.crit { color: var(--danger); }
+
+.claude-bar-wrap { position: relative; height: 8px; background: #2a1808; border-radius: 99px; overflow: hidden; margin-bottom: 6px; }
+.claude-bar-fill { height: 100%; border-radius: 99px; transition: width .8s ease; }
+.claude-bar-fill.ok   { background: linear-gradient(90deg, #c2612a, #e8914a); }
+.claude-bar-fill.warn { background: linear-gradient(90deg, #b45309, var(--warning)); }
+.claude-bar-fill.crit { background: linear-gradient(90deg, #991b1b, var(--danger)); }
+
+.claude-bar-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-family: 'Courier New', monospace; }
+
+/* 서브 박스 */
+.claude-sub-row { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.claude-sub { background: #1c1108; border: 1px solid #e8914a18; border-radius: 8px; padding: 10px 14px; flex: 1; min-width: 110px; }
+.claude-sub .sl { font-size: 10px; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .06em; }
+.claude-sub .sv { font-size: 17px; font-weight: 700; color: var(--text2); font-family: 'Courier New', monospace; }
+.claude-sub .sv.orange { color: var(--claude); }
+
+/* 한도 설정 */
+.limit-row { display: flex; align-items: center; gap: 8px; }
+.limit-inp { background: #0d0a06; border: 1px solid #e8914a30; border-radius: 6px; padding: 4px 8px; color: var(--text); font-size: 12px; width: 120px; outline: none; font-family: 'Courier New', monospace; }
+.limit-inp:focus { border-color: var(--claude); }
+.limit-btn { background: #2a1808; border: 1px solid #e8914a44; color: #e8914a; border-radius: 6px; padding: 4px 10px; font-size: 11px; cursor: pointer; font-weight: 600; }
+.limit-btn:hover { background: #3a2010; }
+
+/* 프로젝트 칩 */
+.claude-projects { display: flex; flex-wrap: wrap; gap: 6px; }
+.proj-chip { background: #1c1108; border: 1px solid #e8914a28; border-radius: 99px; padding: 3px 10px; font-size: 11px; color: #d4a06a; display: flex; align-items: center; gap: 5px; font-family: 'Courier New', monospace; }
+.proj-chip .ct { font-weight: 700; color: var(--claude); }
+.claude-note { font-size: 11px; color: var(--muted); margin-top: 8px; }
+
+/* ── Banner ── */
+.banner { background: #0d2010; border: 1px solid #3fb95033; border-radius: var(--r); padding: 11px 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.banner-txt { font-size: 13px; color: #7ee787; }
+.banner-btn { background: var(--success); color: #0d1117; border: none; border-radius: 6px; padding: 5px 12px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+
+/* ── Add task ── */
+.add-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.inp { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 7px 12px; color: var(--text); font-size: 14px; outline: none; transition: border-color .15s; }
+.inp:focus { border-color: var(--accent); }
+.inp::placeholder { color: var(--muted); }
+.inp-title { flex: 1; min-width: 160px; }
+.inp-min   { width: 68px; }
+.sel { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; color: var(--text); font-size: 13px; cursor: pointer; outline: none; }
+.btn-add  { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 7px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.btn-add:hover { background: var(--accent-h); }
+.btn-sync { background: transparent; border: 1px solid #3fb95044; color: #7ee787; border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 500; cursor: pointer; transition: all .15s; }
+.btn-sync:hover:not(:disabled) { background: #0d2010; }
+.btn-sync:disabled { opacity: .45; cursor: not-allowed; }
+.sync-msg { font-size: 12px; color: var(--muted); margin-top: 8px; display: none; }
+
+/* ── Accordion ── */
+.acc-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+
+.acc-group { border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+
+.acc-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px; cursor: pointer; user-select: none;
+  background: var(--surface); transition: background .1s;
+}
+.acc-header:hover { background: var(--surface2); }
+
+.acc-arrow { font-size: 10px; color: var(--muted); transition: transform .2s; flex-shrink: 0; width: 12px; }
+.acc-arrow.open { transform: rotate(90deg); }
+
+.acc-name { font-size: 14px; font-weight: 600; color: var(--text); flex: 1; }
+
+.acc-pct  { font-size: 11px; color: var(--muted); min-width: 28px; text-align: right; }
+.acc-mini-bar { width: 48px; height: 4px; background: var(--border); border-radius: 99px; overflow: hidden; flex-shrink: 0; }
+.acc-mini-fill { height: 100%; border-radius: 99px; }
+
+.acc-badge { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.acc-badge.done { color: var(--success); font-weight: 600; }
+
+/* ── Task items ── */
+.acc-body { display: none; background: var(--bg); }
+.acc-body.open { display: block; }
+
+.task { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.task:last-child { border-bottom: none; }
+.task.done { opacity: .38; }
+.task.done .task-title { text-decoration: line-through; }
+
+.pri-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 1px; }
+.pri-dot[data-p="1"] { background: var(--danger); }
+.pri-dot[data-p="2"] { background: var(--warning); }
+.pri-dot[data-p="3"] { background: var(--border); }
+
+.cb { width: 18px; height: 18px; border: 2px solid var(--border); border-radius: 50%; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+.cb.on { background: var(--success); border-color: var(--success); }
+.cb.on::after { content: "✓"; font-size: 10px; color: #0d1117; font-weight: 800; }
+
+.task-title { flex: 1; font-size: 14px; color: var(--text2); line-height: 1.4; }
+.carry-badge { font-size: 10px; color: var(--muted); background: var(--surface); border-radius: 4px; padding: 1px 5px; margin-right: 5px; border: 1px solid var(--border); }
+
+/* 인라인 시간 편집 */
+.task-min-wrap { position: relative; }
+.task-min {
+  font-size: 12px; color: var(--muted); cursor: pointer;
+  padding: 2px 6px; border-radius: 4px; border: 1px solid transparent;
+  transition: all .15s; white-space: nowrap;
+}
+.task-min:hover { border-color: var(--border); color: var(--text2); }
+.task-min-input {
+  display: none; width: 56px; font-size: 12px; color: var(--text);
+  background: var(--surface); border: 1px solid var(--accent);
+  border-radius: 4px; padding: 2px 6px; outline: none;
+}
+.task-min-input.show { display: inline-block; }
+.task-min.hide { display: none; }
+
+.task-del { background: none; border: none; color: var(--border); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 4px; transition: color .15s; flex-shrink: 0; }
+.task-del:hover { color: var(--danger); }
+
+.empty { text-align: center; color: var(--muted); padding: 32px; font-size: 13px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); }
+
+/* ── Check-in ── */
+.ci-hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.sec-title { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.btn-ci { background: var(--surface2); border: 1px solid var(--border); color: var(--text2); border-radius: 6px; padding: 5px 12px; font-size: 12px; cursor: pointer; transition: all .15s; }
+.btn-ci:hover { border-color: var(--accent); color: var(--accent); }
+.ci-form { display: none; margin-bottom: 12px; }
+.ci-form.open { display: block; }
+.ci-note { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 9px 12px; color: var(--text); font-size: 13px; outline: none; resize: vertical; min-height: 60px; font-family: inherit; line-height: 1.6; margin-bottom: 8px; }
+.ci-note:focus { border-color: var(--accent); }
+.btn-save { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 6px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
+
+.ci-hist { display: flex; flex-direction: column; gap: 6px; }
+.ci-entry { background: var(--surface2); border-radius: 6px; padding: 9px 12px; border: 1px solid var(--border); }
+.ci-time   { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+.ci-counts { font-size: 13px; font-weight: 600; color: var(--text2); }
+.ci-note-disp { font-size: 12px; color: var(--muted); margin-top: 4px; font-style: italic; line-height: 1.5; }
+.ci-empty  { font-size: 13px; color: var(--muted); }
+
+/* ── Week ── */
+.wk-hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.wk-label { font-size: 12px; color: var(--muted); }
+.goal-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.goal-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; }
+.gcb { width: 17px; height: 17px; border: 2px solid var(--border); border-radius: 4px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+.gcb.on { background: var(--success); border-color: var(--success); }
+.gcb.on::after { content: "✓"; font-size: 10px; color: #0d1117; font-weight: 800; }
+.goal-txt { flex: 1; font-size: 14px; color: var(--text2); }
+.goal-txt.done-txt { text-decoration: line-through; color: var(--muted); }
+.goal-del { background: none; border: none; color: var(--border); cursor: pointer; font-size: 15px; transition: color .15s; }
+.goal-del:hover { color: var(--danger); }
+.goal-add-row { display: flex; gap: 8px; }
+.btn-gadd { background: var(--surface2); border: 1px solid var(--border); color: var(--text2); border-radius: 6px; padding: 7px 14px; font-size: 13px; cursor: pointer; transition: all .15s; }
+.btn-gadd:hover { border-color: var(--accent); color: var(--accent); }
+
+.wk-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 12px; }
+.day-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 6px; text-align: center; }
+.day-card.today { border-color: var(--accent); }
+.day-name { font-size: 10px; color: var(--muted); margin-bottom: 4px; font-weight: 600; text-transform: uppercase; }
+.day-num  { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+.day-card.today .day-num { color: var(--accent); }
+.day-count { font-size: 11px; color: var(--muted); }
+.day-pb { height: 3px; background: var(--border); border-radius: 99px; margin-top: 8px; overflow: hidden; }
+.day-pf { height: 100%; background: var(--success); border-radius: 99px; }
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <div class="hd">
+    <div>
+      <div class="date-big" id="dateBig"></div>
+      <div class="date-sm"  id="dateSm"></div>
+    </div>
+    <div class="hd-right">
+      <div class="next-ci" id="nextCi"></div>
+      <div class="tabs">
+        <button class="tab on" onclick="switchTab('today')">오늘</button>
+        <button class="tab"    onclick="switchTab('week')">이번 주</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ TODAY ════════ -->
+  <div id="vToday">
+
+    <!-- Progress -->
+    <div class="card">
+      <div class="prog-hd">
+        <span class="prog-label">오늘 완료율</span>
+        <span class="prog-pct" id="progPct">0%</span>
+      </div>
+      <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+      <div class="prog-stats">
+        <div class="stat">작업 <b id="stTasks">0/0</b></div>
+        <div class="stat">예상 시간 <b id="stTime">0/0분</b></div>
+        <div class="stat">남은 <b id="stLeft">-</b></div>
+      </div>
+    </div>
+
+    <!-- Claude Usage -->
+    <div class="claude-card">
+      <div class="claude-hd">
+        <span class="claude-title">Claude Code 토큰 사용량</span>
+        <div class="claude-hd-right">
+          <span class="claude-time" id="claudeTime"></span>
+          <span id="claudeMonthLabel" style="font-size:11px;color:var(--muted)"></span>
+          <a class="claude-link" href="https://claude.ai/settings/usage" target="_blank">↗ 상세</a>
+        </div>
+      </div>
+
+      <!-- 메인 프로그레스 -->
+      <div class="claude-main">
+        <div class="claude-main-row">
+          <div class="claude-used-label">이번 달 <b id="claudeUsedPct">0</b>% 사용</div>
+          <div class="claude-remain ok" id="claudeRemain">— 남음</div>
+        </div>
+        <div class="claude-bar-wrap">
+          <div class="claude-bar-fill ok" id="claudeBar" style="width:0%"></div>
+        </div>
+        <div class="claude-bar-labels">
+          <span id="claudeUsedTok">0</span>
+          <span id="claudeLimitTok">한도 설정 필요</span>
+        </div>
+      </div>
+
+      <!-- 오늘 / 입력 / 출력 / 캐시 -->
+      <div class="claude-sub-row">
+        <div class="claude-sub">
+          <div class="sl">오늘 사용</div>
+          <div class="sv orange" id="claudeToday">-</div>
+        </div>
+        <div class="claude-sub">
+          <div class="sl">입력 토큰</div>
+          <div class="sv" id="claudeInput">-</div>
+        </div>
+        <div class="claude-sub">
+          <div class="sl">출력 토큰</div>
+          <div class="sv" id="claudeOutput">-</div>
+        </div>
+        <div class="claude-sub">
+          <div class="sl">캐시 읽기</div>
+          <div class="sv" id="claudeCache">-</div>
+        </div>
+      </div>
+
+      <!-- 한도 설정 -->
+      <div class="limit-row" style="margin-bottom:12px">
+        <span style="font-size:12px;color:var(--muted)">월 한도 설정:</span>
+        <input class="limit-inp" id="limitInp" type="text" placeholder="예: 2000000000">
+        <button class="limit-btn" onclick="saveLimit()">저장</button>
+        <span style="font-size:11px;color:var(--muted)" id="limitHint"></span>
+      </div>
+
+      <!-- 프로젝트별 -->
+      <div class="claude-projects" id="claudeProjects"></div>
+      <div class="claude-note" id="claudeNote"></div>
+    </div>
+
+    <!-- Carry-over banner -->
+    <div class="banner" id="carryBanner" style="display:none">
+      <div class="banner-txt" id="carryTxt"></div>
+      <button class="banner-btn" onclick="doCarry()">오늘로 이월</button>
+    </div>
+
+    <!-- Add task -->
+    <div class="card">
+      <div class="add-row">
+        <input class="inp inp-title" id="inTitle" placeholder="할 일 추가..." onkeydown="if(e(event))addTask()">
+        <input class="inp inp-min"   id="inMin" type="number" value="30" min="5" max="480" title="예상 시간 (분)">
+        <select class="sel" id="inPri">
+          <option value="1">🔴 높음</option>
+          <option value="2" selected>🟡 보통</option>
+          <option value="3">⚪ 낮음</option>
+        </select>
+        <button class="btn-add"  onclick="addTask()">+ 추가</button>
+        <button class="btn-sync" id="syncBtn" onclick="syncLogs()">↻ 동기화</button>
+      </div>
+      <div class="sync-msg" id="syncMsg"></div>
+    </div>
+
+    <!-- Accordion -->
+    <div class="acc-list" id="accList"></div>
+
+    <!-- Check-in -->
+    <div class="card">
+      <div class="ci-hd">
+        <span class="sec-title">체크인 기록</span>
+        <button class="btn-ci" onclick="toggleCi()">체크인 남기기</button>
+      </div>
+      <div class="ci-form" id="ciForm">
+        <textarea class="ci-note" id="ciNote" placeholder="진행 상황, 막힌 부분, 다음 집중 포인트..."></textarea>
+        <button class="btn-save" onclick="saveCheckin()">저장</button>
+      </div>
+      <div class="ci-hist" id="ciHist"></div>
+    </div>
+
+  </div>
+
+  <!-- ════════ WEEK ════════ -->
+  <div id="vWeek" style="display:none">
+    <div class="card">
+      <div class="wk-hd">
+        <span class="sec-title">이번 주 목표</span>
+        <span class="wk-label" id="wkLabel"></span>
+      </div>
+      <div class="goal-list" id="goalList"></div>
+      <div class="goal-add-row">
+        <input class="inp" style="flex:1" id="inGoal" placeholder="이번 주 목표 추가..." onkeydown="if(e(event))addGoal()">
+        <button class="btn-gadd" onclick="addGoal()">추가</button>
+      </div>
+    </div>
+    <div class="wk-grid" id="wkGrid"></div>
+  </div>
+
+</div>
+
+<script>
+const DAYS   = ['일','월','화','수','목','금','토'];
+const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+const CHECK_HOURS = [9,11,13,15,17,19];
+
+const e   = ev => ev.key === 'Enter';
+const esc = s  => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const p2  = n  => String(n).padStart(2,'0');
+
+// 토큰 포맷 (1,234,567 → 1.2M)
+function fmtTok(n) {
+  if (n >= 1e9) return (n/1e9).toFixed(1) + 'B';
+  if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n/1e3).toFixed(1) + 'K';
+  return String(n);
+}
+
+// Accordion state
+let openGroups = new Set(JSON.parse(localStorage.getItem('acc_open') || '[]'));
+function saveOpen() { localStorage.setItem('acc_open', JSON.stringify([...openGroups])); }
+
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
+}
+function fmtT(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${p2(d.getHours())}:${p2(d.getMinutes())}`;
+}
+
+// ── Header ──────────────────────────────────────────────────
+function drawHeader() {
+  const d = new Date();
+  document.getElementById('dateBig').textContent = `${d.getFullYear()}년 ${MONTHS[d.getMonth()]} ${d.getDate()}일`;
+  document.getElementById('dateSm').textContent  = DAYS[d.getDay()] + '요일';
+}
+function updateCountdown() {
+  const now = new Date(), cur = now.getHours()*60+now.getMinutes();
+  const next = CHECK_HOURS.find(h => h*60 > cur);
+  const el = document.getElementById('nextCi');
+  if (!next) { el.textContent = '오늘 체크인 종료'; return; }
+  const diff = next*60 - cur;
+  el.textContent = diff >= 60
+    ? `다음 체크인까지 ${Math.floor(diff/60)}시간 ${diff%60}분`
+    : `다음 체크인까지 ${diff}분`;
+}
+
+// ── Tab ─────────────────────────────────────────────────────
+function switchTab(t) {
+  document.getElementById('vToday').style.display = t==='today' ? '' : 'none';
+  document.getElementById('vWeek').style.display  = t==='week'  ? '' : 'none';
+  document.querySelectorAll('.tab').forEach((el,i) =>
+    el.classList.toggle('on', (i===0&&t==='today')||(i===1&&t==='week'))
+  );
+  if (t === 'week') loadWeek();
+}
+
+// ── Group by [project] ──────────────────────────────────────
+function groupTasks(tasks) {
+  const groups = {}, order = [];
+  for (const t of tasks) {
+    const m = t.title.match(/^\[([^\]]+)\]/);
+    const proj = m ? m[1] : '기타';
+    if (!groups[proj]) { groups[proj] = []; order.push(proj); }
+    groups[proj].push(t);
+  }
+  return { groups, order };
+}
+
+// ── Priority color ───────────────────────────────────────────
+const FILL_COLOR = { 1: 'var(--danger)', 2: 'var(--warning)', 3: 'var(--border)' };
+
+// ── Render accordion ────────────────────────────────────────
+function renderAccordion(tasks) {
+  const list = document.getElementById('accList');
+  if (!tasks.length) {
+    list.innerHTML = '<div class="empty">오늘 할 일을 추가하거나 ↻ 동기화를 눌러보세요</div>';
+    return;
+  }
+
+  const { groups, order } = groupTasks(tasks);
+
+  // 완전 완료 그룹은 뒤로
+  const sortedKeys = [...order].sort((a,b) => {
+    const aAll = groups[a].every(t => t.status==='done') ? 1 : 0;
+    const bAll = groups[b].every(t => t.status==='done') ? 1 : 0;
+    return aAll - bAll;
+  });
+
+  // 첫 로드: 미완료 그룹 자동 열기
+  if (openGroups.size === 0) {
+    sortedKeys.forEach(k => {
+      if (!groups[k].every(t => t.status==='done')) openGroups.add(k);
+    });
+    saveOpen();
+  }
+
+  list.innerHTML = sortedKeys.map(proj => {
+    const items = groups[proj];
+    const total = items.length, done = items.filter(t=>t.status==='done').length;
+    const pct   = total > 0 ? Math.round(done/total*100) : 0;
+    const allDone = done === total && total > 0;
+    const fillColor = allDone ? 'var(--success)' : 'var(--accent)';
+    const totalMin = items.reduce((s,t) => s+t.estimated_minutes, 0);
+    const isOpen = openGroups.has(proj);
+
+    const label = proj;
+    const tasksHtml = items.map(t => {
+      const isDone = t.status === 'done';
+      const title  = t.title.replace(/^\[[^\]]+\]\s*/, '');
+      return `
+        <div class="task ${isDone?'done':''}" data-id="${t.id}">
+          <div class="pri-dot" data-p="${t.priority}"></div>
+          <div class="cb ${isDone?'on':''}" onclick="toggleTask(${t.id},${isDone})"></div>
+          <div class="task-title">
+            ${t.carry_from ? '<span class="carry-badge">이월</span>' : ''}
+            ${esc(title)}
+          </div>
+          <div class="task-min-wrap">
+            <span class="task-min" onclick="editMin(this,${t.id})" title="클릭하여 시간 수정">${t.estimated_minutes}분</span>
+            <input class="task-min-input" type="number" min="5" max="480"
+              onblur="saveMin(this,${t.id})" onkeydown="if(event.key==='Enter')this.blur()">
+          </div>
+          <button class="task-del" onclick="delTask(${t.id})">×</button>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="acc-group">
+        <div class="acc-header" onclick="toggleAcc('${esc(proj)}')">
+          <span class="acc-arrow ${isOpen?'open':''}">▶</span>
+          <span class="acc-name">${esc(label)}</span>
+          <span class="acc-pct">${pct}%</span>
+          <div class="acc-mini-bar">
+            <div class="acc-mini-fill" style="width:${pct}%;background:${fillColor}"></div>
+          </div>
+          <span class="acc-badge ${allDone?'done':''}">${done}/${total}</span>
+          <span class="acc-badge">${totalMin}분</span>
+        </div>
+        <div class="acc-body ${isOpen?'open':''}">${tasksHtml}</div>
+      </div>`;
+  }).join('');
+}
+
+function toggleAcc(proj) {
+  openGroups.has(proj) ? openGroups.delete(proj) : openGroups.add(proj);
+  saveOpen();
+  document.querySelectorAll('.acc-header').forEach(hd => {
+    if (hd.querySelector('.acc-name')?.textContent === proj) {
+      hd.querySelector('.acc-arrow').classList.toggle('open', openGroups.has(proj));
+      hd.nextElementSibling.classList.toggle('open', openGroups.has(proj));
+    }
+  });
+}
+
+// ── Inline time editing ─────────────────────────────────────
+function editMin(span, id) {
+  const inp = span.nextElementSibling;
+  inp.value = parseInt(span.textContent);
+  span.classList.add('hide');
+  inp.classList.add('show');
+  inp.focus(); inp.select();
+}
+async function saveMin(inp, id) {
+  const val = Math.max(5, Math.min(480, parseInt(inp.value)||30));
+  await fetch(`/api/tasks/${id}`, {
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({estimated_minutes: val})
+  });
+  await loadToday();
+}
+
+// ── Today ────────────────────────────────────────────────────
+async function loadToday() {
+  const r = await fetch('/api/today');
+  const { tasks, stats } = await r.json();
+  const pct = stats.total > 0 ? Math.round(stats.done/stats.total*100) : 0;
+
+  document.getElementById('progPct').textContent  = pct + '%';
+  document.getElementById('progFill').style.width = pct + '%';
+  document.getElementById('stTasks').textContent  = `${stats.done}/${stats.total}`;
+  document.getElementById('stTime').textContent   = `${stats.done_minutes}/${stats.total_minutes}분`;
+  const left = stats.total_minutes - stats.done_minutes;
+  document.getElementById('stLeft').textContent   = left > 0 ? `${left}분` : '완료!';
+
+  renderAccordion(tasks);
+  loadCheckins();
+  checkCarry();
+}
+
+async function addTask() {
+  const title = document.getElementById('inTitle').value.trim();
+  if (!title) return;
+  const min = parseInt(document.getElementById('inMin').value)||30;
+  const priority = parseInt(document.getElementById('inPri').value);
+  await fetch('/api/tasks', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({title, estimated_minutes:min, priority})
+  });
+  document.getElementById('inTitle').value = '';
+  await loadToday();
+}
+
+async function toggleTask(id, isDone) {
+  await fetch(`/api/tasks/${id}`, {
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({status: isDone ? 'todo' : 'done'})
+  });
+  await loadToday();
+}
+
+async function delTask(id) {
+  await fetch(`/api/tasks/${id}`, {method:'DELETE'});
+  await loadToday();
+}
+
+async function checkCarry() {
+  const r = await fetch('/api/yesterday-undone');
+  const tasks = await r.json();
+  const banner = document.getElementById('carryBanner');
+  if (tasks.length) {
+    document.getElementById('carryTxt').textContent = `어제 미완료 작업 ${tasks.length}개가 있습니다`;
+    banner.style.display = 'flex';
+  } else banner.style.display = 'none';
+}
+async function doCarry() {
+  await fetch('/api/carry-over', {method:'POST'});
+  document.getElementById('carryBanner').style.display = 'none';
+  await loadToday();
+}
+
+function toggleCi() {
+  const f = document.getElementById('ciForm');
+  f.classList.toggle('open');
+  if (f.classList.contains('open')) document.getElementById('ciNote').focus();
+}
+async function saveCheckin() {
+  const note = document.getElementById('ciNote').value;
+  await fetch('/api/checkin', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({note})
+  });
+  document.getElementById('ciNote').value = '';
+  document.getElementById('ciForm').classList.remove('open');
+  await loadCheckins();
+  await loadToday();
+}
+async function loadCheckins() {
+  const r = await fetch('/api/checkins');
+  const list = await r.json();
+  const el = document.getElementById('ciHist');
+  if (!list.length) {
+    el.innerHTML = '<div class="ci-empty">아직 체크인 기록이 없습니다</div>'; return;
+  }
+  el.innerHTML = [...list].reverse().map(c => {
+    const pct = c.total_count>0 ? Math.round(c.completed_count/c.total_count*100) : 0;
+    return `<div class="ci-entry">
+      <div class="ci-time">${fmtT(c.checkin_time)}</div>
+      <div class="ci-counts">${c.completed_count}/${c.total_count} 완료 (${pct}%)</div>
+      ${c.note ? `<div class="ci-note-disp">${esc(c.note)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// Sync logs
+async function syncLogs() {
+  const btn = document.getElementById('syncBtn');
+  const msg = document.getElementById('syncMsg');
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    const r = await fetch('/api/sync-logs', {method:'POST'});
+    const data = await r.json();
+    msg.style.display = 'block';
+    if (data.error) { msg.style.color='var(--danger)'; msg.textContent='오류: '+data.error; }
+    else {
+      msg.style.color='var(--muted)';
+      msg.textContent=`${data.imported.length}개 임포트, ${data.skipped.length}개 중복 스킵`;
+      await loadToday();
+    }
+  } catch { msg.style.display='block'; msg.style.color='var(--danger)'; msg.textContent='서버 오류'; }
+  btn.disabled = false; btn.textContent = '↻ 동기화';
+}
+
+// ── Claude Usage ─────────────────────────────────────────────
+function barClass(pct) {
+  if (pct >= 90) return 'crit';
+  if (pct >= 70) return 'warn';
+  return 'ok';
+}
+
+async function loadClaudeUsage() {
+  try {
+    const r = await fetch('/api/claude-usage');
+    const d = await r.json();
+
+    // 기준 시각
+    const now = new Date();
+    document.getElementById('claudeTime').textContent =
+      `기준 ${p2(now.getHours())}:${p2(now.getMinutes())}`;
+
+    // 월 라벨
+    document.getElementById('claudeMonthLabel').textContent = d.month_label || '';
+
+    // 프로그레스바
+    const pct  = d.used_pct || 0;
+    const cls  = barClass(pct);
+    const bar  = document.getElementById('claudeBar');
+    bar.style.width = Math.min(pct, 100) + '%';
+    bar.className   = `claude-bar-fill ${cls}`;
+
+    document.getElementById('claudeUsedPct').textContent = pct.toFixed(1);
+
+    const rem = document.getElementById('claudeRemain');
+    rem.className   = `claude-remain ${cls}`;
+    rem.textContent = `${d.remain_pct.toFixed(1)}% 남음`;
+
+    document.getElementById('claudeUsedTok').textContent  = fmtTok(d.month_tokens||0) + ' 사용';
+    document.getElementById('claudeLimitTok').textContent = d.token_limit
+      ? '한도 ' + fmtTok(d.token_limit)
+      : '한도 미설정';
+
+    // 서브 박스
+    const mt = d.month_total || {};
+    document.getElementById('claudeToday').textContent  = fmtTok(d.today_tokens||0);
+    document.getElementById('claudeInput').textContent  = fmtTok(mt.input||0);
+    document.getElementById('claudeOutput').textContent = fmtTok(mt.output||0);
+    document.getElementById('claudeCache').textContent  = fmtTok(mt.cache_read||0);
+
+    // 한도 입력창 초기값
+    const limitInp = document.getElementById('limitInp');
+    if (!limitInp.dataset.init) {
+      limitInp.value = d.token_limit || '';
+      limitInp.dataset.init = '1';
+      // 힌트: 알려진 플랜 기준
+      document.getElementById('limitHint').textContent = 'Max 5x≈2B / Max 20x≈8B';
+    }
+
+    // 프로젝트 칩
+    const projects = d.by_project || [];
+    const maxTok   = projects[0]
+      ? projects[0].input+projects[0].output+projects[0].cache_create+projects[0].cache_read : 1;
+
+    if (!projects.length || d.month_tokens === 0) {
+      document.getElementById('claudeProjects').innerHTML =
+        '<span style="font-size:12px;color:var(--muted)">세션 종료 후 반영됩니다</span>';
+    } else {
+      document.getElementById('claudeProjects').innerHTML = projects.slice(0,8).map(p => {
+        const ptok = p.input+p.output+p.cache_create+p.cache_read;
+        return `<div class="proj-chip">
+          <span class="ct">${fmtTok(ptok)}</span>
+          <span>${esc(p.name)}</span>
+        </div>`;
+      }).join('');
+    }
+    document.getElementById('claudeNote').textContent =
+      d.month_tokens === 0 ? '(현재 진행 중인 세션은 종료 후 집계됩니다)' : '';
+  } catch(err) {
+    document.getElementById('claudeRemain').textContent = '불러오기 실패';
+  }
+}
+
+async function saveLimit() {
+  const raw = document.getElementById('limitInp').value.replace(/,/g,'').trim();
+  const val = parseInt(raw);
+  if (!val || val < 1000) { alert('올바른 토큰 수를 입력하세요 (예: 2000000000)'); return; }
+  await fetch(`/api/settings/token-limit?limit=${val}`, {method:'POST'});
+  document.getElementById('limitInp').dataset.init = '';
+  await loadClaudeUsage();
+}
+
+// ── Week ─────────────────────────────────────────────────────
+async function loadWeek() {
+  const r = await fetch('/api/week');
+  const data = await r.json();
+  const ws = new Date(data.week_start+'T00:00:00');
+  const we = new Date(ws); we.setDate(we.getDate()+6);
+  const fmt = d => `${d.getMonth()+1}/${d.getDate()}`;
+  document.getElementById('wkLabel').textContent = `${fmt(ws)} ~ ${fmt(we)}`;
+
+  document.getElementById('goalList').innerHTML = !data.goals.length
+    ? '<div class="ci-empty">이번 주 목표를 추가해보세요</div>'
+    : data.goals.map(g => `
+      <div class="goal-item">
+        <div class="gcb ${g.done?'on':''}" onclick="toggleGoal(${g.id},${g.done})"></div>
+        <div class="goal-txt ${g.done?'done-txt':''}">${esc(g.goal)}</div>
+        <button class="goal-del" onclick="delGoal(${g.id})">×</button>
+      </div>`).join('');
+
+  const today = todayStr();
+  const dayNames = ['월','화','수','목','금','토','일'];
+  document.getElementById('wkGrid').innerHTML = Array.from({length:7},(_,i) => {
+    const d = new Date(ws); d.setDate(d.getDate()+i);
+    const ds = `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
+    const isT = ds === today;
+    const dd  = data.daily[ds] || {total:0,done:0};
+    const pct = dd.total>0 ? Math.round(dd.done/dd.total*100) : 0;
+    return `<div class="day-card ${isT?'today':''}">
+      <div class="day-name">${dayNames[i]}</div>
+      <div class="day-num">${d.getDate()}</div>
+      <div class="day-count">${dd.done}/${dd.total}</div>
+      <div class="day-pb"><div class="day-pf" style="width:${pct}%"></div></div>
+    </div>`;
+  }).join('');
+}
+
+async function addGoal() {
+  const inp = document.getElementById('inGoal');
+  const goal = inp.value.trim(); if (!goal) return;
+  await fetch('/api/week/goals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({goal})});
+  inp.value=''; loadWeek();
+}
+async function toggleGoal(id,isDone) {
+  await fetch(`/api/week/goals/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({done:isDone?0:1})});
+  loadWeek();
+}
+async function delGoal(id) {
+  await fetch(`/api/week/goals/${id}`,{method:'DELETE'}); loadWeek();
+}
+
+// ── Boot ─────────────────────────────────────────────────────
+drawHeader();
+updateCountdown();
+setInterval(updateCountdown, 60000);
+loadToday();
+loadClaudeUsage();
+setInterval(loadClaudeUsage, 30000);  // 30초 자동 갱신
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+data/
+*.db
+*.sqlite
+morning_ai.py
+morning_ai.bat
