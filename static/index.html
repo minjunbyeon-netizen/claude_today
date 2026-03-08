@@ -690,35 +690,42 @@ async function loadCheckins() {
   }).join('');
 }
 
-// Sync logs
+// Sync — squad-team 로그 + git 레포 두 소스 동시 처리
 async function syncLogs() {
   const btn = document.getElementById('syncBtn');
   const msg = document.getElementById('syncMsg');
-  btn.disabled = true; btn.textContent = '...';
+  btn.disabled = true; btn.textContent = '동기화 중...';
+  msg.style.display = 'block';
+  msg.style.color = 'var(--muted)';
+  msg.textContent = '로그 + git 스캔 중...';
+
   try {
-    const r = await fetch('/api/sync-logs', {method:'POST'});
-    const data = await r.json();
-    msg.style.display = 'block';
-    if (data.error) {
-      msg.style.color = 'var(--danger)';
-      msg.textContent = '동기화 오류: ' + data.error;
-    } else {
-      const imp = data.imported?.length || 0;
-      const upd = data.updated?.length || 0;
-      const skp = data.skipped?.length || 0;
-      const parts = [];
-      if (imp > 0) parts.push(`${imp}개 신규`);
-      if (upd > 0) parts.push(`${upd}개 완료 업데이트`);
-      if (skp > 0) parts.push(`${skp}개 스킵`);
-      msg.style.color = upd > 0 ? 'var(--success)' : 'var(--muted)';
-      msg.textContent = parts.join(' · ') || '변경 없음';
-    }
+    // 두 소스 병렬 호출
+    const [rLogs, rGit] = await Promise.all([
+      fetch('/api/sync-logs', {method:'POST'}),
+      fetch('/api/sync-git',  {method:'POST'}),
+    ]);
+    const [logs, git] = await Promise.all([rLogs.json(), rGit.json()]);
+
+    const parts = [];
+    const logImp = logs.imported?.length || 0;
+    const logUpd = logs.updated?.length  || 0;
+    const gitUpd = git.count || 0;
+    const totalUpd = logUpd + gitUpd;
+
+    if (logs.error) parts.push('로그오류: ' + logs.error);
+    if (logImp  > 0) parts.push(`${logImp}개 신규`);
+    if (logUpd  > 0) parts.push(`로그 ${logUpd}개 완료`);
+    if (gitUpd  > 0) parts.push(`git ${gitUpd}개 완료`);
+    if (!parts.length) parts.push('변경 없음');
+
+    msg.style.color = totalUpd > 0 ? 'var(--success)' : 'var(--muted)';
+    msg.textContent = parts.join(' · ');
   } catch(e) {
-    msg.style.display = 'block';
     msg.style.color = 'var(--danger)';
-    msg.textContent = '서버 오류 — 서버가 실행 중인지 확인하세요';
+    msg.textContent = '서버 오류 — 서버 실행 여부 확인';
   }
-  // 에러 여부와 관계없이 항상 할 일 목록 갱신
+
   await loadToday();
   btn.disabled = false; btn.textContent = '↻ 동기화';
 }

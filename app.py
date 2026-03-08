@@ -5,6 +5,8 @@ from pydantic import BaseModel
 from typing import Optional
 import sqlite3
 import os
+import re
+import subprocess
 from datetime import date, datetime, timedelta
 
 app = FastAPI()
@@ -393,6 +395,140 @@ def sync_logs(logs_path: Optional[str] = None):
     conn.commit()
     conn.close()
     return results
+
+
+@app.post("/api/sync-git")
+def sync_git():
+    """
+    로컬 git 레포 스캔 → 오늘 활동 기반으로 task 완료 자동 업데이트.
+    - 오늘 커밋 있음 → '[project] 이어서: ...' 태스크 → done
+    - 미커밋 수 감소(0 포함) → '[project] 미커밋 변경사항 N개' → done
+    - Claude Code 세션 오늘 활동 → '[project] 이어서' 태스크 status in_progress 표시용 flag
+    """
+    SCAN_ROOTS = [
+        r"G:\내 드라이브\01_work",
+        r"G:\내 드라이브\01_work\_agents",
+        r"G:\내 드라이브\01_work\hive-media",
+        r"G:\내 드라이브\01_work\my-project",
+        r"C:\Users\USER\Desktop",
+    ]
+    MAX_DEPTH = 3
+    today = str(date.today())
+    today_dt = f"{today} 00:00:00"
+    updated = []
+    scanned = []
+
+    def git_run(args, cwd):
+        try:
+            r = subprocess.run(
+                ["git"] + args, cwd=cwd,
+                capture_output=True, text=True, timeout=6,
+                encoding="utf-8", errors="replace"
+            )
+            return r.stdout.strip()
+        except Exception:
+            return ""
+
+    def find_repos(root):
+        repos = []
+        if not os.path.isdir(root):
+            return repos
+        try:
+            for dirpath, dirnames, _ in os.walk(root):
+                depth = dirpath.replace(root, "").count(os.sep)
+                if depth >= MAX_DEPTH:
+                    dirnames.clear()
+                    continue
+                dirnames[:] = [
+                    d for d in dirnames
+                    if not d.startswith(".")
+                    and d not in ("node_modules", "venv", "__pycache__", ".git")
+                ]
+                if ".git" in os.listdir(dirpath):
+                    repos.append(dirpath)
+                    dirnames.clear()
+        except (PermissionError, OSError):
+            pass
+        return repos
+
+    conn = get_db()
+
+    # 오늘 todo 상태 task 가져오기 → 프로젝트별 그룹핑
+    tasks_today = conn.execute(
+        "SELECT id, title, status FROM tasks WHERE date = ? AND status = 'todo'",
+        (today,)
+    ).fetchall()
+
+    proj_tasks: dict = {}
+    for t in tasks_today:
+        m = re.match(r'^\[([^\]]+)\]', t["title"])
+        if m:
+            proj = m.group(1).lower()
+            proj_tasks.setdefault(proj, []).append(dict(t))
+
+    # 레포 스캔 (seen으로 중복 방지)
+    seen_paths = set()
+    for root in SCAN_ROOTS:
+        for repo_path in find_repos(root):
+            if repo_path in seen_paths:
+                continue
+            seen_paths.add(repo_path)
+
+            repo_name = os.path.basename(repo_path).lower()
+            # 프로젝트명 정규화 (lotto-app ↔ lotto_app 등 매칭)
+            norm = repo_name.replace("-", "").replace("_", "")
+
+            # 이 레포와 연결된 task 목록 찾기
+            matched_proj = None
+            for proj_key in proj_tasks:
+                proj_norm = proj_key.replace("-", "").replace("_", "")
+                if proj_norm == norm:
+                    matched_proj = proj_key
+                    break
+
+            # git 상태 조회
+            commits_today = git_run(["log", f"--since={today_dt}", "--oneline", "--no-merges"], repo_path)
+            dirty_out = git_run(["status", "--short"], repo_path)
+            dirty_count = len([l for l in dirty_out.splitlines() if l.strip()])
+            has_commit = bool(commits_today.strip())
+
+            scanned.append({
+                "repo": repo_name,
+                "commits_today": has_commit,
+                "dirty": dirty_count,
+                "matched": matched_proj,
+            })
+
+            if matched_proj is None:
+                continue
+
+            for task in proj_tasks[matched_proj]:
+                task_id = task["id"]
+                title = task["title"]
+                should_done = False
+
+                # 오늘 커밋 있으면 "이어서" 작업 완료 처리
+                if has_commit and "이어서:" in title:
+                    should_done = True
+
+                # 미커밋 변경사항 태스크: 원래 N개보다 줄었거나 0개면 완료
+                if "미커밋 변경사항" in title and "정리/커밋" in title:
+                    m2 = re.search(r"(\d+)개", title)
+                    if m2:
+                        orig = int(m2.group(1))
+                        if dirty_count == 0 or dirty_count < orig:
+                            should_done = True
+
+                if should_done:
+                    conn.execute(
+                        "UPDATE tasks SET status='done', completed_at=? WHERE id=?",
+                        (datetime.now().isoformat(), task_id),
+                    )
+                    updated.append(title)
+
+    conn.commit()
+    conn.close()
+    return {"updated": updated, "count": len(updated), "scanned": scanned}
 
 
 @app.get("/api/settings/token-limit")
