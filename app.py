@@ -296,17 +296,15 @@ def carry_over():
 @app.post("/api/sync-logs")
 def sync_logs(logs_path: Optional[str] = None):
     """
-    Claude Code squad-team 로그 디렉토리를 읽어 오늘 투두에 자동 임포트.
-    - current_task.md에서 프로젝트명 추출
-    - *_todo.md에서 미완료 항목(- [ ]) 추출
-    - 완료 항목(- [x])은 done 상태로 임포트
-    - 이미 존재하는 제목은 중복 추가 안 함
+    Claude Code squad-team 로그 디렉토리를 읽어 오늘 투두에 자동 임포트/업데이트.
+    - *_todo.md의 - [x] 항목: DB에 없으면 done으로 추가, 있으면 done으로 업데이트
+    - *_todo.md의 - [ ] 항목: DB에 없으면 todo로 추가, 있으면 스킵 (수동 체크 보존)
     """
     if not logs_path:
         logs_path = r"G:\내 드라이브\01_work\_agents\squad-team\logs"
 
     today = str(date.today())
-    results = {"imported": [], "skipped": [], "project": None, "error": None}
+    results = {"imported": [], "updated": [], "skipped": [], "project": None, "error": None}
 
     if not os.path.isdir(logs_path):
         results["error"] = f"경로를 찾을 수 없음: {logs_path}"
@@ -314,13 +312,13 @@ def sync_logs(logs_path: Optional[str] = None):
 
     conn = get_db()
 
-    # 오늘 이미 있는 task 제목 수집 (중복 방지)
+    # 오늘 이미 있는 task: {title: (id, status)} 로 저장
     existing = {
-        row["title"]
-        for row in conn.execute("SELECT title FROM tasks WHERE date = ?", (today,)).fetchall()
+        row["title"]: {"id": row["id"], "status": row["status"]}
+        for row in conn.execute("SELECT id, title, status FROM tasks WHERE date = ?", (today,)).fetchall()
     }
 
-    # 1) current_task.md 에서 프로젝트명 추출
+    # current_task.md 에서 프로젝트명 추출
     current_task_path = os.path.join(logs_path, "status", "current_task.md")
     project_name = None
     if os.path.isfile(current_task_path):
@@ -332,14 +330,13 @@ def sync_logs(logs_path: Optional[str] = None):
                     break
     results["project"] = project_name
 
-    # 2) todo 디렉토리의 *_todo.md 파싱
+    # todo 디렉토리의 *_todo.md 파싱
     todo_dir = os.path.join(logs_path, "todo")
     if not os.path.isdir(todo_dir):
         results["error"] = "todo 디렉토리 없음"
         conn.close()
         return results
 
-    # 팀별 우선순위 매핑
     priority_map = {"기획팀": 1, "실무팀": 1, "검수팀": 2, "소비자팀": 2, "리뷰팀": 3}
 
     for fname in sorted(os.listdir(todo_dir)):
@@ -352,16 +349,6 @@ def sync_logs(logs_path: Optional[str] = None):
         with open(fpath, encoding="utf-8") as f:
             content = f.read()
 
-        # 작업명 추출
-        task_section = None
-        for line in content.splitlines():
-            if line.startswith("## 작업명"):
-                task_section = True
-                continue
-            if task_section and line.strip():
-                task_section = line.strip()
-                break
-
         # 진척도 추출
         progress = None
         for line in content.splitlines():
@@ -369,34 +356,39 @@ def sync_logs(logs_path: Optional[str] = None):
                 progress = line.strip()
                 break
 
-        # 체크박스 항목 파싱 (최상위 항목만, 서브항목 제외)
+        # 체크박스 항목 파싱
         for line in content.splitlines():
             stripped = line.strip()
             if not stripped.startswith("- ["):
                 continue
-            # 서브항목(들여쓰기) 제외
             if line.startswith("  ") and not line.startswith("- ["):
                 continue
 
             is_done = stripped.startswith("- [x]") or stripped.startswith("- [X]")
-            title_raw = stripped[6:].strip()  # "- [ ] " 또는 "- [x] " 제거
-
-            # 팀 prefix 붙이기
+            title_raw = stripped[6:].strip()
             title = f"[{team}] {title_raw}"
 
             if title in existing:
-                results["skipped"].append(title)
-                continue
-
-            status = "done" if is_done else "todo"
-            completed_at = datetime.now().isoformat() if is_done else None
-
-            conn.execute(
-                "INSERT INTO tasks (date, title, estimated_minutes, priority, status, completed_at, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (today, title, 30, priority, status, completed_at, f"출처: {fname} | {progress or ''}"),
-            )
-            existing.add(title)
-            results["imported"].append({"title": title, "status": status, "team": team})
+                # 이미 존재: [x] 완료 표시면 → DB도 done으로 업데이트
+                if is_done and existing[title]["status"] != "done":
+                    conn.execute(
+                        "UPDATE tasks SET status='done', completed_at=? WHERE id=?",
+                        (datetime.now().isoformat(), existing[title]["id"]),
+                    )
+                    existing[title]["status"] = "done"
+                    results["updated"].append(title)
+                else:
+                    results["skipped"].append(title)
+            else:
+                # 신규 추가
+                status = "done" if is_done else "todo"
+                completed_at = datetime.now().isoformat() if is_done else None
+                conn.execute(
+                    "INSERT INTO tasks (date, title, estimated_minutes, priority, status, completed_at, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (today, title, 30, priority, status, completed_at, f"출처: {fname} | {progress or ''}"),
+                )
+                existing[title] = {"id": -1, "status": status}
+                results["imported"].append({"title": title, "status": status, "team": team})
 
     conn.commit()
     conn.close()
