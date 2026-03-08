@@ -14,12 +14,18 @@ import subprocess
 import requests
 import webbrowser
 import time
+import sys
 from datetime import date, timedelta
 
-API_BASE = "http://localhost:8000"
+# Windows 터미널 한글/특수문자 인코딩 문제 방지
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
+API_BASE = "http://localhost:8001"
 
 SCAN_ROOTS = [
     r"G:\내 드라이브\01_work",
+    r"G:\내 드라이브\01_work\_agents",
     r"C:\Users\USER\Desktop",
     r"C:\Users\USER\Documents",
 ]
@@ -204,7 +210,7 @@ def start_server():
     import sys
     script_dir = os.path.dirname(os.path.abspath(__file__))
     subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "warning"],
+        [sys.executable, "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8001", "--log-level", "warning"],
         cwd=script_dir,
         creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0,
     )
