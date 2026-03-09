@@ -842,12 +842,18 @@ async function renderWeekList() {
   document.getElementById('weekList').innerHTML = html;
 }
 
+// squad-team 하위 팀 → 'squad-team' 으로 그룹핑
+const SQUAD_TEAMS = new Set(['기획팀','실무팀','검수팀','소비자팀','리뷰팀']);
+function normalizeProject(name) {
+  return SQUAD_TEAMS.has(name) ? 'squad-team' : name;
+}
+
 // ── Project List (sidebar) ────────────────────────────────────
 function renderProjectList(tasks) {
   const counts = {};
   for (const t of tasks) {
     const m = t.title.match(/^\[([^\]]+)\]/);
-    const proj = m ? m[1] : '기타';
+    const proj = normalizeProject(m ? m[1] : '기타');
     if (!counts[proj]) counts[proj] = 0;
     counts[proj]++;
   }
@@ -913,6 +919,7 @@ function applyProjectFilter() {
     const filtered = allTasks.filter(t => {
       const m = t.title.match(/^\[([^\]]+)\]/);
       const p = m ? m[1] : '기타';
+      if (currentProject === 'squad-team') return SQUAD_TEAMS.has(p);
       return p === currentProject;
     });
     renderAccordion(filtered);
@@ -929,7 +936,7 @@ function groupTasks(tasks) {
   const groups = {}, order = [];
   for (const t of tasks) {
     const m = t.title.match(/^\[([^\]]+)\]/);
-    const proj = m ? m[1] : '기타';
+    const proj = normalizeProject(m ? m[1] : '기타');
     if (!groups[proj]) { groups[proj] = []; order.push(proj); }
     groups[proj].push(t);
   }
