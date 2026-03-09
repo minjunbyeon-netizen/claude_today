@@ -5,3 +5,6 @@ data/
 *.sqlite
 morning_ai.py
 morning_ai.bat
+
+.venv/
+log/
