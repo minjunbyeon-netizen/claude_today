@@ -805,7 +805,7 @@ def claude_usage():
         key=lambda x: -(x["input"] + x["output"] + x["cache_create"] + x["cache_read"])
     )
 
-    return {
+    result = {
         "month_tokens": month_tokens,
         "today_tokens": today_tokens,
         "month_total":  month_total,
@@ -816,6 +816,31 @@ def claude_usage():
         "by_project":   sorted_projects,
         "month_label":  date.today().strftime("%Y년 %m월"),
     }
+
+    # 로컬에서 읽은 결과를 캐시에 저장 (클라우드에서도 볼 수 있도록)
+    import json as _json2
+    conn_c = get_db()
+    conn_c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('claude_usage_cache', ?)",
+                   (_json2.dumps(result),))
+    conn_c.commit()
+    conn_c.close()
+
+    return result
+
+
+@app.get("/api/claude-usage-cached")
+def claude_usage_cached():
+    """캐시된 claude 사용량 반환 (클라우드 서버용)"""
+    import json as _json3
+    conn = get_db()
+    row = conn.execute("SELECT value FROM settings WHERE key='claude_usage_cache'").fetchone()
+    conn.close()
+    if not row:
+        return {"error": "캐시 없음 — 로컬에서 한 번 접속하면 자동 동기화됩니다",
+                "month_tokens": 0, "today_tokens": 0, "month_total": {},
+                "today_total": {}, "used_pct": 0, "remain_pct": 100,
+                "by_project": [], "month_label": date.today().strftime("%Y년 %m월")}
+    return _json3.loads(row["value"])
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
