@@ -1,113 +1,111 @@
-# Daily Focus
+﻿# Daily Focus Migration README
 
-Personal task management + Claude Code usage dashboard.
-Runs locally on **port 8888**.
+This file is intentionally ASCII-only to reduce future encoding problems.
 
----
+## Project summary
 
-## Stack
+This project is a FastAPI-based internal task dashboard.
 
-- **Backend**: Python, FastAPI, SQLite (`data/focus.db`)
-- **Frontend**: Single-file HTML/CSS/JS (no build step)
-- **Runner**: Uvicorn with hot-reload
+Current MVP includes:
 
----
+- org hierarchy: ceo / manager / member
+- task assignment and task status updates
+- weekly focus entry
+- daily work log entry
+- manager / ceo review flow
+- guest preview mode
+- demo login mode with seeded test users
 
-## Features
+## Main files
 
-| Feature | Description |
-|---|---|
-| Today's tasks | Add, complete, carry over tasks by date |
-| Weekly goals | Set and track weekly objectives |
-| Claude usage | Real-time token usage across all Claude Code sessions |
-| Agent status | Live status feed from other Claude Code sessions (project, task, status) |
-| CC button | Open Claude Code for any project directly from the dashboard |
-| VIEW button | Jump to a project's web homepage (URL reported by the session) |
-| Morning checkin | Auto-checkin via `morning.py` on startup |
+- `app.py`: main FastAPI app, DB init, org logic, demo login API
+- `run.py`: standard local launcher
+- `start.bat`: Windows entry point
+- `static/index.html`: main UI shell
+- `static/app.js`: frontend logic
+- `static/styles.css`: frontend styling
+- `data/focus.db`: SQLite database
 
----
+## Runtime
 
-## Quick Start
+Checked-in default local port:
 
-```bash
-# 1. Create virtual environment
-python -m venv .venv
-.venv/Scripts/pip install -r requirements.txt
+- `8001`
 
-# 2. Run
-.venv/Scripts/python -m uvicorn app:app --host 0.0.0.0 --port 8888 --reload
-```
+Current launcher behavior:
 
-Or double-click **`start.bat`**.
+- `start.bat` -> `python run.py`
+- `run.py` starts `uvicorn app:app --host 0.0.0.0 --port 8001`
 
-Open: http://localhost:8888
+Important:
 
----
+- During recent debugging, a manual server was also seen on port `8888`.
+- That `8888` process is not the checked-in default launcher.
+- After moving, use one fixed port only and remove old manual run habits.
 
-## Agent Status API
+## Dependencies
 
-Other Claude Code sessions report their status here.
+From `requirements.txt`:
 
-**POST** `/api/agent-status`
+- `fastapi`
+- `uvicorn[standard]`
+- `schedule`
+- `plyer`
 
-```json
-{
-  "project": "my-project",
-  "task": "short task summary in English",
-  "status": "start",
-  "url": "http://localhost:8001"
-}
-```
+## Data
 
-- `status`: `start` | `step` | `done`
-- `url`: project web homepage (optional, enables VIEW button)
+Primary local data file:
 
-**GET** `/api/agent-status` — returns all active sessions.
+- `data/focus.db`
 
----
+Before moving, make sure this file is copied together with the code.
 
-## DB Schema (SQLite)
+## Current product state
 
-```
-tasks           - daily tasks (date, title, status, priority, minutes)
-weekly_goals    - weekly objectives
-checkins        - morning check-in log
-settings        - token_limit, remote_url
-agent_status    - live session status from other Claude Code instances
-```
+Working now:
 
----
+- guest preview
+- demo login
+- org dashboard by role
+- task create / update
+- weekly focus save
+- work log save
+- review approve / needs_update
 
-## Project Structure
+Not finished yet:
 
-```
-daily-focus/
-  app.py          - FastAPI backend + all API routes
-  run.py          - entry point
-  morning.py      - morning checkin automation
-  morning_ai.py   - AI-assisted morning summary
-  notifier.py     - desktop notification scheduler
-  static/
-    index.html    - entire frontend (CSS + JS inline)
-    favicon.svg
-  data/
-    focus.db      - SQLite database (gitignored)
-  log/
-    YYYY-MM-DD.log - daily work log (gitignored)
-```
+- real auth
+- real user/company admin UI
+- push/mobile notifications
+- reporting/export
 
----
+## Encoding warning
 
-## Migration Notes
+Known issue:
 
-- DB file (`data/focus.db`) is **not** committed — copy it manually when moving.
-- `data/` and `log/` are gitignored.
-- Port changed from 8000 → **8888** (to avoid conflict with Org Focus on 8001).
-- Korean text in curl POST body causes encoding errors in Git Bash — always use English for `task` field.
+- Some existing Python comments and some UI text have already been damaged by Korean encoding problems.
+- Future edits should use UTF-8 consistently.
 
----
+Recommended rules after moving:
 
-## Related
+- save source files as `UTF-8`
+- avoid mixed editors with legacy Korean code pages
+- confirm terminal/editor encoding before bulk edits
+- keep migration notes in ASCII when possible if environment is unstable
 
-- **Org Focus Dashboard**: `../org-focus/` — org-level task dashboard on port 8001
-- **GitHub**: https://github.com/minjunbyeon-netizen/claude_today
+## Move checklist
+
+1. Copy the whole project folder, including `data/`, `static/`, and `.venv/` if you want the same local environment.
+2. Verify Python and dependencies on the new machine.
+3. Start with `start.bat` or `python run.py`.
+4. Open `http://localhost:8001`.
+5. Confirm demo login and guest preview still work.
+6. Confirm `data/focus.db` is being read correctly.
+7. Standardize one dev port and stop any old background uvicorn process.
+
+## Suggested first cleanup after move
+
+1. Fix encoding-damaged Korean text in `app.py` and UI strings.
+2. Pick one permanent local port.
+3. Add a real README in Korean only after UTF-8 is stable.
+4. Add `.editorconfig` or editor settings for UTF-8 enforcement.
