@@ -778,14 +778,28 @@ def claude_usage():
             pass
 
     def proj_name_from_dir(d: str) -> str:
-        """G---------01-work-hive-media-auto-blog → auto-blog, C--Users-USER → 기타"""
-        # 연속 하이픈 구분자 기준으로 마지막 의미있는 세그먼트 추출
-        parts = [p for p in d.replace("--", "\x00").split("\x00") if p.strip("-")]
-        if not parts:
-            return d
-        last = parts[-1].strip("-")
-        # chunking-english 처럼 하이픈 포함 이름 처리
-        return last if last else d
+        """클로드 프로젝트 디렉토리명 → 사람이 읽기 쉬운 프로젝트명
+        X--01-work-hive-media-chunking-english → chunking-english
+        G---------01-work-hive-media-auto-blog → auto-blog
+        C--Users-USER → 기타
+        """
+        import re as _re
+        # 드라이브 접두어(단일 대문자 + 연속 하이픈) 제거
+        cleaned = _re.sub(r'^[A-Z]-+', '', d)
+        # 알려진 경로 접두어 제거 (긴 것 우선)
+        for pfx in [
+            '01-work-hive-media-',
+            '01-work-my-project-',
+            '01-work--agents-',
+            '01-work-agents-',
+            '01-work-',
+        ]:
+            if cleaned.startswith(pfx):
+                result = cleaned[len(pfx):]
+                return result if result else cleaned
+        if not cleaned or cleaned == 'Users-USER':
+            return '기타'
+        return cleaned
 
     for proj_dir in os.listdir(projects_dir):
         proj_path = os.path.join(projects_dir, proj_dir)
