@@ -25,6 +25,11 @@
   --claude:    #e8914a;
   --claude-bg: #130d06;
   --r: 10px;
+  --sidebar-w: 240px;
+}
+
+html, body {
+  height: 100%;
 }
 
 body {
@@ -33,24 +38,258 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
   font-size: 14px;
   line-height: 1.6;
-  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
 }
 
-.wrap { max-width: 880px; margin: 0 auto; padding: 28px 20px; }
+/* ── Layout ── */
+.app-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
 
-/* ── Header ── */
-.hd { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; }
-.date-big { font-size: 22px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; }
-.date-sm  { font-size: 13px; color: var(--muted); margin-top: 2px; }
-.hd-right { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; }
-.next-ci  { font-size: 12px; color: var(--muted); }
-.tabs { display: inline-flex; gap: 2px; background: var(--surface); padding: 3px; border-radius: 8px; border: 1px solid var(--border); }
-.tab { padding: 5px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--muted); border: none; background: none; transition: all .15s; }
-.tab.on { background: var(--accent); color: #fff; }
-.tab:hover:not(.on) { color: var(--text); }
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+.sidebar-section {
+  padding: 16px 14px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-section:last-child { border-bottom: none; }
+
+.sidebar-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 10px;
+}
+
+/* ── Mini Calendar ── */
+.cal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.cal-nav-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: color .15s;
+}
+.cal-nav-btn:hover { color: var(--text); }
+.cal-month-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text2);
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.cal-dow {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--muted);
+  text-align: center;
+  padding: 2px 0 4px;
+  text-transform: uppercase;
+}
+.cal-cell {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--text2);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background .12s;
+}
+.cal-cell:hover:not(.cal-empty) { background: var(--surface2); }
+.cal-cell.cal-empty { cursor: default; color: transparent; }
+.cal-cell.cal-today {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+.cal-cell.cal-today:hover { background: var(--accent-h); }
+.cal-cell.cal-selected:not(.cal-today) {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--accent);
+}
+.cal-cell.cal-other-month { color: var(--muted); }
+
+.cal-dot {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.cal-cell.cal-today .cal-dot { background: rgba(255,255,255,0.7); }
+
+/* ── Week List ── */
+.week-list { display: flex; flex-direction: column; gap: 2px; }
+.week-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .12s;
+}
+.week-item:hover { background: var(--surface2); }
+.week-item.active { background: var(--surface2); }
+.week-item.active .week-item-day { color: var(--accent); }
+.week-item.today-item .week-item-day { color: var(--accent); font-weight: 700; }
+
+.week-item-day {
+  font-size: 11px;
+  color: var(--muted);
+  width: 28px;
+  flex-shrink: 0;
+}
+.week-item-date {
+  font-size: 12px;
+  color: var(--text2);
+  flex: 1;
+}
+.week-item-badge {
+  font-size: 10px;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+.week-item-badge.done-badge { color: var(--success); border-color: #3fb95040; }
+
+/* ── Project List ── */
+.proj-list { display: flex; flex-direction: column; gap: 2px; }
+.proj-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .12s;
+}
+.proj-item:hover { background: var(--surface2); }
+.proj-item.active { background: var(--surface2); }
+.proj-item.active .proj-item-name { color: var(--text); }
+.proj-item-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+.proj-item.all-item .proj-item-dot { background: var(--muted); }
+.proj-item-name {
+  font-size: 12px;
+  color: var(--text2);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.proj-item-count {
+  font-size: 10px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+/* ── Main Panel ── */
+.main-panel {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-panel::-webkit-scrollbar { width: 5px; }
+.main-panel::-webkit-scrollbar-track { background: var(--bg); }
+.main-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+.main-inner {
+  padding: 24px 28px;
+  max-width: 960px;
+  width: 100%;
+}
+
+/* ── Main Header ── */
+.main-hd {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+.main-hd-left {}
+.main-hd-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.3px;
+  line-height: 1.2;
+}
+.main-hd-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.main-hd-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.next-ci { font-size: 11px; color: var(--muted); }
 
 /* ── Card ── */
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 18px; margin-bottom: 12px; }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 18px;
+  margin-bottom: 12px;
+}
 
 /* ── Progress ── */
 .prog-hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
@@ -82,7 +321,6 @@ body {
 .claude-link { font-size: 11px; color: var(--muted); text-decoration: none; }
 .claude-link:hover { color: var(--claude); }
 
-/* 메인 프로그레스 */
 .claude-main { margin-bottom: 16px; }
 .claude-main-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
 .claude-used-label { font-size: 13px; color: var(--text2); }
@@ -100,21 +338,18 @@ body {
 
 .claude-bar-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-family: 'Courier New', monospace; }
 
-/* 서브 박스 */
 .claude-sub-row { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
 .claude-sub { background: #1c1108; border: 1px solid #e8914a18; border-radius: 8px; padding: 10px 14px; flex: 1; min-width: 110px; }
 .claude-sub .sl { font-size: 10px; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .06em; }
 .claude-sub .sv { font-size: 17px; font-weight: 700; color: var(--text2); font-family: 'Courier New', monospace; }
 .claude-sub .sv.orange { color: var(--claude); }
 
-/* 한도 설정 */
 .limit-row { display: flex; align-items: center; gap: 8px; }
 .limit-inp { background: #0d0a06; border: 1px solid #e8914a30; border-radius: 6px; padding: 4px 8px; color: var(--text); font-size: 12px; width: 120px; outline: none; font-family: 'Courier New', monospace; }
 .limit-inp:focus { border-color: var(--claude); }
 .limit-btn { background: #2a1808; border: 1px solid #e8914a44; color: #e8914a; border-radius: 6px; padding: 4px 10px; font-size: 11px; cursor: pointer; font-weight: 600; }
 .limit-btn:hover { background: #3a2010; }
 
-/* 프로젝트 칩 */
 .claude-projects { display: flex; flex-wrap: wrap; gap: 6px; }
 .proj-chip { background: #1c1108; border: 1px solid #e8914a28; border-radius: 99px; padding: 3px 10px; font-size: 11px; color: #d4a06a; display: flex; align-items: center; gap: 5px; font-family: 'Courier New', monospace; }
 .proj-chip .ct { font-weight: 700; color: var(--claude); }
@@ -164,10 +399,10 @@ body {
 .acc-badge { font-size: 11px; color: var(--muted); white-space: nowrap; }
 .acc-badge.done { color: var(--success); font-weight: 600; }
 
-/* ── Task items ── */
 .acc-body { display: none; background: var(--bg); }
 .acc-body.open { display: block; }
 
+/* ── Task items ── */
 .task { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
 .task:last-child { border-bottom: none; }
 .task.done { opacity: .38; }
@@ -185,7 +420,6 @@ body {
 .task-title { flex: 1; font-size: 14px; color: var(--text2); line-height: 1.4; }
 .carry-badge { font-size: 10px; color: var(--muted); background: var(--surface); border-radius: 4px; padding: 1px 5px; margin-right: 5px; border: 1px solid var(--border); }
 
-/* 인라인 시간 편집 */
 .task-min-wrap { position: relative; }
 .task-min {
   font-size: 12px; color: var(--muted); cursor: pointer;
@@ -224,32 +458,7 @@ body {
 .ci-note-disp { font-size: 12px; color: var(--muted); margin-top: 4px; font-style: italic; line-height: 1.5; }
 .ci-empty  { font-size: 13px; color: var(--muted); }
 
-/* ── Week ── */
-.wk-hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-.wk-label { font-size: 12px; color: var(--muted); }
-.goal-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
-.goal-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; }
-.gcb { width: 17px; height: 17px; border: 2px solid var(--border); border-radius: 4px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all .15s; }
-.gcb.on { background: var(--success); border-color: var(--success); }
-.gcb.on::after { content: "✓"; font-size: 10px; color: #0d1117; font-weight: 800; }
-.goal-txt { flex: 1; font-size: 14px; color: var(--text2); }
-.goal-txt.done-txt { text-decoration: line-through; color: var(--muted); }
-.goal-del { background: none; border: none; color: var(--border); cursor: pointer; font-size: 15px; transition: color .15s; }
-.goal-del:hover { color: var(--danger); }
-.goal-add-row { display: flex; gap: 8px; }
-.btn-gadd { background: var(--surface2); border: 1px solid var(--border); color: var(--text2); border-radius: 6px; padding: 7px 14px; font-size: 13px; cursor: pointer; transition: all .15s; }
-.btn-gadd:hover { border-color: var(--accent); color: var(--accent); }
-
-.wk-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 12px; }
-.day-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 6px; text-align: center; }
-.day-card.today { border-color: var(--accent); }
-.day-name { font-size: 10px; color: var(--muted); margin-bottom: 4px; font-weight: 600; text-transform: uppercase; }
-.day-num  { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
-.day-card.today .day-num { color: var(--accent); }
-.day-count { font-size: 11px; color: var(--muted); }
-.day-pb { height: 3px; background: var(--border); border-radius: 99px; margin-top: 8px; overflow: hidden; }
-.day-pf { height: 100%; background: var(--success); border-radius: 99px; }
-
+/* ── CC button ── */
 .btn-cc {
   background: #0a1a0a; border: 1px solid #3fb95050; color: #7ee787;
   border-radius: 4px; padding: 2px 8px; font-size: 10px; font-weight: 700;
@@ -259,169 +468,222 @@ body {
 .btn-cc:hover { background: #0d2010; border-color: #3fb950aa; color: #a8f5b0; }
 .btn-cc:active { transform: scale(.95); }
 
+/* ── Project filter notice ── */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.filter-bar span { color: var(--accent); font-weight: 600; }
+.filter-clear {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.filter-clear:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Refresh btn ── */
+.icon-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+  line-height: 1;
+  border-radius: 4px;
+  transition: color .15s;
+}
+.icon-btn:hover { color: var(--text); }
+
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
 </style>
 </head>
 <body>
-<div class="wrap">
 
-  <!-- Header -->
-  <div class="hd">
-    <div>
-      <div class="date-big" id="dateBig"></div>
-      <div class="date-sm"  id="dateSm"></div>
-    </div>
-    <div class="hd-right">
-      <div class="next-ci" id="nextCi"></div>
-      <div class="tabs">
-        <button class="tab on" onclick="switchTab('today')">오늘</button>
-        <button class="tab"    onclick="switchTab('week')">이번 주</button>
-      </div>
-    </div>
-  </div>
+<div class="app-layout">
 
-  <!-- ════════ TODAY ════════ -->
-  <div id="vToday">
+  <!-- ════════ SIDEBAR ════════ -->
+  <aside class="sidebar">
 
-    <!-- Progress -->
-    <div class="card">
-      <div class="prog-hd">
-        <div>
-          <span class="prog-label">오늘 완료율</span>
-          <span id="progRefreshTime" style="font-size:10px;color:var(--muted);margin-left:8px;font-family:'Courier New',monospace"></span>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <button onclick="loadToday()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0;line-height:1" title="새로고침">↻</button>
-          <span class="prog-pct" id="progPct">-</span>
-        </div>
+    <!-- 1. 월별 캘린더 -->
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">캘린더</div>
+      <div class="cal-nav">
+        <button class="cal-nav-btn" onclick="calPrev()">&#8249;</button>
+        <span class="cal-month-label" id="calMonthLabel"></span>
+        <button class="cal-nav-btn" onclick="calNext()">&#8250;</button>
       </div>
-      <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
-      <div class="prog-stats">
-        <div class="stat">작업 <b id="stTasks">-/-</b></div>
-        <div class="stat">예상 시간 <b id="stTime">-</b></div>
-        <div class="stat">남은 <b id="stLeft">-</b></div>
-      </div>
+      <div class="cal-grid" id="calGrid"></div>
     </div>
 
-    <!-- Claude Usage -->
-    <div class="claude-card">
-      <div class="claude-hd">
-        <span class="claude-title">Claude Code 토큰 사용량</span>
-        <div class="claude-hd-right">
-          <span class="claude-time" id="claudeTime"></span>
-          <span id="claudeMonthLabel" style="font-size:11px;color:var(--muted)"></span>
-          <button onclick="loadClaudeUsage()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0;line-height:1" title="새로고침">↻</button>
-          <a class="claude-link" href="https://claude.ai/settings/usage" target="_blank">↗ 상세</a>
-        </div>
-      </div>
-
-      <!-- 메인 프로그레스 -->
-      <div class="claude-main">
-        <div class="claude-main-row">
-          <div class="claude-used-label">이번 달 <b id="claudeUsedPct">0</b>% 사용</div>
-          <div class="claude-remain ok" id="claudeRemain">— 남음</div>
-        </div>
-        <div class="claude-bar-wrap">
-          <div class="claude-bar-fill ok" id="claudeBar" style="width:0%"></div>
-        </div>
-        <div class="claude-bar-labels">
-          <span id="claudeUsedTok">0</span>
-          <span id="claudeLimitTok">한도 설정 필요</span>
-        </div>
-      </div>
-
-      <!-- 오늘 / 입력 / 출력 / 캐시 -->
-      <div class="claude-sub-row">
-        <div class="claude-sub">
-          <div class="sl">오늘 사용</div>
-          <div class="sv orange" id="claudeToday">-</div>
-        </div>
-        <div class="claude-sub">
-          <div class="sl">입력 토큰</div>
-          <div class="sv" id="claudeInput">-</div>
-        </div>
-        <div class="claude-sub">
-          <div class="sl">출력 토큰</div>
-          <div class="sv" id="claudeOutput">-</div>
-        </div>
-        <div class="claude-sub">
-          <div class="sl">캐시 읽기</div>
-          <div class="sv" id="claudeCache">-</div>
-        </div>
-      </div>
-
-      <!-- 한도 설정 -->
-      <div class="limit-row" style="margin-bottom:12px">
-        <span style="font-size:12px;color:var(--muted)">월 한도 설정:</span>
-        <input class="limit-inp" id="limitInp" type="text" placeholder="예: 2000000000">
-        <button class="limit-btn" onclick="saveLimit()">저장</button>
-        <span style="font-size:11px;color:var(--muted)" id="limitHint"></span>
-      </div>
-
-      <!-- 프로젝트별 -->
-      <div class="claude-projects" id="claudeProjects"></div>
-      <div class="claude-note" id="claudeNote"></div>
+    <!-- 2. 주별 일정 -->
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">이번 주</div>
+      <div class="week-list" id="weekList"></div>
     </div>
 
-    <!-- Carry-over banner -->
-    <div class="banner" id="carryBanner" style="display:none">
-      <div class="banner-txt" id="carryTxt"></div>
-      <button class="banner-btn" onclick="doCarry()">오늘로 이월</button>
+    <!-- 3. 프로젝트별 -->
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">프로젝트</div>
+      <div class="proj-list" id="projList"></div>
     </div>
 
-    <!-- Add task -->
-    <div class="card">
-      <div class="add-row">
-        <input class="inp inp-title" id="inTitle" placeholder="할 일 추가..." onkeydown="if(e(event))addTask()">
-        <input class="inp inp-min"   id="inMin" type="number" value="30" min="5" max="480" title="예상 시간 (분)">
-        <select class="sel" id="inPri">
-          <option value="1">🔴 높음</option>
-          <option value="2" selected>🟡 보통</option>
-          <option value="3">⚪ 낮음</option>
-        </select>
-        <button class="btn-add"  onclick="addTask()">+ 추가</button>
-        <button class="btn-sync" id="syncBtn" onclick="syncLogs()">↻ 동기화</button>
-        <input type="file" id="logFolderInput" webkitdirectory multiple accept=".md" style="display:none" onchange="uploadLogsFromFolder(this)">
+  </aside>
+
+  <!-- ════════ MAIN PANEL ════════ -->
+  <main class="main-panel">
+    <div class="main-inner">
+
+      <!-- Main Header -->
+      <div class="main-hd">
+        <div class="main-hd-left">
+          <div class="main-hd-title" id="mainTitle"></div>
+          <div class="main-hd-sub" id="mainSub"></div>
+        </div>
+        <div class="main-hd-right">
+          <div class="next-ci" id="nextCi"></div>
+        </div>
       </div>
-      <div class="sync-msg" id="syncMsg"></div>
+
+      <!-- Progress -->
+      <div class="card">
+        <div class="prog-hd">
+          <div>
+            <span class="prog-label">완료율</span>
+            <span id="progRefreshTime" style="font-size:10px;color:var(--muted);margin-left:8px;font-family:'Courier New',monospace"></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="icon-btn" onclick="refreshMain()" title="새로고침">↻</button>
+            <span class="prog-pct" id="progPct">-</span>
+          </div>
+        </div>
+        <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+        <div class="prog-stats">
+          <div class="stat">작업 <b id="stTasks">-/-</b></div>
+          <div class="stat">예상 시간 <b id="stTime">-</b></div>
+          <div class="stat">남은 <b id="stLeft">-</b></div>
+        </div>
+      </div>
+
+      <!-- Claude Usage -->
+      <div class="claude-card">
+        <div class="claude-hd">
+          <span class="claude-title">Claude Code 토큰 사용량</span>
+          <div class="claude-hd-right">
+            <span class="claude-time" id="claudeTime"></span>
+            <span id="claudeMonthLabel" style="font-size:11px;color:var(--muted)"></span>
+            <button class="icon-btn" onclick="loadClaudeUsage()" title="새로고침">↻</button>
+            <a class="claude-link" href="https://claude.ai/settings/usage" target="_blank">↗ 상세</a>
+          </div>
+        </div>
+
+        <div class="claude-main">
+          <div class="claude-main-row">
+            <div class="claude-used-label">이번 달 <b id="claudeUsedPct">0</b>% 사용</div>
+            <div class="claude-remain ok" id="claudeRemain">— 남음</div>
+          </div>
+          <div class="claude-bar-wrap">
+            <div class="claude-bar-fill ok" id="claudeBar" style="width:0%"></div>
+          </div>
+          <div class="claude-bar-labels">
+            <span id="claudeUsedTok">0</span>
+            <span id="claudeLimitTok">한도 설정 필요</span>
+          </div>
+        </div>
+
+        <div class="claude-sub-row">
+          <div class="claude-sub">
+            <div class="sl">오늘 사용</div>
+            <div class="sv orange" id="claudeToday">-</div>
+          </div>
+          <div class="claude-sub">
+            <div class="sl">입력 토큰</div>
+            <div class="sv" id="claudeInput">-</div>
+          </div>
+          <div class="claude-sub">
+            <div class="sl">출력 토큰</div>
+            <div class="sv" id="claudeOutput">-</div>
+          </div>
+          <div class="claude-sub">
+            <div class="sl">캐시 읽기</div>
+            <div class="sv" id="claudeCache">-</div>
+          </div>
+        </div>
+
+        <div class="limit-row" style="margin-bottom:12px">
+          <span style="font-size:12px;color:var(--muted)">월 한도 설정:</span>
+          <input class="limit-inp" id="limitInp" type="text" placeholder="예: 2000000000">
+          <button class="limit-btn" onclick="saveLimit()">저장</button>
+          <span style="font-size:11px;color:var(--muted)" id="limitHint"></span>
+        </div>
+
+        <div class="claude-projects" id="claudeProjects"></div>
+        <div class="claude-note" id="claudeNote"></div>
+      </div>
+
+      <!-- Carry-over banner -->
+      <div class="banner" id="carryBanner" style="display:none">
+        <div class="banner-txt" id="carryTxt"></div>
+        <button class="banner-btn" onclick="doCarry()">오늘로 이월</button>
+      </div>
+
+      <!-- Add task -->
+      <div class="card">
+        <div class="add-row">
+          <input class="inp inp-title" id="inTitle" placeholder="할 일 추가..." onkeydown="if(e(event))addTask()">
+          <input class="inp inp-min"   id="inMin" type="number" value="30" min="5" max="480" title="예상 시간 (분)">
+          <select class="sel" id="inPri">
+            <option value="1">높음</option>
+            <option value="2" selected>보통</option>
+            <option value="3">낮음</option>
+          </select>
+          <button class="btn-add"  onclick="addTask()">+ 추가</button>
+          <button class="btn-sync" id="syncBtn" onclick="syncLogs()">↻ 동기화</button>
+          <input type="file" id="logFolderInput" webkitdirectory multiple accept=".md" style="display:none" onchange="uploadLogsFromFolder(this)">
+        </div>
+        <div class="sync-msg" id="syncMsg"></div>
+      </div>
+
+      <!-- Project filter notice -->
+      <div class="filter-bar" id="filterBar" style="display:none">
+        프로젝트 필터: <span id="filterLabel"></span>
+        <button class="filter-clear" onclick="clearProjectFilter()">전체 보기</button>
+      </div>
+
+      <!-- Accordion -->
+      <div class="acc-list" id="accList"></div>
+
+      <!-- Check-in -->
+      <div class="card">
+        <div class="ci-hd">
+          <span class="sec-title">체크인 기록</span>
+          <button class="btn-ci" onclick="toggleCi()">체크인 남기기</button>
+        </div>
+        <div class="ci-form" id="ciForm">
+          <textarea class="ci-note" id="ciNote" placeholder="진행 상황, 막힌 부분, 다음 집중 포인트..."></textarea>
+          <button class="btn-save" onclick="saveCheckin()">저장</button>
+        </div>
+        <div class="ci-hist" id="ciHist"></div>
+      </div>
+
     </div>
-
-    <!-- Accordion -->
-    <div class="acc-list" id="accList"></div>
-
-    <!-- Check-in -->
-    <div class="card">
-      <div class="ci-hd">
-        <span class="sec-title">체크인 기록</span>
-        <button class="btn-ci" onclick="toggleCi()">체크인 남기기</button>
-      </div>
-      <div class="ci-form" id="ciForm">
-        <textarea class="ci-note" id="ciNote" placeholder="진행 상황, 막힌 부분, 다음 집중 포인트..."></textarea>
-        <button class="btn-save" onclick="saveCheckin()">저장</button>
-      </div>
-      <div class="ci-hist" id="ciHist"></div>
-    </div>
-
-  </div>
-
-  <!-- ════════ WEEK ════════ -->
-  <div id="vWeek" style="display:none">
-    <div class="card">
-      <div class="wk-hd">
-        <span class="sec-title">이번 주 목표</span>
-        <span class="wk-label" id="wkLabel"></span>
-      </div>
-      <div class="goal-list" id="goalList"></div>
-      <div class="goal-add-row">
-        <input class="inp" style="flex:1" id="inGoal" placeholder="이번 주 목표 추가..." onkeydown="if(e(event))addGoal()">
-        <button class="btn-gadd" onclick="addGoal()">추가</button>
-      </div>
-    </div>
-    <div class="wk-grid" id="wkGrid"></div>
-  </div>
-
+  </main>
 </div>
 
 <script>
@@ -433,13 +695,13 @@ const e   = ev => ev.key === 'Enter';
 const esc = s  => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const p2  = n  => String(n).padStart(2,'0');
 
-// 토큰 포맷 (1,234,567 → 1.2M)
-function fmtTok(n) {
-  if (n >= 1e9) return (n/1e9).toFixed(1) + 'B';
-  if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
-  if (n >= 1e3) return (n/1e3).toFixed(1) + 'K';
-  return String(n);
-}
+// ── State ─────────────────────────────────────────────────────
+let currentViewDate  = todayStr();   // YYYY-MM-DD (선택된 날짜)
+let currentProject   = null;         // null = 전체, string = 프로젝트명
+let allTasks         = [];           // 현재 로드된 전체 태스크
+let weekTaskMap      = {};           // { 'YYYY-MM-DD': { total, done } }
+let calViewYear      = new Date().getFullYear();
+let calViewMonth     = new Date().getMonth();  // 0-based
 
 // Accordion state
 let openGroups = new Set(JSON.parse(localStorage.getItem('acc_open') || '[]'));
@@ -454,13 +716,31 @@ function fmtT(iso) {
   const d = new Date(iso);
   return `${p2(d.getHours())}:${p2(d.getMinutes())}`;
 }
-
-// ── Header ──────────────────────────────────────────────────
-function drawHeader() {
-  const d = new Date();
-  document.getElementById('dateBig').textContent = `${d.getFullYear()}년 ${MONTHS[d.getMonth()]} ${d.getDate()}일`;
-  document.getElementById('dateSm').textContent  = DAYS[d.getDay()] + '요일';
+function fmtTok(n) {
+  if (n >= 1e9) return (n/1e9).toFixed(1) + 'B';
+  if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n/1e3).toFixed(1) + 'K';
+  return String(n);
 }
+
+// ── Main header update ────────────────────────────────────────
+function updateMainHeader() {
+  const titleEl = document.getElementById('mainTitle');
+  const subEl   = document.getElementById('mainSub');
+  const today   = todayStr();
+
+  if (currentProject) {
+    titleEl.textContent = '[' + currentProject + '] 프로젝트';
+    subEl.textContent   = '프로젝트 필터 — 모든 날짜';
+  } else {
+    const d = new Date(currentViewDate + 'T00:00:00');
+    const isToday = currentViewDate === today;
+    const dayLabel = DAYS[d.getDay()] + '요일';
+    titleEl.textContent = `${d.getFullYear()}년 ${MONTHS[d.getMonth()]} ${d.getDate()}일`;
+    subEl.textContent   = isToday ? `오늘 · ${dayLabel}` : dayLabel;
+  }
+}
+
 function updateCountdown() {
   const now = new Date(), cur = now.getHours()*60+now.getMinutes();
   const next = CHECK_HOURS.find(h => h*60 > cur);
@@ -472,17 +752,179 @@ function updateCountdown() {
     : `다음 체크인까지 ${diff}분`;
 }
 
-// ── Tab ─────────────────────────────────────────────────────
-function switchTab(t) {
-  document.getElementById('vToday').style.display = t==='today' ? '' : 'none';
-  document.getElementById('vWeek').style.display  = t==='week'  ? '' : 'none';
-  document.querySelectorAll('.tab').forEach((el,i) =>
-    el.classList.toggle('on', (i===0&&t==='today')||(i===1&&t==='week'))
-  );
-  if (t === 'week') loadWeek();
+// ── Mini Calendar ─────────────────────────────────────────────
+function calPrev() {
+  calViewMonth--;
+  if (calViewMonth < 0) { calViewMonth = 11; calViewYear--; }
+  renderCalendar();
+}
+function calNext() {
+  calViewMonth++;
+  if (calViewMonth > 11) { calViewMonth = 0; calViewYear++; }
+  renderCalendar();
 }
 
-// ── Group by [project] ──────────────────────────────────────
+function renderCalendar() {
+  const today = todayStr();
+  const label = `${calViewYear}년 ${MONTHS[calViewMonth]}`;
+  document.getElementById('calMonthLabel').textContent = label;
+
+  const firstDay = new Date(calViewYear, calViewMonth, 1);
+  const lastDay  = new Date(calViewYear, calViewMonth + 1, 0);
+  const startDow = firstDay.getDay(); // 0=Sun
+  const totalCells = Math.ceil((startDow + lastDay.getDate()) / 7) * 7;
+
+  const dows = ['일','월','화','수','목','금','토'];
+  let html = dows.map(d => `<div class="cal-dow">${d}</div>`).join('');
+
+  for (let i = 0; i < totalCells; i++) {
+    const dayNum = i - startDow + 1;
+    if (dayNum < 1 || dayNum > lastDay.getDate()) {
+      html += `<div class="cal-cell cal-empty"></div>`;
+      continue;
+    }
+    const ds = `${calViewYear}-${p2(calViewMonth+1)}-${p2(dayNum)}`;
+    const isToday    = ds === today;
+    const isSelected = ds === currentViewDate && !currentProject;
+    const hasTasks   = weekTaskMap[ds] && weekTaskMap[ds].total > 0;
+    const cls = [
+      'cal-cell',
+      isToday    ? 'cal-today'    : '',
+      isSelected ? 'cal-selected' : '',
+    ].filter(Boolean).join(' ');
+
+    const dot = hasTasks ? '<span class="cal-dot"></span>' : '';
+    html += `<div class="${cls}" onclick="selectDate('${ds}')">${dayNum}${dot}</div>`;
+  }
+
+  document.getElementById('calGrid').innerHTML = html;
+}
+
+// ── Week List (sidebar) ───────────────────────────────────────
+async function renderWeekList() {
+  const today = todayStr();
+  const d = new Date();
+  // 이번 주 월요일 계산
+  const dow = d.getDay(); // 0=Sun
+  const diffToMon = (dow === 0) ? -6 : 1 - dow;
+  const mon = new Date(d);
+  mon.setDate(d.getDate() + diffToMon);
+
+  const dayNames = ['월','화','수','목','금','토','일'];
+  let html = '';
+
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(mon);
+    day.setDate(mon.getDate() + i);
+    const ds = `${day.getFullYear()}-${p2(day.getMonth()+1)}-${p2(day.getDate())}`;
+    const isToday    = ds === today;
+    const isSelected = ds === currentViewDate && !currentProject;
+    const dd = weekTaskMap[ds] || { total: 0, done: 0 };
+    const allDone = dd.total > 0 && dd.done === dd.total;
+
+    const badgeCls = allDone ? 'week-item-badge done-badge' : 'week-item-badge';
+    const badgeTxt = dd.total > 0 ? `${dd.done}/${dd.total}` : '';
+    const badge    = badgeTxt ? `<span class="${badgeCls}">${badgeTxt}</span>` : '';
+
+    const cls = [
+      'week-item',
+      isToday    ? 'today-item' : '',
+      isSelected ? 'active'     : '',
+    ].filter(Boolean).join(' ');
+
+    html += `<div class="${cls}" onclick="selectDate('${ds}')">
+      <span class="week-item-day">${dayNames[i]}</span>
+      <span class="week-item-date">${day.getMonth()+1}/${day.getDate()}</span>
+      ${badge}
+    </div>`;
+  }
+
+  document.getElementById('weekList').innerHTML = html;
+}
+
+// ── Project List (sidebar) ────────────────────────────────────
+function renderProjectList(tasks) {
+  const counts = {};
+  for (const t of tasks) {
+    const m = t.title.match(/^\[([^\]]+)\]/);
+    const proj = m ? m[1] : '기타';
+    if (!counts[proj]) counts[proj] = 0;
+    counts[proj]++;
+  }
+
+  const total = tasks.length;
+  const projEntries = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+
+  let html = `<div class="proj-item all-item ${!currentProject?'active':''}" onclick="selectProject(null)">
+    <div class="proj-item-dot"></div>
+    <span class="proj-item-name">전체</span>
+    <span class="proj-item-count">${total}</span>
+  </div>`;
+
+  html += projEntries.map(([name, cnt]) => {
+    const isActive = currentProject === name;
+    return `<div class="proj-item ${isActive?'active':''}" onclick="selectProject('${esc(name)}')">
+      <div class="proj-item-dot"></div>
+      <span class="proj-item-name">${esc(name)}</span>
+      <span class="proj-item-count">${cnt}</span>
+    </div>`;
+  }).join('');
+
+  document.getElementById('projList').innerHTML = html;
+}
+
+// ── Navigation actions ────────────────────────────────────────
+function selectDate(ds) {
+  currentViewDate = ds;
+  currentProject  = null;
+  updateMainHeader();
+  renderCalendar();
+  renderWeekList();
+  loadTodayByDate(ds);
+}
+
+function selectProject(proj) {
+  currentProject = proj;
+  if (!proj) {
+    // 프로젝트 해제 시 현재 날짜로 복원
+    updateMainHeader();
+    renderCalendar();
+    renderWeekList();
+    renderProjectList(allTasks);
+    applyProjectFilter();
+  } else {
+    updateMainHeader();
+    renderProjectList(allTasks);
+    applyProjectFilter();
+  }
+}
+
+function clearProjectFilter() {
+  selectProject(null);
+}
+
+function applyProjectFilter() {
+  const filterBar   = document.getElementById('filterBar');
+  const filterLabel = document.getElementById('filterLabel');
+
+  if (currentProject) {
+    filterBar.style.display   = 'flex';
+    filterLabel.textContent   = '[' + currentProject + ']';
+    const filtered = allTasks.filter(t => {
+      const m = t.title.match(/^\[([^\]]+)\]/);
+      const p = m ? m[1] : '기타';
+      return p === currentProject;
+    });
+    renderAccordion(filtered);
+    updateProgressFromTasks(filtered);
+  } else {
+    filterBar.style.display = 'none';
+    renderAccordion(allTasks);
+    updateProgressFromAllStats();
+  }
+}
+
+// ── Group by [project] ────────────────────────────────────────
 function groupTasks(tasks) {
   const groups = {}, order = [];
   for (const t of tasks) {
@@ -494,27 +936,24 @@ function groupTasks(tasks) {
   return { groups, order };
 }
 
-// ── Priority color ───────────────────────────────────────────
 const FILL_COLOR = { 1: 'var(--danger)', 2: 'var(--warning)', 3: 'var(--border)' };
 
-// ── Render accordion ────────────────────────────────────────
+// ── Render accordion ──────────────────────────────────────────
 function renderAccordion(tasks) {
   const list = document.getElementById('accList');
   if (!tasks.length) {
-    list.innerHTML = '<div class="empty">오늘 할 일을 추가하거나 ↻ 동기화를 눌러보세요</div>';
+    list.innerHTML = '<div class="empty">할 일을 추가하거나 ↻ 동기화를 눌러보세요</div>';
     return;
   }
 
   const { groups, order } = groupTasks(tasks);
 
-  // 완전 완료 그룹은 뒤로
   const sortedKeys = [...order].sort((a,b) => {
     const aAll = groups[a].every(t => t.status==='done') ? 1 : 0;
     const bAll = groups[b].every(t => t.status==='done') ? 1 : 0;
     return aAll - bAll;
   });
 
-  // 첫 로드: 미완료 그룹 자동 열기
   if (openGroups.size === 0) {
     sortedKeys.forEach(k => {
       if (!groups[k].every(t => t.status==='done')) openGroups.add(k);
@@ -523,15 +962,14 @@ function renderAccordion(tasks) {
   }
 
   list.innerHTML = sortedKeys.map(proj => {
-    const items = groups[proj];
-    const total = items.length, done = items.filter(t=>t.status==='done').length;
-    const pct   = total > 0 ? Math.round(done/total*100) : 0;
-    const allDone = done === total && total > 0;
-    const fillColor = allDone ? 'var(--success)' : 'var(--accent)';
+    const items    = groups[proj];
+    const total    = items.length, done = items.filter(t=>t.status==='done').length;
+    const pct      = total > 0 ? Math.round(done/total*100) : 0;
+    const allDone  = done === total && total > 0;
+    const fillColor= allDone ? 'var(--success)' : 'var(--accent)';
     const totalMin = items.reduce((s,t) => s+t.estimated_minutes, 0);
-    const isOpen = openGroups.has(proj);
+    const isOpen   = openGroups.has(proj);
 
-    const label = proj;
     const tasksHtml = items.map(t => {
       const isDone = t.status === 'done';
       const title  = t.title.replace(/^\[[^\]]+\]\s*/, '');
@@ -556,7 +994,7 @@ function renderAccordion(tasks) {
       <div class="acc-group">
         <div class="acc-header" onclick="toggleAcc('${esc(proj)}')">
           <span class="acc-arrow ${isOpen?'open':''}">▶</span>
-          <span class="acc-name">${esc(label)}</span>
+          <span class="acc-name">${esc(proj)}</span>
           <span class="acc-pct">${pct}%</span>
           <div class="acc-mini-bar">
             <div class="acc-mini-fill" style="width:${pct}%;background:${fillColor}"></div>
@@ -581,7 +1019,7 @@ function toggleAcc(proj) {
   });
 }
 
-// ── Inline time editing ─────────────────────────────────────
+// ── Inline time editing ───────────────────────────────────────
 function editMin(span, id) {
   const inp = span.nextElementSibling;
   inp.value = parseInt(span.textContent);
@@ -595,50 +1033,114 @@ async function saveMin(inp, id) {
     method:'PATCH', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({estimated_minutes: val})
   });
-  await loadToday();
+  await refreshMain();
 }
 
-// ── Today ────────────────────────────────────────────────────
-async function loadToday() {
+// ── Progress update helpers ───────────────────────────────────
+let _lastStats = null;
+
+function updateProgressFromTasks(tasks) {
+  const total = tasks.length;
+  const done  = tasks.filter(t => t.status==='done').length;
+  const pct   = total > 0 ? Math.round(done/total*100) : 0;
+  const totalMin = tasks.reduce((s,t) => s+t.estimated_minutes, 0);
+  const doneMin  = tasks.filter(t=>t.status==='done').reduce((s,t) => s+t.estimated_minutes, 0);
+  const left = totalMin - doneMin;
+
+  document.getElementById('progPct').textContent  = pct + '%';
+  document.getElementById('progFill').style.width = pct + '%';
+  document.getElementById('stTasks').textContent  = `${done}/${total}`;
+  document.getElementById('stTime').textContent   = `${doneMin}/${totalMin}분`;
+  document.getElementById('stLeft').textContent   = left > 0 ? `${left}분` : '완료!';
+}
+
+function updateProgressFromAllStats() {
+  if (!_lastStats) return;
+  const s = _lastStats;
+  const pct = s.total > 0 ? Math.round(s.done / s.total * 100) : 0;
+  document.getElementById('progPct').textContent  = pct + '%';
+  document.getElementById('progFill').style.width = pct + '%';
+  document.getElementById('stTasks').textContent  = `${s.done}/${s.total}`;
+  document.getElementById('stTime').textContent   = `${s.done_minutes}/${s.total_minutes}분`;
+  const left = s.total_minutes - s.done_minutes;
+  document.getElementById('stLeft').textContent   = left > 0 ? `${left}분` : '완료!';
+}
+
+// ── Load by date ──────────────────────────────────────────────
+async function loadTodayByDate(ds) {
   try {
-    const r = await fetch('/api/today');
+    const isToday = ds === todayStr();
+    const url     = isToday ? '/api/today' : `/api/today?d=${ds}`;
+    const r = await fetch(url);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const { tasks, stats } = await r.json();
-    const pct = stats.total > 0 ? Math.round(stats.done / stats.total * 100) : 0;
 
-    document.getElementById('progPct').textContent  = pct + '%';
-    document.getElementById('progFill').style.width = pct + '%';
-    document.getElementById('stTasks').textContent  = `${stats.done}/${stats.total}`;
-    document.getElementById('stTime').textContent   = `${stats.done_minutes}/${stats.total_minutes}분`;
-    const left = stats.total_minutes - stats.done_minutes;
-    document.getElementById('stLeft').textContent   = left > 0 ? `${left}분` : '완료!';
+    _lastStats  = stats;
+    allTasks    = tasks;
 
-    // 마지막 갱신 시각
+    updateProgressFromAllStats();
+
     const now = new Date();
     document.getElementById('progRefreshTime').textContent =
       `${p2(now.getHours())}:${p2(now.getMinutes())}:${p2(now.getSeconds())} 기준`;
 
-    renderAccordion(tasks);
-    loadCheckins();
-    checkCarry();
+    if (currentProject) {
+      applyProjectFilter();
+    } else {
+      renderAccordion(tasks);
+    }
+
+    renderProjectList(tasks);
+
+    if (isToday) {
+      loadCheckins();
+      checkCarry();
+    }
   } catch(err) {
     document.getElementById('progPct').textContent = '오류';
-    document.getElementById('progRefreshTime').textContent = '데이터 로드 실패 — 새로고침';
-    console.error('loadToday 실패:', err);
+    document.getElementById('progRefreshTime').textContent = '로드 실패';
+    console.error('loadTodayByDate 실패:', err);
   }
 }
 
+async function loadToday() {
+  await loadTodayByDate(currentViewDate);
+}
+
+function refreshMain() {
+  if (currentProject) {
+    loadTodayByDate(todayStr());
+  } else {
+    loadTodayByDate(currentViewDate);
+  }
+}
+
+// ── Week task map (for calendar dots) ────────────────────────
+async function loadWeekTaskMap() {
+  try {
+    const r = await fetch('/api/week');
+    const data = await r.json();
+    weekTaskMap = data.daily || {};
+    renderCalendar();
+    renderWeekList();
+  } catch(err) {
+    renderCalendar();
+    renderWeekList();
+  }
+}
+
+// ── Task CRUD ─────────────────────────────────────────────────
 async function addTask() {
   const title = document.getElementById('inTitle').value.trim();
   if (!title) return;
-  const min = parseInt(document.getElementById('inMin').value)||30;
+  const min      = parseInt(document.getElementById('inMin').value)||30;
   const priority = parseInt(document.getElementById('inPri').value);
   await fetch('/api/tasks', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({title, estimated_minutes:min, priority})
   });
   document.getElementById('inTitle').value = '';
-  await loadToday();
+  await refreshMain();
 }
 
 async function toggleTask(id, isDone) {
@@ -646,12 +1148,13 @@ async function toggleTask(id, isDone) {
     method:'PATCH', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({status: isDone ? 'todo' : 'done'})
   });
-  await loadToday();
+  await refreshMain();
+  await loadWeekTaskMap();
 }
 
 async function delTask(id) {
   await fetch(`/api/tasks/${id}`, {method:'DELETE'});
-  await loadToday();
+  await refreshMain();
 }
 
 async function checkCarry() {
@@ -666,9 +1169,10 @@ async function checkCarry() {
 async function doCarry() {
   await fetch('/api/carry-over', {method:'POST'});
   document.getElementById('carryBanner').style.display = 'none';
-  await loadToday();
+  await refreshMain();
 }
 
+// ── Check-in ──────────────────────────────────────────────────
 function toggleCi() {
   const f = document.getElementById('ciForm');
   f.classList.toggle('open');
@@ -683,7 +1187,7 @@ async function saveCheckin() {
   document.getElementById('ciNote').value = '';
   document.getElementById('ciForm').classList.remove('open');
   await loadCheckins();
-  await loadToday();
+  await refreshMain();
 }
 async function loadCheckins() {
   const r = await fetch('/api/checkins');
@@ -702,7 +1206,7 @@ async function loadCheckins() {
   }).join('');
 }
 
-// Sync — 폴더 선택 → 파일 읽어서 서버로 전송
+// ── Sync ──────────────────────────────────────────────────────
 function syncLogs() {
   document.getElementById('logFolderInput').click();
 }
@@ -726,10 +1230,9 @@ async function uploadLogsFromFolder(input) {
     return;
   }
 
-  // 파일 내용 읽기
   const readFile = f => new Promise(res => {
     const r = new FileReader();
-    r.onload = e => res(e.target.result);
+    r.onload = ev => res(ev.target.result);
     r.readAsText(f, 'utf-8');
   });
 
@@ -745,27 +1248,26 @@ async function uploadLogsFromFolder(input) {
       body: JSON.stringify({log_files: logFiles, current_task: currentTask}),
     });
     const logs = await r.json();
-
     const logImp = logs.imported?.length || 0;
     const logUpd = logs.updated?.length  || 0;
     const parts = [];
     if (logImp > 0) parts.push(`${logImp}개 신규`);
     if (logUpd > 0) parts.push(`${logUpd}개 완료 업데이트`);
     if (!parts.length) parts.push('변경 없음');
-
     msg.style.color = (logImp + logUpd) > 0 ? 'var(--success)' : 'var(--muted)';
     msg.textContent = parts.join(' · ');
-  } catch(e) {
+  } catch(err) {
     msg.style.color = 'var(--danger)';
     msg.textContent = '전송 오류';
   }
 
   input.value = '';
-  await loadToday();
+  await refreshMain();
+  await loadWeekTaskMap();
   btn.disabled = false; btn.textContent = '↻ 동기화';
 }
 
-// ── Claude Usage ─────────────────────────────────────────────
+// ── Claude Usage ──────────────────────────────────────────────
 function barClass(pct) {
   if (pct >= 90) return 'crit';
   if (pct >= 70) return 'warn';
@@ -774,24 +1276,19 @@ function barClass(pct) {
 
 async function loadClaudeUsage() {
   try {
-    // 로컬이면 실시간, 클라우드면 캐시 사용
     const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
     const endpoint = isLocal ? '/api/claude-usage' : '/api/claude-usage-cached';
     const r = await fetch(endpoint);
     const d = await r.json();
 
-    // 기준 시각
     const now = new Date();
     document.getElementById('claudeTime').textContent =
       `기준 ${p2(now.getHours())}:${p2(now.getMinutes())}`;
-
-    // 월 라벨
     document.getElementById('claudeMonthLabel').textContent = d.month_label || '';
 
-    // 프로그레스바
-    const pct  = d.used_pct || 0;
-    const cls  = barClass(pct);
-    const bar  = document.getElementById('claudeBar');
+    const pct = d.used_pct || 0;
+    const cls = barClass(pct);
+    const bar = document.getElementById('claudeBar');
     bar.style.width = Math.min(pct, 100) + '%';
     bar.className   = `claude-bar-fill ${cls}`;
 
@@ -806,27 +1303,20 @@ async function loadClaudeUsage() {
       ? '한도 ' + fmtTok(d.token_limit)
       : '한도 미설정';
 
-    // 서브 박스
     const mt = d.month_total || {};
     document.getElementById('claudeToday').textContent  = fmtTok(d.today_tokens||0);
     document.getElementById('claudeInput').textContent  = fmtTok(mt.input||0);
     document.getElementById('claudeOutput').textContent = fmtTok(mt.output||0);
     document.getElementById('claudeCache').textContent  = fmtTok(mt.cache_read||0);
 
-    // 한도 입력창 초기값
     const limitInp = document.getElementById('limitInp');
     if (!limitInp.dataset.init) {
       limitInp.value = d.token_limit || '';
       limitInp.dataset.init = '1';
-      // 힌트: 알려진 플랜 기준
       document.getElementById('limitHint').textContent = 'Max 5x≈2B / Max 20x≈8B';
     }
 
-    // 프로젝트 칩
     const projects = d.by_project || [];
-    const maxTok   = projects[0]
-      ? projects[0].input+projects[0].output+projects[0].cache_create+projects[0].cache_read : 1;
-
     if (!projects.length || d.month_tokens === 0) {
       document.getElementById('claudeProjects').innerHTML =
         '<span style="font-size:12px;color:var(--muted)">세션 종료 후 반영됩니다</span>';
@@ -855,71 +1345,27 @@ async function saveLimit() {
   await loadClaudeUsage();
 }
 
-// ── Week ─────────────────────────────────────────────────────
-async function loadWeek() {
-  const r = await fetch('/api/week');
-  const data = await r.json();
-  const ws = new Date(data.week_start+'T00:00:00');
-  const we = new Date(ws); we.setDate(we.getDate()+6);
-  const fmt = d => `${d.getMonth()+1}/${d.getDate()}`;
-  document.getElementById('wkLabel').textContent = `${fmt(ws)} ~ ${fmt(we)}`;
-
-  document.getElementById('goalList').innerHTML = !data.goals.length
-    ? '<div class="ci-empty">이번 주 목표를 추가해보세요</div>'
-    : data.goals.map(g => `
-      <div class="goal-item">
-        <div class="gcb ${g.done?'on':''}" onclick="toggleGoal(${g.id},${g.done})"></div>
-        <div class="goal-txt ${g.done?'done-txt':''}">${esc(g.goal)}</div>
-        <button class="goal-del" onclick="delGoal(${g.id})">×</button>
-      </div>`).join('');
-
-  const today = todayStr();
-  const dayNames = ['월','화','수','목','금','토','일'];
-  document.getElementById('wkGrid').innerHTML = Array.from({length:7},(_,i) => {
-    const d = new Date(ws); d.setDate(d.getDate()+i);
-    const ds = `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
-    const isT = ds === today;
-    const dd  = data.daily[ds] || {total:0,done:0};
-    const pct = dd.total>0 ? Math.round(dd.done/dd.total*100) : 0;
-    return `<div class="day-card ${isT?'today':''}">
-      <div class="day-name">${dayNames[i]}</div>
-      <div class="day-num">${d.getDate()}</div>
-      <div class="day-count">${dd.done}/${dd.total}</div>
-      <div class="day-pb"><div class="day-pf" style="width:${pct}%"></div></div>
-    </div>`;
-  }).join('');
-}
-
-async function addGoal() {
-  const inp = document.getElementById('inGoal');
-  const goal = inp.value.trim(); if (!goal) return;
-  await fetch('/api/week/goals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({goal})});
-  inp.value=''; loadWeek();
-}
-async function toggleGoal(id,isDone) {
-  await fetch(`/api/week/goals/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({done:isDone?0:1})});
-  loadWeek();
-}
-async function delGoal(id) {
-  await fetch(`/api/week/goals/${id}`,{method:'DELETE'}); loadWeek();
-}
-
-// ── Open Claude Code ─────────────────────────────────────────
+// ── Open Claude Code ──────────────────────────────────────────
 async function openClaude(proj) {
   const r = await fetch(`/api/open-claude?proj=${encodeURIComponent(proj)}`, {method:'POST'});
   const d = await r.json();
-  if (!d.ok) {
-    alert(`Claude Code 열기 실패\n${d.error}`);
-  }
+  if (!d.ok) alert(`Claude Code 열기 실패\n${d.error}`);
 }
 
-// ── Boot ─────────────────────────────────────────────────────
-drawHeader();
+// ── Boot ──────────────────────────────────────────────────────
+updateMainHeader();
 updateCountdown();
 setInterval(updateCountdown, 60000);
-loadToday();
+
+// 1) 주간 태스크 맵 로드 (캘린더 점 + 주별 일정 뱃지)
+loadWeekTaskMap();
+
+// 2) 오늘 태스크 로드
+loadTodayByDate(currentViewDate);
+
+// 3) Claude 사용량 로드
 loadClaudeUsage();
-setInterval(loadClaudeUsage, 30000);  // 30초 자동 갱신
+setInterval(loadClaudeUsage, 30000);
 </script>
 </body>
 </html>
