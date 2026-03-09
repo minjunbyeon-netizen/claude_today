@@ -382,6 +382,7 @@ body {
         </select>
         <button class="btn-add"  onclick="addTask()">+ 추가</button>
         <button class="btn-sync" id="syncBtn" onclick="syncLogs()">↻ 동기화</button>
+        <input type="file" id="logFolderInput" webkitdirectory multiple accept=".md" style="display:none" onchange="uploadLogsFromFolder(this)">
       </div>
       <div class="sync-msg" id="syncMsg"></div>
     </div>
@@ -700,42 +701,65 @@ async function loadCheckins() {
   }).join('');
 }
 
-// Sync — squad-team 로그 + git 레포 두 소스 동시 처리
-async function syncLogs() {
+// Sync — 폴더 선택 → 파일 읽어서 서버로 전송
+function syncLogs() {
+  document.getElementById('logFolderInput').click();
+}
+
+async function uploadLogsFromFolder(input) {
   const btn = document.getElementById('syncBtn');
   const msg = document.getElementById('syncMsg');
   btn.disabled = true; btn.textContent = '동기화 중...';
   msg.style.display = 'block';
   msg.style.color = 'var(--muted)';
-  msg.textContent = '로그 + git 스캔 중...';
+  msg.textContent = '파일 읽는 중...';
+
+  const files = Array.from(input.files);
+  const todoFiles = files.filter(f => f.name.endsWith('_todo.md'));
+  const currentTaskFile = files.find(f => f.name === 'current_task.md');
+
+  if (!todoFiles.length) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = '_todo.md 파일 없음 — squad-team/logs 폴더를 선택해주세요';
+    btn.disabled = false; btn.textContent = '↻ 동기화';
+    return;
+  }
+
+  // 파일 내용 읽기
+  const readFile = f => new Promise(res => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result);
+    r.readAsText(f, 'utf-8');
+  });
+
+  const logFiles = {};
+  for (const f of todoFiles) logFiles[f.name] = await readFile(f);
+  const currentTask = currentTaskFile ? await readFile(currentTaskFile) : '';
 
   try {
-    // 두 소스 병렬 호출
-    const [rLogs, rGit] = await Promise.all([
-      fetch('/api/sync-logs', {method:'POST'}),
-      fetch('/api/sync-git',  {method:'POST'}),
-    ]);
-    const [logs, git] = await Promise.all([rLogs.json(), rGit.json()]);
+    msg.textContent = '서버에 전송 중...';
+    const r = await fetch('/api/sync-logs-upload', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({log_files: logFiles, current_task: currentTask}),
+    });
+    const logs = await r.json();
 
-    const parts = [];
     const logImp = logs.imported?.length || 0;
     const logUpd = logs.updated?.length  || 0;
-    const gitUpd = git.count || 0;
-    const totalUpd = logUpd + gitUpd;
-
-    // logs.error는 로컬 환경에서만 의미있음 (서버에선 무시)
-    if (logImp  > 0) parts.push(`${logImp}개 신규`);
-    if (logUpd  > 0) parts.push(`로그 ${logUpd}개 완료`);
-    if (gitUpd  > 0) parts.push(`git ${gitUpd}개 완료`);
+    const parts = [];
+    if (logImp > 0) parts.push(`${logImp}개 신규`);
+    if (logUpd > 0) parts.push(`${logUpd}개 완료 업데이트`);
     if (!parts.length) parts.push('변경 없음');
 
-    msg.style.color = totalUpd > 0 ? 'var(--success)' : 'var(--muted)';
+    msg.style.color = (logImp + logUpd) > 0 ? 'var(--success)' : 'var(--muted)';
     msg.textContent = parts.join(' · ');
   } catch(e) {
     msg.style.color = 'var(--danger)';
-    msg.textContent = '서버 오류 — 서버 실행 여부 확인';
+    msg.textContent = '전송 오류';
   }
 
+  input.value = '';
   await loadToday();
   btn.disabled = false; btn.textContent = '↻ 동기화';
 }

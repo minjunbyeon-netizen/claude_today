@@ -397,6 +397,79 @@ def sync_logs(logs_path: Optional[str] = None):
     return results
 
 
+class SyncLogsUpload(BaseModel):
+    log_files: dict   # {"팀명_todo.md": "내용", ...}
+    current_task: Optional[str] = ""
+
+
+@app.post("/api/sync-logs-upload")
+def sync_logs_upload(payload: SyncLogsUpload):
+    """브라우저에서 업로드한 _todo.md 파일 내용을 파싱해 DB에 반영"""
+    today = str(date.today())
+    results = {"imported": [], "updated": [], "skipped": [], "project": None}
+
+    conn = get_db()
+    existing = {
+        row["title"]: {"id": row["id"], "status": row["status"]}
+        for row in conn.execute("SELECT id, title, status FROM tasks WHERE date = ?", (today,)).fetchall()
+    }
+
+    # current_task에서 프로젝트명 추출
+    project_name = None
+    for line in (payload.current_task or "").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and not line.startswith("|") and not line.startswith("-"):
+            project_name = line
+            break
+    results["project"] = project_name
+
+    priority_map = {"기획팀": 1, "실무팀": 1, "검수팀": 2, "소비자팀": 2, "리뷰팀": 3}
+
+    for fname, content in sorted(payload.log_files.items()):
+        if not fname.endswith("_todo.md"):
+            continue
+        team = fname.replace("_todo.md", "")
+        priority = priority_map.get(team, 2)
+
+        progress = None
+        for line in content.splitlines():
+            if "진척도" in line:
+                progress = line.strip()
+                break
+
+        for line in content.splitlines():
+            stripped = line.strip()
+            if not stripped.startswith("- ["):
+                continue
+            is_done = stripped.startswith("- [x]") or stripped.startswith("- [X]")
+            title_raw = stripped[6:].strip()
+            title = f"[{team}] {title_raw}"
+
+            if title in existing:
+                if is_done and existing[title]["status"] != "done":
+                    conn.execute(
+                        "UPDATE tasks SET status='done', completed_at=? WHERE id=?",
+                        (datetime.now().isoformat(), existing[title]["id"]),
+                    )
+                    existing[title]["status"] = "done"
+                    results["updated"].append(title)
+                else:
+                    results["skipped"].append(title)
+            else:
+                status = "done" if is_done else "todo"
+                completed_at = datetime.now().isoformat() if is_done else None
+                conn.execute(
+                    "INSERT INTO tasks (date, title, estimated_minutes, priority, status, completed_at, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (today, title, 30, priority, status, completed_at, f"출처: {fname} | {progress or ''}"),
+                )
+                existing[title] = {"id": -1, "status": status}
+                results["imported"].append({"title": title, "status": status, "team": team})
+
+    conn.commit()
+    conn.close()
+    return results
+
+
 @app.post("/api/sync-git")
 def sync_git():
     """
