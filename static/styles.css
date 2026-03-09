@@ -100,6 +100,42 @@ body {
   justify-content: center;
 }
 
+.session-badge {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(24, 34, 24, 0.08);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.session-controls {
+  display: grid;
+  gap: 10px;
+}
+
+.control-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.session-card {
+  border-radius: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .hero-panel label,
 .panel-head p,
 .field label {
@@ -160,6 +196,10 @@ button.ghost {
   gap: 18px;
 }
 
+.hidden {
+  display: none !important;
+}
+
 .panel {
   border-radius: var(--radius);
   padding: 22px;
@@ -207,6 +247,65 @@ button.ghost {
 
 .metric-grid {
   grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.access-grid {
+  display: grid;
+  grid-template-columns: 1.05fr 1.35fr;
+  gap: 18px;
+}
+
+.access-card {
+  border-radius: 22px;
+  padding: 22px;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--line);
+}
+
+.access-card h3,
+.access-card h4 {
+  margin: 0;
+}
+
+.access-card p {
+  margin: 10px 0 0;
+  color: var(--muted);
+}
+
+.account-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.account-card {
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+}
+
+.account-card h4 {
+  margin: 0;
+}
+
+.account-meta {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.account-creds {
+  margin-top: 12px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.helper-text {
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .card-grid.two {
@@ -336,6 +435,8 @@ button.ghost {
 
 @media (max-width: 980px) {
   .hero,
+  .access-grid,
+  .account-list,
   .metric-grid,
   .card-grid.two,
   .list-grid.two,

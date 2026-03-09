@@ -69,6 +69,15 @@ def init_db():
 init_db()
 
 
+def ensure_table_column(conn, table_name: str, column_name: str, column_def: str):
+    columns = {
+        row["name"]
+        for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    }
+    if column_name not in columns:
+        conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_def}")
+
+
 def init_org_data():
     conn = get_db()
     conn.executescript("""
@@ -131,63 +140,120 @@ def init_org_data():
         );
     """)
 
-    user_count = conn.execute("SELECT COUNT(*) AS count FROM org_users").fetchone()["count"]
-    if user_count == 0:
-        users = [
-            ("???", "ceo", "??", None, 1),
-            ("???", "manager", "???", 1, 2),
-            ("???", "manager", "??", 1, 3),
-            ("???", "member", "???", 2, 4),
-            ("???", "member", "???", 2, 5),
-            ("???", "member", "??", 3, 6),
-            ("???", "member", "??", 3, 7),
+    ensure_table_column(conn, "org_users", "title", "TEXT DEFAULT ''")
+    ensure_table_column(conn, "org_users", "demo_login_id", "TEXT")
+    ensure_table_column(conn, "org_users", "demo_password", "TEXT")
+
+    demo_seed_version = "2026-03-09-demo-login-v1"
+    seeded_version = conn.execute(
+        "SELECT value FROM settings WHERE key = 'org_demo_seed_version'"
+    ).fetchone()
+
+    if not seeded_version or seeded_version["value"] != demo_seed_version:
+        demo_users = [
+            (1, "민아 한", "ceo", "대표", "경영", None, 1, "ceo", "1111"),
+            (2, "지훈 박", "manager", "마케팅 팀장", "마케팅", 1, 2, "mktlead", "2222"),
+            (3, "서연 이", "manager", "운영 팀장", "운영", 1, 3, "opslead", "3333"),
+            (4, "유진 최", "member", "마케팅 팀원", "마케팅", 2, 4, "mkt01", "4444"),
+            (5, "다온 정", "member", "마케팅 팀원", "마케팅", 2, 5, "mkt02", "5555"),
+            (6, "현우 한", "member", "운영 팀원", "운영", 3, 6, "ops01", "6666"),
+            (7, "나래 윤", "member", "운영 팀원", "운영", 3, 7, "ops02", "7777"),
         ]
-        conn.executemany(
-            "INSERT INTO org_users (name, role, team, manager_id, sort_order) VALUES (?, ?, ?, ?, ?)",
-            users,
-        )
+        for user in demo_users:
+            conn.execute(
+                """
+                INSERT INTO org_users
+                    (id, name, role, title, team, manager_id, sort_order, demo_login_id, demo_password)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    name = excluded.name,
+                    role = excluded.role,
+                    title = excluded.title,
+                    team = excluded.team,
+                    manager_id = excluded.manager_id,
+                    sort_order = excluded.sort_order,
+                    demo_login_id = excluded.demo_login_id,
+                    demo_password = excluded.demo_password
+                """,
+                user,
+            )
 
         today = date.today()
         week_start = get_week_start(today)
-        tasks = [
-            ("3? ?? ??? ??", "??? ??? ???? ??? ?? ??", "in_progress", 1, str(today + timedelta(days=2)), 1, 2, None, "?? ?? ?? ??"),
-            ("??? ??? ??? ??", "?? ? ??? ?? ??? ??", "planned", 2, str(today + timedelta(days=1)), 2, 4, 1, ""),
-            ("?? ?? ??? ??", "?? ?? ?? ??? 1?? ??", "review", 1, str(today), 2, 5, 1, "?? ?? ??"),
-            ("?? ????? ??", "??? ?? ????? ??", "in_progress", 2, str(today + timedelta(days=3)), 1, 3, None, ""),
-            ("?? ?? ? ??", "?? ? ?? ??? ?? ??", "blocked", 1, str(today - timedelta(days=1)), 3, 6, 4, "?? ?? ??"),
-            ("???? ?? ??? ??", "?? ? ?? ??? ??? ??", "planned", 3, str(today + timedelta(days=4)), 3, 7, 4, ""),
+        demo_tasks = [
+            (1, "3월 핵심 캠페인 총괄", "대표가 마케팅 팀장에게 위임한 핵심 과제입니다.", "in_progress", 1, str(today + timedelta(days=2)), 1, 2, None, "수요일 오후 중간 점검"),
+            (2, "고객사 제안서 템플릿 정리", "제안서 공통 구조와 메시지를 표준화합니다.", "planned", 2, str(today + timedelta(days=1)), 2, 4, 1, "샘플 2종 포함"),
+            (3, "광고 성과 리포트 초안", "지난주 성과를 대표 공유용 1차안으로 정리합니다.", "review", 1, str(today), 2, 5, 1, "팀장 검토 대기"),
+            (4, "운영 체크리스트 개편", "운영팀 반복 업무를 주간 체크리스트로 정리합니다.", "in_progress", 2, str(today + timedelta(days=3)), 1, 3, None, "누락 단계 없는지 확인"),
+            (5, "정산 누락 건 확인", "정산 누락 원인을 파악하고 재발 방지안을 적습니다.", "blocked", 1, str(today - timedelta(days=1)), 3, 6, 4, "회계 자료 회신 대기"),
+            (6, "파트너사 공지 일정표 작성", "다음 주 공지 배포 일정과 담당자를 정리합니다.", "planned", 3, str(today + timedelta(days=4)), 3, 7, 4, "공유 캘린더 반영 예정"),
         ]
-        conn.executemany(
-            """
-            INSERT INTO org_tasks
-                (title, description, status, priority, due_date, created_by, assignee_id, parent_task_id, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            tasks,
-        )
+        for task in demo_tasks:
+            conn.execute(
+                """
+                INSERT INTO org_tasks
+                    (id, title, description, status, priority, due_date, created_by, assignee_id, parent_task_id, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    title = excluded.title,
+                    description = excluded.description,
+                    status = excluded.status,
+                    priority = excluded.priority,
+                    due_date = excluded.due_date,
+                    created_by = excluded.created_by,
+                    assignee_id = excluded.assignee_id,
+                    parent_task_id = excluded.parent_task_id,
+                    notes = excluded.notes
+                """,
+                task,
+            )
 
-        weekly_focus = [
-            (4, week_start, "??? ??? ?? ? ?? ??? ???? ??", "?? ?? ?? ?? ??"),
-            (5, week_start, "?? ??? ?? ?? ? ?? ??? ??", ""),
-            (6, week_start, "?? ?? ?? ??? ?? ?? ????? ??", "?? ?? ?? ??"),
-            (7, week_start, "???? ?? ???? ??? ??", ""),
+        demo_focus = [
+            (4, week_start, "제안서 템플릿을 마무리하고 대표 보고용 샘플까지 준비", "우수 사례 링크가 필요함"),
+            (5, week_start, "광고 리포트 초안을 제출하고 팀장 피드백 반영", ""),
+            (6, week_start, "정산 누락 원인 파악과 재발 방지 체크리스트 작성", "회계팀 자료 확인 필요"),
+            (7, week_start, "파트너사 공지 일정표 확정과 담당자 확인", ""),
         ]
-        conn.executemany(
-            "INSERT INTO org_weekly_focus (user_id, week_start, focus, support_needed) VALUES (?, ?, ?, ?)",
-            weekly_focus,
-        )
+        for focus in demo_focus:
+            conn.execute(
+                """
+                INSERT INTO org_weekly_focus (user_id, week_start, focus, support_needed, updated_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id, week_start) DO UPDATE SET
+                    focus = excluded.focus,
+                    support_needed = excluded.support_needed,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                focus,
+            )
 
-        work_logs = [
-            (3, 5, str(today), "?? ??? ?? ?? ??", "??? ?? ? ?? ??", "", 80, "submitted", "", None, None),
-            (5, 6, str(today), "?? ?? ?? 1? ??", "?? ??? ??? ??", "?? ?? ??", 45, "submitted", "", None, None),
+        demo_logs = [
+            (3, 5, str(today), "광고 리포트 핵심 수치를 정리하고 초안 문구를 작성", "디자인 반영 후 팀장 검토 요청", "", 80, "submitted", "", None, None),
+            (5, 6, str(today), "정산 누락 원인을 1차 확인하고 거래처 목록을 비교", "회신 자료 도착 즉시 재대조", "자료 회신 지연", 45, "submitted", "", None, None),
         ]
-        conn.executemany(
-            """
-            INSERT INTO org_work_logs
-                (task_id, user_id, log_date, today_done, next_plan, blockers, progress, review_status, review_note, reviewed_by, reviewed_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            work_logs,
+        for log in demo_logs:
+            conn.execute(
+                """
+                INSERT INTO org_work_logs
+                    (task_id, user_id, log_date, today_done, next_plan, blockers, progress, review_status, review_note, reviewed_by, reviewed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(task_id, user_id, log_date) DO UPDATE SET
+                    today_done = excluded.today_done,
+                    next_plan = excluded.next_plan,
+                    blockers = excluded.blockers,
+                    progress = excluded.progress,
+                    review_status = excluded.review_status,
+                    review_note = excluded.review_note,
+                    reviewed_by = excluded.reviewed_by,
+                    reviewed_at = excluded.reviewed_at,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                log,
+            )
+
+        conn.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES ('org_demo_seed_version', ?)",
+            (demo_seed_version,),
         )
 
     conn.commit()
@@ -265,6 +331,11 @@ class OrgWorkLogReview(BaseModel):
     actor_id: int
     review_status: str
     review_note: str = ""
+
+
+class DemoLoginRequest(BaseModel):
+    login_id: str
+    password: str
 
 
 def get_week_start(d=None):
@@ -1080,15 +1151,15 @@ def claude_usage_cached():
 
 
 
-ORG_ROLE_LABELS = {"ceo": "??", "manager": "??", "member": "??"}
+ORG_ROLE_LABELS = {"ceo": "대표", "manager": "팀장", "member": "팀원"}
 ORG_STATUS_LABELS = {
-    "planned": "??",
-    "in_progress": "???",
-    "blocked": "??",
-    "review": "????",
-    "done": "??",
+    "planned": "예정",
+    "in_progress": "진행중",
+    "blocked": "막힘",
+    "review": "검토요청",
+    "done": "완료",
 }
-PRIORITY_LABELS = {1: "??", 2: "??", 3: "??"}
+PRIORITY_LABELS = {1: "긴급", 2: "중요", 3: "일반"}
 
 
 def get_org_user(conn, user_id: int):
@@ -1249,20 +1320,20 @@ def build_org_dashboard(conn, actor_row):
 
     highlights = []
     if actor_row["role"] == "ceo":
-        highlights.append(f"?? ?? ? ?: ?? ?? {len([task for task in open_tasks if task['due_date'] < today])}?")
-        highlights.append(f"???? ???? {len(missing_logs)}?")
-        highlights.append(f"?? ?? ?? {len([task for task in tasks if task['status'] == 'review'])}?")
+        highlights.append(f"오늘 볼 핵심: 지연 업무 {len([task for task in open_tasks if task['due_date'] < today])}건")
+        highlights.append(f"업무일지 미작성자 {len(missing_logs)}명")
+        highlights.append(f"검토 대기 업무 {len([task for task in tasks if task['status'] == 'review'])}건")
     elif actor_row["role"] == "manager":
         direct_reports = [user for user in users if user.get("manager_id") == actor_row["id"]]
-        highlights.append(f"?? ?? ?? ?? {len(direct_reports)}?")
-        highlights.append(f"?? ??? ???? {len([log for log in logs_today if log['review_status'] in ('submitted', 'needs_update') and log['user_id'] != actor_row['id']])}?")
-        highlights.append(f"?? ?? {len([task for task in open_tasks if task['due_date'] < today])}?")
+        highlights.append(f"직접 관리 팀원 {len(direct_reports)}명")
+        highlights.append(f"오늘 검토할 업무일지 {len([log for log in logs_today if log['review_status'] in ('submitted', 'needs_update') and log['user_id'] != actor_row['id']])}건")
+        highlights.append(f"지연 업무 {len([task for task in open_tasks if task['due_date'] < today])}건")
     else:
         overdue = [task for task in my_open_tasks if task["due_date"] < today]
         due_today = [task for task in my_open_tasks if task["due_date"] == today]
-        highlights.append(f"?? ??? ? ? {len(due_today)}?")
-        highlights.append(f"?? ? {len(overdue)}?")
-        highlights.append(f"?? ???? {len([log for log in logs_today if log['user_id'] == actor_row['id']])}? ??")
+        highlights.append(f"오늘 끝내야 할 일 {len(due_today)}건")
+        highlights.append(f"밀린 일 {len(overdue)}건")
+        highlights.append(f"오늘 업무일지 {len([log for log in logs_today if log['user_id'] == actor_row['id']])}건 작성")
 
     teams = []
     if actor_row["role"] == "ceo":
@@ -1303,11 +1374,11 @@ def build_org_dashboard(conn, actor_row):
         )
         for task in ordered_tasks[:5]:
             if task["due_date"] < today:
-                kind = "??"
+                kind = "지연"
             elif task["due_date"] == today:
-                kind = "??"
+                kind = "오늘"
             else:
-                kind = "??"
+                kind = "예정"
             reminders.append({
                 "task_id": task["id"],
                 "kind": kind,
@@ -1344,6 +1415,14 @@ def build_org_dashboard(conn, actor_row):
 def serialize_org_user(row):
     data = dict(row)
     data["role_label"] = ORG_ROLE_LABELS.get(data["role"], data["role"])
+    data["title"] = data.get("title") or data["role_label"]
+    data.pop("demo_password", None)
+    return data
+
+
+def serialize_demo_account(row):
+    data = serialize_org_user(row)
+    data["demo_password"] = row["demo_password"]
     return data
 
 
@@ -1364,6 +1443,39 @@ def org_users():
     users = [serialize_org_user(row) for row in get_all_org_users(conn)]
     conn.close()
     return users
+
+
+@app.get("/api/org/demo-accounts")
+def org_demo_accounts():
+    conn = get_db()
+    rows = conn.execute(
+        """
+        SELECT *
+        FROM org_users
+        WHERE demo_login_id IS NOT NULL AND demo_password IS NOT NULL
+        ORDER BY CASE role WHEN 'ceo' THEN 1 WHEN 'manager' THEN 2 ELSE 3 END, sort_order, id
+        """
+    ).fetchall()
+    accounts = [serialize_demo_account(row) for row in rows]
+    conn.close()
+    return accounts
+
+
+@app.post("/api/org/demo-login")
+def org_demo_login(payload: DemoLoginRequest):
+    conn = get_db()
+    row = conn.execute(
+        """
+        SELECT *
+        FROM org_users
+        WHERE demo_login_id = ? AND demo_password = ?
+        """,
+        (payload.login_id.strip(), payload.password.strip()),
+    ).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(401, "테스트 계정 정보가 맞지 않습니다.")
+    return {"user": serialize_org_user(row)}
 
 
 @app.get("/api/org/state")
