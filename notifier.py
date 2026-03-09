@@ -13,7 +13,7 @@ def notify():
         from plyer import notification
         notification.notify(
             title="Daily Focus - 체크인 시간!",
-            message="2시간 경과. 작업 현황을 기록하세요 -> http://localhost:8000",
+            message="2시간 경과. 작업 현황을 기록하세요 -> http://localhost:8888",
             app_name="Daily Focus",
             timeout=15,
         )

@@ -29,7 +29,7 @@ After=network.target
 
 [Service]
 WorkingDirectory=/opt/daily-focus
-ExecStart=/opt/daily-focus/.venv/bin/uvicorn app:app --host 0.0.0.0 --port 8080
+ExecStart=/opt/daily-focus/.venv/bin/uvicorn app:app --host 0.0.0.0 --port 8888
 Restart=always
 RestartSec=5
 
