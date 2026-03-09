@@ -54,6 +54,7 @@ def init_db():
             value TEXT NOT NULL
         );
         INSERT OR IGNORE INTO settings (key, value) VALUES ('token_limit', '2000000000');
+        INSERT OR IGNORE INTO settings (key, value) VALUES ('remote_url', '');
     """)
     conn.commit()
     conn.close()
@@ -817,15 +818,59 @@ def claude_usage():
         "month_label":  date.today().strftime("%Y년 %m월"),
     }
 
-    # 로컬에서 읽은 결과를 캐시에 저장 (클라우드에서도 볼 수 있도록)
-    import json as _json2
+    import json as _json2, urllib.request as _ur
+
+    # 로컬 캐시 저장
     conn_c = get_db()
     conn_c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('claude_usage_cache', ?)",
                    (_json2.dumps(result),))
     conn_c.commit()
+
+    # 원격 서버에도 push
+    remote_row = conn_c.execute("SELECT value FROM settings WHERE key='remote_url'").fetchone()
     conn_c.close()
+    remote_url = remote_row["value"].strip() if remote_row else ""
+    if remote_url:
+        try:
+            req = _ur.Request(
+                f"{remote_url}/api/claude-usage-push",
+                data=_json2.dumps(result).encode(),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            _ur.urlopen(req, timeout=3)
+        except Exception:
+            pass
 
     return result
+
+
+@app.get("/api/settings/remote-url")
+def get_remote_url():
+    conn = get_db()
+    row = conn.execute("SELECT value FROM settings WHERE key='remote_url'").fetchone()
+    conn.close()
+    return {"url": row["value"] if row else ""}
+
+@app.post("/api/settings/remote-url")
+def set_remote_url(url: str):
+    conn = get_db()
+    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('remote_url', ?)", (url,))
+    conn.commit()
+    conn.close()
+    return {"url": url}
+
+
+@app.post("/api/claude-usage-push")
+def claude_usage_push(payload: dict):
+    """로컬에서 push한 claude 사용량을 DB에 캐시"""
+    import json as _json4
+    conn = get_db()
+    conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('claude_usage_cache', ?)",
+                 (_json4.dumps(payload),))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
 
 
 @app.get("/api/claude-usage-cached")
@@ -836,7 +881,7 @@ def claude_usage_cached():
     row = conn.execute("SELECT value FROM settings WHERE key='claude_usage_cache'").fetchone()
     conn.close()
     if not row:
-        return {"error": "캐시 없음 — 로컬에서 한 번 접속하면 자동 동기화됩니다",
+        return {"error": "캐시 없음",
                 "month_tokens": 0, "today_tokens": 0, "month_total": {},
                 "today_total": {}, "used_pct": 0, "remain_pct": 100,
                 "by_project": [], "month_label": date.today().strftime("%Y년 %m월")}
