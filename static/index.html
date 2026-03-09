@@ -561,6 +561,37 @@ body {
         </div>
       </div>
 
+      <!-- Claude Usage (compact) -->
+      <div class="claude-card">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span class="claude-title">Claude</span>
+          <div class="claude-bar-wrap" style="flex:1;min-width:80px;margin:0">
+            <div class="claude-bar-fill ok" id="claudeBar" style="width:0%"></div>
+          </div>
+          <span class="claude-remain ok" id="claudeRemain" style="font-size:13px">—</span>
+          <span id="claudeUsedTok" style="font-size:11px;color:var(--muted);font-family:'Courier New',monospace"></span>
+          <span style="font-size:11px;color:var(--muted)">오늘 <span id="claudeToday" style="color:var(--claude)">-</span></span>
+          <span id="claudeMonthLabel" style="font-size:11px;color:var(--muted)"></span>
+          <button onclick="loadClaudeUsage()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0" title="새로고침">↻</button>
+          <a class="claude-link" href="https://claude.ai/settings/usage" target="_blank">↗</a>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">
+          <span style="font-size:11px;color:var(--muted)">한도</span>
+          <input class="limit-inp" id="limitInp" type="text" placeholder="예: 2000000000" style="width:130px">
+          <button class="limit-btn" onclick="saveLimit()">저장</button>
+          <div class="claude-projects" id="claudeProjects" style="flex:1"></div>
+        </div>
+        <div class="claude-note" id="claudeNote"></div>
+        <!-- hidden elements for JS compatibility -->
+        <span id="claudeTime" style="display:none"></span>
+        <span id="claudeUsedPct" style="display:none">0</span>
+        <span id="claudeLimitTok" style="display:none"></span>
+        <span id="claudeInput" style="display:none"></span>
+        <span id="claudeOutput" style="display:none"></span>
+        <span id="claudeCache" style="display:none"></span>
+        <span id="limitHint" style="display:none"></span>
+      </div>
+
       <!-- Progress -->
       <div class="card">
         <div class="prog-hd">
@@ -579,62 +610,6 @@ body {
           <div class="stat">예상 시간 <b id="stTime">-</b></div>
           <div class="stat">남은 <b id="stLeft">-</b></div>
         </div>
-      </div>
-
-      <!-- Claude Usage -->
-      <div class="claude-card">
-        <div class="claude-hd">
-          <span class="claude-title">Claude Code 토큰 사용량</span>
-          <div class="claude-hd-right">
-            <span class="claude-time" id="claudeTime"></span>
-            <span id="claudeMonthLabel" style="font-size:11px;color:var(--muted)"></span>
-            <button class="icon-btn" onclick="loadClaudeUsage()" title="새로고침">↻</button>
-            <a class="claude-link" href="https://claude.ai/settings/usage" target="_blank">↗ 상세</a>
-          </div>
-        </div>
-
-        <div class="claude-main">
-          <div class="claude-main-row">
-            <div class="claude-used-label">이번 달 <b id="claudeUsedPct">0</b>% 사용</div>
-            <div class="claude-remain ok" id="claudeRemain">— 남음</div>
-          </div>
-          <div class="claude-bar-wrap">
-            <div class="claude-bar-fill ok" id="claudeBar" style="width:0%"></div>
-          </div>
-          <div class="claude-bar-labels">
-            <span id="claudeUsedTok">0</span>
-            <span id="claudeLimitTok">한도 설정 필요</span>
-          </div>
-        </div>
-
-        <div class="claude-sub-row">
-          <div class="claude-sub">
-            <div class="sl">오늘 사용</div>
-            <div class="sv orange" id="claudeToday">-</div>
-          </div>
-          <div class="claude-sub">
-            <div class="sl">입력 토큰</div>
-            <div class="sv" id="claudeInput">-</div>
-          </div>
-          <div class="claude-sub">
-            <div class="sl">출력 토큰</div>
-            <div class="sv" id="claudeOutput">-</div>
-          </div>
-          <div class="claude-sub">
-            <div class="sl">캐시 읽기</div>
-            <div class="sv" id="claudeCache">-</div>
-          </div>
-        </div>
-
-        <div class="limit-row" style="margin-bottom:12px">
-          <span style="font-size:12px;color:var(--muted)">월 한도 설정:</span>
-          <input class="limit-inp" id="limitInp" type="text" placeholder="예: 2000000000">
-          <button class="limit-btn" onclick="saveLimit()">저장</button>
-          <span style="font-size:11px;color:var(--muted)" id="limitHint"></span>
-        </div>
-
-        <div class="claude-projects" id="claudeProjects"></div>
-        <div class="claude-note" id="claudeNote"></div>
       </div>
 
       <!-- Carry-over banner -->
