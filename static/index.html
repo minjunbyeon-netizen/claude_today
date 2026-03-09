@@ -404,6 +404,20 @@ body {
 .acc-body { display: none; background: var(--bg); }
 .acc-body.open { display: block; }
 
+/* ── Done sub-section ── */
+.done-toggle {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 14px; cursor: pointer;
+  border-top: 1px solid var(--border);
+  color: var(--muted); font-size: 12px;
+  user-select: none;
+}
+.done-toggle:hover { color: var(--text2); }
+.done-toggle-arrow { font-size: 9px; transition: transform .15s; }
+.done-toggle-arrow.open { transform: rotate(90deg); }
+.done-list { display: none; }
+.done-list.open { display: block; }
+
 /* ── Task items ── */
 .task { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
 .task:last-child { border-bottom: none; }
@@ -954,7 +968,10 @@ function renderAccordion(tasks) {
     const totalMin = items.reduce((s,t) => s+t.estimated_minutes, 0);
     const isOpen   = openGroups.has(proj);
 
-    const tasksHtml = items.map(t => {
+    const todoItems = items.filter(t => t.status !== 'done');
+    const doneItems = items.filter(t => t.status === 'done');
+
+    const renderTask = t => {
       const isDone = t.status === 'done';
       const title  = t.title.replace(/^\[[^\]]+\]\s*/, '');
       return `
@@ -972,7 +989,15 @@ function renderAccordion(tasks) {
           </div>
           <button class="task-del" onclick="delTask(${t.id})">×</button>
         </div>`;
-    }).join('');
+    };
+
+    const todoHtml = todoItems.map(renderTask).join('');
+    const doneHtml = doneItems.length ? `
+      <div class="done-toggle" onclick="toggleDoneSection(this)">
+        <span class="done-toggle-arrow">▶</span>
+        <span>완료 ${doneItems.length}개</span>
+      </div>
+      <div class="done-list">${doneItems.map(renderTask).join('')}</div>` : '';
 
     return `
       <div class="acc-group">
@@ -987,7 +1012,7 @@ function renderAccordion(tasks) {
           <span class="acc-badge">${totalMin}분</span>
           <button class="btn-cc" onclick="event.stopPropagation();openClaude('${esc(proj)}')" title="Claude Code 열기">CC</button>
         </div>
-        <div class="acc-body ${isOpen?'open':''}">${tasksHtml}</div>
+        <div class="acc-body ${isOpen?'open':''}">${todoHtml}${doneHtml}</div>
       </div>`;
   }).join('');
 }
@@ -1001,6 +1026,13 @@ function toggleAcc(proj) {
       hd.nextElementSibling.classList.toggle('open', openGroups.has(proj));
     }
   });
+}
+
+function toggleDoneSection(toggleEl) {
+  const arrow = toggleEl.querySelector('.done-toggle-arrow');
+  const list  = toggleEl.nextElementSibling;
+  const open  = list.classList.toggle('open');
+  arrow.classList.toggle('open', open);
 }
 
 // ── Inline time editing ───────────────────────────────────────
