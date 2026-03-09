@@ -1,0 +1,22 @@
+name: Deploy to Droplet
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH Deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 137.184.82.157
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/daily-focus
+            git pull origin master
+            .venv/bin/pip install -q -r requirements.txt
+            systemctl restart daily-focus
+            echo "배포 완료"
