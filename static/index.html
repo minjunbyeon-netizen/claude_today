@@ -723,7 +723,7 @@ async function syncLogs() {
     const gitUpd = git.count || 0;
     const totalUpd = logUpd + gitUpd;
 
-    if (logs.error) parts.push('로그오류: ' + logs.error);
+    // logs.error는 로컬 환경에서만 의미있음 (서버에선 무시)
     if (logImp  > 0) parts.push(`${logImp}개 신규`);
     if (logUpd  > 0) parts.push(`로그 ${logUpd}개 완료`);
     if (gitUpd  > 0) parts.push(`git ${gitUpd}개 완료`);
