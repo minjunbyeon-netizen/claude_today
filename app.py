@@ -303,7 +303,7 @@ def sync_logs(logs_path: Optional[str] = None):
     - *_todo.md의 - [ ] 항목: DB에 없으면 todo로 추가, 있으면 스킵 (수동 체크 보존)
     """
     if not logs_path:
-        logs_path = r"G:\내 드라이브\01_work\_agents\squad-team\logs"
+        logs_path = r"X:\01_work\_agents\squad-team\logs"
 
     today = str(date.today())
     results = {"imported": [], "updated": [], "skipped": [], "project": None, "error": None}
@@ -406,10 +406,10 @@ def sync_git():
     - Claude Code 세션 오늘 활동 → '[project] 이어서' 태스크 status in_progress 표시용 flag
     """
     SCAN_ROOTS = [
-        r"G:\내 드라이브\01_work",
-        r"G:\내 드라이브\01_work\_agents",
-        r"G:\내 드라이브\01_work\hive-media",
-        r"G:\내 드라이브\01_work\my-project",
+        r"X:\01_work",
+        r"X:\01_work\_agents",
+        r"X:\01_work\hive-media",
+        r"X:\01_work\my-project",
         r"C:\Users\USER\Desktop",
     ]
     MAX_DEPTH = 3
@@ -529,6 +529,85 @@ def sync_git():
     conn.commit()
     conn.close()
     return {"updated": updated, "count": len(updated), "scanned": scanned}
+
+
+@app.post("/api/open-claude")
+def open_claude(proj: str):
+    """프로젝트명으로 레포를 찾아 Claude Code 터미널 열기"""
+    SCAN_ROOTS = [
+        r"X:\01_work",
+        r"X:\01_work\_agents",
+        r"X:\01_work\hive-media",
+        r"X:\01_work\my-project",
+        r"C:\Users\USER\Desktop",
+    ]
+    MAX_DEPTH = 3
+    norm_proj = proj.lower().replace("-", "").replace("_", "").replace(" ", "")
+
+    target_path = None
+    seen = set()
+    for root in SCAN_ROOTS:
+        if target_path or not os.path.isdir(root):
+            continue
+        try:
+            for dirpath, dirnames, filenames in os.walk(root):
+                if dirpath in seen:
+                    dirnames.clear(); continue
+                seen.add(dirpath)
+                depth = len(os.path.relpath(dirpath, root).split(os.sep))
+                if depth > MAX_DEPTH:
+                    dirnames.clear(); continue
+                dirnames[:] = [
+                    d for d in dirnames
+                    if not d.startswith(".")
+                    and d not in ("node_modules", "venv", "__pycache__", ".git")
+                ]
+                if ".git" in filenames or ".git" in os.listdir(dirpath):
+                    repo_name = os.path.basename(dirpath).lower()
+                    norm_repo = repo_name.replace("-", "").replace("_", "").replace(" ", "")
+                    if norm_repo == norm_proj:
+                        target_path = dirpath
+                        break
+        except (PermissionError, OSError):
+            pass
+
+    if not target_path:
+        return {"ok": False, "error": f"경로를 찾을 수 없음: {proj}"}
+
+    CLAUDE_CMD = r"C:\Users\USER\AppData\Roaming\npm\claude.cmd"
+
+    # 1) 새 탭 열기 + claude 실행 (CLAUDECODE 환경변수 제거하여 중첩 세션 오류 우회)
+    env = os.environ.copy()
+    env.pop("CLAUDECODE", None)
+    try:
+        subprocess.Popen(
+            f'wt new-tab -d "{target_path}" -- cmd /k "{CLAUDE_CMD}"',
+            shell=True,
+            env=env
+        )
+    except Exception as ex:
+        return {"ok": False, "error": str(ex)}
+
+    # 2) WT 창 강제 포커스 (최소화 복원 + 앞으로 가져오기)
+    ps = r"""
+$sig = @'
+[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+'@
+Add-Type -MemberDefinition $sig -Name 'Win32' -Namespace 'WinAPI' -ErrorAction SilentlyContinue
+$wt = Get-Process -Name 'WindowsTerminal' -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($wt) {
+    [WinAPI.Win32]::ShowWindow($wt.MainWindowHandle, 9)        # SW_RESTORE
+    Start-Sleep -Milliseconds 200
+    [WinAPI.Win32]::SetForegroundWindow($wt.MainWindowHandle)
+}
+"""
+    subprocess.Popen(
+        ["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps],
+        shell=False
+    )
+
+    return {"ok": True, "path": target_path, "method": "wt"}
 
 
 @app.get("/api/settings/token-limit")

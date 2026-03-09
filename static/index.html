@@ -250,6 +250,15 @@ body {
 .day-pb { height: 3px; background: var(--border); border-radius: 99px; margin-top: 8px; overflow: hidden; }
 .day-pf { height: 100%; background: var(--success); border-radius: 99px; }
 
+.btn-cc {
+  background: #0a1a0a; border: 1px solid #3fb95050; color: #7ee787;
+  border-radius: 4px; padding: 2px 8px; font-size: 10px; font-weight: 700;
+  cursor: pointer; transition: all .15s; flex-shrink: 0;
+  font-family: 'Courier New', monospace; letter-spacing: .04em;
+}
+.btn-cc:hover { background: #0d2010; border-color: #3fb950aa; color: #a8f5b0; }
+.btn-cc:active { transform: scale(.95); }
+
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
@@ -552,6 +561,7 @@ function renderAccordion(tasks) {
           </div>
           <span class="acc-badge ${allDone?'done':''}">${done}/${total}</span>
           <span class="acc-badge">${totalMin}분</span>
+          <button class="btn-cc" onclick="event.stopPropagation();openClaude('${esc(proj)}')" title="Claude Code 열기">CC</button>
         </div>
         <div class="acc-body ${isOpen?'open':''}">${tasksHtml}</div>
       </div>`;
@@ -864,6 +874,15 @@ async function toggleGoal(id,isDone) {
 }
 async function delGoal(id) {
   await fetch(`/api/week/goals/${id}`,{method:'DELETE'}); loadWeek();
+}
+
+// ── Open Claude Code ─────────────────────────────────────────
+async function openClaude(proj) {
+  const r = await fetch(`/api/open-claude?proj=${encodeURIComponent(proj)}`, {method:'POST'});
+  const d = await r.json();
+  if (!d.ok) {
+    alert(`Claude Code 열기 실패\n${d.error}`);
+  }
 }
 
 // ── Boot ─────────────────────────────────────────────────────

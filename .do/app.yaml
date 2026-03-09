@@ -1,0 +1,15 @@
+name: daily-focus
+region: sgp
+
+services:
+- name: web
+  dockerfile_path: Dockerfile
+  github:
+    repo: minjunbyeon-netizen/claude_today
+    branch: master
+    deploy_on_push: true
+  http_port: 8080
+  instance_size_slug: apps-s-1vcpu-0.5gb
+  instance_count: 1
+  routes:
+  - path: /
