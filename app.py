@@ -55,12 +55,143 @@ def init_db():
         );
         INSERT OR IGNORE INTO settings (key, value) VALUES ('token_limit', '2000000000');
         INSERT OR IGNORE INTO settings (key, value) VALUES ('remote_url', '');
+        CREATE TABLE IF NOT EXISTS agent_status (
+            project TEXT PRIMARY KEY,
+            task    TEXT NOT NULL,
+            status  TEXT NOT NULL,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
     """)
     conn.commit()
     conn.close()
 
 
 init_db()
+
+
+def init_org_data():
+    conn = get_db()
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS org_users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            role TEXT NOT NULL CHECK (role IN ('ceo', 'manager', 'member')),
+            team TEXT,
+            manager_id INTEGER,
+            sort_order INTEGER DEFAULT 0,
+            FOREIGN KEY (manager_id) REFERENCES org_users(id)
+        );
+        CREATE TABLE IF NOT EXISTS org_tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'planned',
+            priority INTEGER NOT NULL DEFAULT 2,
+            due_date TEXT NOT NULL,
+            created_by INTEGER NOT NULL,
+            assignee_id INTEGER NOT NULL,
+            parent_task_id INTEGER,
+            notes TEXT DEFAULT '',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            completed_at TEXT,
+            FOREIGN KEY (created_by) REFERENCES org_users(id),
+            FOREIGN KEY (assignee_id) REFERENCES org_users(id),
+            FOREIGN KEY (parent_task_id) REFERENCES org_tasks(id)
+        );
+        CREATE TABLE IF NOT EXISTS org_weekly_focus (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            week_start TEXT NOT NULL,
+            focus TEXT NOT NULL,
+            support_needed TEXT DEFAULT '',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, week_start),
+            FOREIGN KEY (user_id) REFERENCES org_users(id)
+        );
+        CREATE TABLE IF NOT EXISTS org_work_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            log_date TEXT NOT NULL,
+            today_done TEXT NOT NULL,
+            next_plan TEXT NOT NULL,
+            blockers TEXT DEFAULT '',
+            progress INTEGER DEFAULT 0,
+            review_status TEXT NOT NULL DEFAULT 'submitted',
+            review_note TEXT DEFAULT '',
+            reviewed_by INTEGER,
+            reviewed_at TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(task_id, user_id, log_date),
+            FOREIGN KEY (task_id) REFERENCES org_tasks(id),
+            FOREIGN KEY (user_id) REFERENCES org_users(id),
+            FOREIGN KEY (reviewed_by) REFERENCES org_users(id)
+        );
+    """)
+
+    user_count = conn.execute("SELECT COUNT(*) AS count FROM org_users").fetchone()["count"]
+    if user_count == 0:
+        users = [
+            ("???", "ceo", "??", None, 1),
+            ("???", "manager", "???", 1, 2),
+            ("???", "manager", "??", 1, 3),
+            ("???", "member", "???", 2, 4),
+            ("???", "member", "???", 2, 5),
+            ("???", "member", "??", 3, 6),
+            ("???", "member", "??", 3, 7),
+        ]
+        conn.executemany(
+            "INSERT INTO org_users (name, role, team, manager_id, sort_order) VALUES (?, ?, ?, ?, ?)",
+            users,
+        )
+
+        today = date.today()
+        week_start = get_week_start(today)
+        tasks = [
+            ("3? ?? ??? ??", "??? ??? ???? ??? ?? ??", "in_progress", 1, str(today + timedelta(days=2)), 1, 2, None, "?? ?? ?? ??"),
+            ("??? ??? ??? ??", "?? ? ??? ?? ??? ??", "planned", 2, str(today + timedelta(days=1)), 2, 4, 1, ""),
+            ("?? ?? ??? ??", "?? ?? ?? ??? 1?? ??", "review", 1, str(today), 2, 5, 1, "?? ?? ??"),
+            ("?? ????? ??", "??? ?? ????? ??", "in_progress", 2, str(today + timedelta(days=3)), 1, 3, None, ""),
+            ("?? ?? ? ??", "?? ? ?? ??? ?? ??", "blocked", 1, str(today - timedelta(days=1)), 3, 6, 4, "?? ?? ??"),
+            ("???? ?? ??? ??", "?? ? ?? ??? ??? ??", "planned", 3, str(today + timedelta(days=4)), 3, 7, 4, ""),
+        ]
+        conn.executemany(
+            """
+            INSERT INTO org_tasks
+                (title, description, status, priority, due_date, created_by, assignee_id, parent_task_id, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            tasks,
+        )
+
+        weekly_focus = [
+            (4, week_start, "??? ??? ?? ? ?? ??? ???? ??", "?? ?? ?? ?? ??"),
+            (5, week_start, "?? ??? ?? ?? ? ?? ??? ??", ""),
+            (6, week_start, "?? ?? ?? ??? ?? ?? ????? ??", "?? ?? ?? ??"),
+            (7, week_start, "???? ?? ???? ??? ??", ""),
+        ]
+        conn.executemany(
+            "INSERT INTO org_weekly_focus (user_id, week_start, focus, support_needed) VALUES (?, ?, ?, ?)",
+            weekly_focus,
+        )
+
+        work_logs = [
+            (3, 5, str(today), "?? ??? ?? ?? ??", "??? ?? ? ?? ??", "", 80, "submitted", "", None, None),
+            (5, 6, str(today), "?? ?? ?? 1? ??", "?? ??? ??? ??", "?? ?? ??", 45, "submitted", "", None, None),
+        ]
+        conn.executemany(
+            """
+            INSERT INTO org_work_logs
+                (task_id, user_id, log_date, today_done, next_plan, blockers, progress, review_status, review_note, reviewed_by, reviewed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            work_logs,
+        )
+
+    conn.commit()
+    conn.close()
 
 
 # --- Models ---
@@ -93,12 +224,58 @@ class CheckinCreate(BaseModel):
     note: Optional[str] = ""
 
 
+class OrgTaskCreate(BaseModel):
+    actor_id: int
+    title: str
+    assignee_id: int
+    due_date: Optional[str] = None
+    priority: int = 2
+    description: str = ""
+    parent_task_id: Optional[int] = None
+
+
+class OrgTaskUpdate(BaseModel):
+    actor_id: int
+    status: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    due_date: Optional[str] = None
+    priority: Optional[int] = None
+    notes: Optional[str] = None
+
+
+class OrgWeeklyFocusUpsert(BaseModel):
+    actor_id: int
+    focus: str
+    support_needed: str = ""
+    week_start: Optional[str] = None
+
+
+class OrgWorkLogUpsert(BaseModel):
+    actor_id: int
+    task_id: int
+    today_done: str
+    next_plan: str
+    blockers: str = ""
+    progress: int = 0
+    log_date: Optional[str] = None
+
+
+class OrgWorkLogReview(BaseModel):
+    actor_id: int
+    review_status: str
+    review_note: str = ""
+
+
 def get_week_start(d=None):
     if d is None:
         d = date.today()
     elif isinstance(d, str):
         d = datetime.strptime(d, "%Y-%m-%d").date()
     return str(d - timedelta(days=d.weekday()))
+
+
+init_org_data()
 
 
 # --- Routes ---
@@ -900,6 +1077,521 @@ def claude_usage_cached():
                 "today_total": {}, "used_pct": 0, "remain_pct": 100,
                 "by_project": [], "month_label": date.today().strftime("%Y년 %m월")}
     return _json3.loads(row["value"])
+
+
+
+ORG_ROLE_LABELS = {"ceo": "??", "manager": "??", "member": "??"}
+ORG_STATUS_LABELS = {
+    "planned": "??",
+    "in_progress": "???",
+    "blocked": "??",
+    "review": "????",
+    "done": "??",
+}
+PRIORITY_LABELS = {1: "??", 2: "??", 3: "??"}
+
+
+def get_org_user(conn, user_id: int):
+    return conn.execute("SELECT * FROM org_users WHERE id = ?", (user_id,)).fetchone()
+
+
+def get_visible_org_user_ids(conn, user_row):
+    if user_row["role"] == "ceo":
+        rows = conn.execute("SELECT id FROM org_users ORDER BY sort_order, id").fetchall()
+        return [row["id"] for row in rows]
+    if user_row["role"] == "manager":
+        rows = conn.execute(
+            """
+            WITH RECURSIVE descendants(id) AS (
+                SELECT id FROM org_users WHERE id = ?
+                UNION ALL
+                SELECT u.id
+                FROM org_users u
+                JOIN descendants d ON u.manager_id = d.id
+            )
+            SELECT id FROM descendants
+            ORDER BY id
+            """,
+            (user_row["id"],),
+        ).fetchall()
+        return [row["id"] for row in rows]
+    return [user_row["id"]]
+
+
+def get_all_org_users(conn):
+    return [
+        dict(row)
+        for row in conn.execute(
+            "SELECT * FROM org_users ORDER BY CASE role WHEN 'ceo' THEN 1 WHEN 'manager' THEN 2 ELSE 3 END, sort_order, id"
+        ).fetchall()
+    ]
+
+
+def get_all_org_tasks(conn):
+    return [
+        dict(row)
+        for row in conn.execute(
+            """
+            SELECT
+                t.*,
+                assignee.name AS assignee_name,
+                assignee.role AS assignee_role,
+                assignee.team AS assignee_team,
+                creator.name AS created_by_name,
+                parent.title AS parent_task_title
+            FROM org_tasks t
+            JOIN org_users assignee ON assignee.id = t.assignee_id
+            JOIN org_users creator ON creator.id = t.created_by
+            LEFT JOIN org_tasks parent ON parent.id = t.parent_task_id
+            ORDER BY t.due_date, t.priority, t.id
+            """
+        ).fetchall()
+    ]
+
+
+def get_all_org_work_logs(conn, log_date: Optional[str] = None):
+    query = """
+        SELECT
+            l.*,
+            u.name AS user_name,
+            t.title AS task_title,
+            reviewer.name AS reviewer_name
+        FROM org_work_logs l
+        JOIN org_users u ON u.id = l.user_id
+        JOIN org_tasks t ON t.id = l.task_id
+        LEFT JOIN org_users reviewer ON reviewer.id = l.reviewed_by
+    """
+    params = []
+    if log_date:
+        query += " WHERE l.log_date = ?"
+        params.append(log_date)
+    query += " ORDER BY l.log_date DESC, l.created_at DESC"
+    return [dict(row) for row in conn.execute(query, params).fetchall()]
+
+
+def get_org_weekly_focus_rows(conn, week_start: str):
+    return [
+        dict(row)
+        for row in conn.execute(
+            """
+            SELECT f.*, u.name AS user_name, u.role AS user_role, u.team AS user_team
+            FROM org_weekly_focus f
+            JOIN org_users u ON u.id = f.user_id
+            WHERE f.week_start = ?
+            ORDER BY u.sort_order, u.id
+            """,
+            (week_start,),
+        ).fetchall()
+    ]
+
+
+def can_assign_org_task(conn, actor_row, assignee_id: int):
+    if actor_row["role"] == "member":
+        return False
+    return assignee_id in get_visible_org_user_ids(conn, actor_row)
+
+
+def can_manage_org_task(conn, actor_row, task_row):
+    visible_ids = get_visible_org_user_ids(conn, actor_row)
+    if actor_row["role"] == "member":
+        return task_row["assignee_id"] == actor_row["id"]
+    return task_row["assignee_id"] in visible_ids or task_row["created_by"] == actor_row["id"]
+
+
+def make_org_summary(actor, tasks, logs_today, visible_users):
+    open_tasks = [task for task in tasks if task["status"] != "done"]
+    overdue = [task for task in open_tasks if task["due_date"] < str(date.today())]
+    blocked = [task for task in open_tasks if task["status"] == "blocked"]
+    review = [task for task in tasks if task["status"] == "review"]
+    return {
+        "actor_name": actor["name"],
+        "actor_role": actor["role"],
+        "visible_user_count": len(visible_users),
+        "total_tasks": len(tasks),
+        "open_tasks": len(open_tasks),
+        "done_tasks": len([task for task in tasks if task["status"] == "done"]),
+        "overdue_tasks": len(overdue),
+        "blocked_tasks": len(blocked),
+        "review_tasks": len(review),
+        "today_log_count": len(logs_today),
+    }
+
+
+def build_org_dashboard(conn, actor_row):
+    today = str(date.today())
+    week_start = get_week_start(today)
+    visible_ids = set(get_visible_org_user_ids(conn, actor_row))
+    users = [user for user in get_all_org_users(conn) if user["id"] in visible_ids]
+    tasks = [
+        task
+        for task in get_all_org_tasks(conn)
+        if task["assignee_id"] in visible_ids or task["created_by"] in visible_ids
+    ]
+    logs_today = [log for log in get_all_org_work_logs(conn, today) if log["user_id"] in visible_ids]
+    weekly_focus = [focus for focus in get_org_weekly_focus_rows(conn, week_start) if focus["user_id"] in visible_ids]
+
+    open_tasks = [task for task in tasks if task["status"] != "done"]
+    my_tasks = [task for task in tasks if task["assignee_id"] == actor_row["id"]]
+    my_open_tasks = [task for task in my_tasks if task["status"] != "done"]
+    missing_logs = []
+    for user in users:
+        if user["role"] == "ceo":
+            continue
+        user_open = [task for task in open_tasks if task["assignee_id"] == user["id"]]
+        has_today_log = any(log["user_id"] == user["id"] for log in logs_today)
+        if user_open and not has_today_log:
+            missing_logs.append({
+                "user_id": user["id"],
+                "name": user["name"],
+                "team": user["team"],
+                "open_task_count": len(user_open),
+            })
+
+    highlights = []
+    if actor_row["role"] == "ceo":
+        highlights.append(f"?? ?? ? ?: ?? ?? {len([task for task in open_tasks if task['due_date'] < today])}?")
+        highlights.append(f"???? ???? {len(missing_logs)}?")
+        highlights.append(f"?? ?? ?? {len([task for task in tasks if task['status'] == 'review'])}?")
+    elif actor_row["role"] == "manager":
+        direct_reports = [user for user in users if user.get("manager_id") == actor_row["id"]]
+        highlights.append(f"?? ?? ?? ?? {len(direct_reports)}?")
+        highlights.append(f"?? ??? ???? {len([log for log in logs_today if log['review_status'] in ('submitted', 'needs_update') and log['user_id'] != actor_row['id']])}?")
+        highlights.append(f"?? ?? {len([task for task in open_tasks if task['due_date'] < today])}?")
+    else:
+        overdue = [task for task in my_open_tasks if task["due_date"] < today]
+        due_today = [task for task in my_open_tasks if task["due_date"] == today]
+        highlights.append(f"?? ??? ? ? {len(due_today)}?")
+        highlights.append(f"?? ? {len(overdue)}?")
+        highlights.append(f"?? ???? {len([log for log in logs_today if log['user_id'] == actor_row['id']])}? ??")
+
+    teams = []
+    if actor_row["role"] == "ceo":
+        managers = [user for user in users if user["role"] == "manager"]
+        for manager in managers:
+            team_user_ids = set(get_visible_org_user_ids(conn, manager)) - {manager["id"]}
+            team_tasks = [task for task in tasks if task["assignee_id"] in team_user_ids]
+            team_logs = [log for log in logs_today if log["user_id"] in team_user_ids]
+            teams.append({
+                "manager_id": manager["id"],
+                "manager_name": manager["name"],
+                "team": manager["team"],
+                "open_tasks": len([task for task in team_tasks if task["status"] != "done"]),
+                "overdue_tasks": len([task for task in team_tasks if task["status"] != "done" and task["due_date"] < today]),
+                "today_logs": len(team_logs),
+            })
+
+    reportees = []
+    if actor_row["role"] == "manager":
+        direct_reports = [user for user in users if user.get("manager_id") == actor_row["id"]]
+        for reportee in direct_reports:
+            user_tasks = [task for task in tasks if task["assignee_id"] == reportee["id"]]
+            reportees.append({
+                "user_id": reportee["id"],
+                "name": reportee["name"],
+                "team": reportee["team"],
+                "open_tasks": len([task for task in user_tasks if task["status"] != "done"]),
+                "overdue_tasks": len([task for task in user_tasks if task["status"] != "done" and task["due_date"] < today]),
+                "has_today_log": any(log["user_id"] == reportee["id"] for log in logs_today),
+            })
+
+    my_weekly_focus = next((focus for focus in weekly_focus if focus["user_id"] == actor_row["id"]), None)
+    reminders = []
+    if actor_row["role"] == "member":
+        ordered_tasks = sorted(
+            my_open_tasks,
+            key=lambda task: (task["due_date"] > today, task["due_date"], task["priority"]),
+        )
+        for task in ordered_tasks[:5]:
+            if task["due_date"] < today:
+                kind = "??"
+            elif task["due_date"] == today:
+                kind = "??"
+            else:
+                kind = "??"
+            reminders.append({
+                "task_id": task["id"],
+                "kind": kind,
+                "title": task["title"],
+                "due_date": task["due_date"],
+            })
+
+    review_queue = []
+    if actor_row["role"] in ("ceo", "manager"):
+        review_queue = [
+            log for log in logs_today
+            if log["user_id"] != actor_row["id"] and log["review_status"] in ("submitted", "needs_update")
+        ]
+
+    return {
+        "today": today,
+        "week_start": week_start,
+        "summary": make_org_summary(actor_row, tasks, logs_today, users),
+        "highlights": highlights,
+        "teams": teams,
+        "reportees": reportees,
+        "missing_logs": missing_logs,
+        "review_queue": review_queue,
+        "my_weekly_focus": my_weekly_focus,
+        "reminders": reminders,
+        "tasks": tasks,
+        "weekly_focus": weekly_focus,
+        "logs_today": logs_today,
+        "visible_users": users,
+        "assignee_options": [user for user in users if user["role"] != "ceo" or actor_row["role"] == "ceo"],
+    }
+
+
+def serialize_org_user(row):
+    data = dict(row)
+    data["role_label"] = ORG_ROLE_LABELS.get(data["role"], data["role"])
+    return data
+
+
+def serialize_org_task(task):
+    task = dict(task)
+    task["status_label"] = ORG_STATUS_LABELS.get(task["status"], task["status"])
+    task["priority_label"] = PRIORITY_LABELS.get(task["priority"], str(task["priority"]))
+    return task
+
+
+def serialize_org_work_log(log):
+    return dict(log)
+
+
+@app.get("/api/org/users")
+def org_users():
+    conn = get_db()
+    users = [serialize_org_user(row) for row in get_all_org_users(conn)]
+    conn.close()
+    return users
+
+
+@app.get("/api/org/state")
+def org_state(user_id: int):
+    conn = get_db()
+    actor = get_org_user(conn, user_id)
+    if not actor:
+        conn.close()
+        raise HTTPException(404, "User not found")
+    dashboard = build_org_dashboard(conn, actor)
+    conn.close()
+    return {
+        "user": serialize_org_user(actor),
+        "today": dashboard["today"],
+        "week_start": dashboard["week_start"],
+        "summary": dashboard["summary"],
+        "highlights": dashboard["highlights"],
+        "teams": dashboard["teams"],
+        "reportees": dashboard["reportees"],
+        "missing_logs": dashboard["missing_logs"],
+        "review_queue": [serialize_org_work_log(log) for log in dashboard["review_queue"]],
+        "reminders": dashboard["reminders"],
+        "my_weekly_focus": dashboard["my_weekly_focus"],
+        "tasks": [serialize_org_task(task) for task in dashboard["tasks"]],
+        "weekly_focus": dashboard["weekly_focus"],
+        "logs_today": [serialize_org_work_log(log) for log in dashboard["logs_today"]],
+        "visible_users": [serialize_org_user(user) for user in dashboard["visible_users"]],
+        "assignee_options": [serialize_org_user(user) for user in dashboard["assignee_options"]],
+    }
+
+
+@app.post("/api/org/tasks")
+def create_org_task(task: OrgTaskCreate):
+    conn = get_db()
+    actor = get_org_user(conn, task.actor_id)
+    if not actor:
+        conn.close()
+        raise HTTPException(404, "Actor not found")
+    if not can_assign_org_task(conn, actor, task.assignee_id):
+        conn.close()
+        raise HTTPException(403, "You cannot assign work to that user")
+    due_date = task.due_date or str(date.today())
+    cur = conn.execute(
+        """
+        INSERT INTO org_tasks (title, description, priority, due_date, created_by, assignee_id, parent_task_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (task.title, task.description, task.priority, due_date, task.actor_id, task.assignee_id, task.parent_task_id),
+    )
+    conn.commit()
+    created = conn.execute("SELECT * FROM org_tasks WHERE id = ?", (cur.lastrowid,)).fetchone()
+    conn.close()
+    return dict(created)
+
+
+@app.patch("/api/org/tasks/{task_id}")
+def update_org_task(task_id: int, update: OrgTaskUpdate):
+    conn = get_db()
+    actor = get_org_user(conn, update.actor_id)
+    task = conn.execute("SELECT * FROM org_tasks WHERE id = ?", (task_id,)).fetchone()
+    if not actor or not task:
+        conn.close()
+        raise HTTPException(404, "Not found")
+    if not can_manage_org_task(conn, actor, task):
+        conn.close()
+        raise HTTPException(403, "You cannot update this task")
+
+    updates = {}
+    for key in ("status", "title", "description", "due_date", "priority", "notes"):
+        value = getattr(update, key)
+        if value is not None:
+            updates[key] = value
+
+    if actor["role"] == "member":
+        forbidden = {"title", "description", "due_date", "priority"} & set(updates)
+        if forbidden:
+            conn.close()
+            raise HTTPException(403, "Members can only update status and notes")
+
+    if update.status == "done" and task["status"] != "done":
+        updates["completed_at"] = datetime.now().isoformat()
+    elif update.status and update.status != "done" and task["status"] == "done":
+        updates["completed_at"] = None
+
+    if updates:
+        sets = ", ".join(f"{key} = ?" for key in updates)
+        conn.execute(f"UPDATE org_tasks SET {sets} WHERE id = ?", (*updates.values(), task_id))
+        conn.commit()
+    updated = conn.execute("SELECT * FROM org_tasks WHERE id = ?", (task_id,)).fetchone()
+    conn.close()
+    return dict(updated)
+
+
+@app.post("/api/org/weekly-focus")
+def upsert_org_weekly_focus(payload: OrgWeeklyFocusUpsert):
+    conn = get_db()
+    actor = get_org_user(conn, payload.actor_id)
+    if not actor:
+        conn.close()
+        raise HTTPException(404, "Actor not found")
+    week_start = payload.week_start or get_week_start()
+    conn.execute(
+        """
+        INSERT INTO org_weekly_focus (user_id, week_start, focus, support_needed, updated_at)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(user_id, week_start) DO UPDATE SET
+            focus = excluded.focus,
+            support_needed = excluded.support_needed,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (payload.actor_id, week_start, payload.focus, payload.support_needed),
+    )
+    conn.commit()
+    row = conn.execute(
+        "SELECT * FROM org_weekly_focus WHERE user_id = ? AND week_start = ?",
+        (payload.actor_id, week_start),
+    ).fetchone()
+    conn.close()
+    return dict(row)
+
+
+@app.post("/api/org/worklogs")
+def upsert_org_worklog(payload: OrgWorkLogUpsert):
+    conn = get_db()
+    actor = get_org_user(conn, payload.actor_id)
+    task = conn.execute("SELECT * FROM org_tasks WHERE id = ?", (payload.task_id,)).fetchone()
+    if not actor or not task:
+        conn.close()
+        raise HTTPException(404, "Not found")
+    if task["assignee_id"] != payload.actor_id:
+        conn.close()
+        raise HTTPException(403, "You can only write logs for your own tasks")
+
+    progress = max(0, min(100, payload.progress))
+    log_date = payload.log_date or str(date.today())
+    conn.execute(
+        """
+        INSERT INTO org_work_logs
+            (task_id, user_id, log_date, today_done, next_plan, blockers, progress, review_status, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'submitted', CURRENT_TIMESTAMP)
+        ON CONFLICT(task_id, user_id, log_date) DO UPDATE SET
+            today_done = excluded.today_done,
+            next_plan = excluded.next_plan,
+            blockers = excluded.blockers,
+            progress = excluded.progress,
+            review_status = 'submitted',
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (payload.task_id, payload.actor_id, log_date, payload.today_done, payload.next_plan, payload.blockers, progress),
+    )
+    conn.commit()
+    row = conn.execute(
+        "SELECT * FROM org_work_logs WHERE task_id = ? AND user_id = ? AND log_date = ?",
+        (payload.task_id, payload.actor_id, log_date),
+    ).fetchone()
+    conn.close()
+    return dict(row)
+
+
+@app.post("/api/org/worklogs/{worklog_id}/review")
+def review_org_worklog(worklog_id: int, payload: OrgWorkLogReview):
+    conn = get_db()
+    actor = get_org_user(conn, payload.actor_id)
+    worklog = conn.execute(
+        "SELECT l.*, t.assignee_id, t.created_by FROM org_work_logs l JOIN org_tasks t ON t.id = l.task_id WHERE l.id = ?",
+        (worklog_id,),
+    ).fetchone()
+    if not actor or not worklog:
+        conn.close()
+        raise HTTPException(404, "Not found")
+    if actor["role"] == "member":
+        conn.close()
+        raise HTTPException(403, "Members cannot review logs")
+    if worklog["assignee_id"] == actor["id"]:
+        conn.close()
+        raise HTTPException(403, "You cannot review your own log")
+    task_like = {"assignee_id": worklog["assignee_id"], "created_by": worklog["created_by"]}
+    if not can_manage_org_task(conn, actor, task_like):
+        conn.close()
+        raise HTTPException(403, "You cannot review this log")
+
+    review_status = payload.review_status
+    if review_status not in ("approved", "needs_update"):
+        conn.close()
+        raise HTTPException(400, "Invalid review status")
+
+    conn.execute(
+        "UPDATE org_work_logs SET review_status = ?, review_note = ?, reviewed_by = ?, reviewed_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (review_status, payload.review_note, payload.actor_id, datetime.now().isoformat(), worklog_id),
+    )
+    conn.commit()
+    updated = conn.execute("SELECT * FROM org_work_logs WHERE id = ?", (worklog_id,)).fetchone()
+    conn.close()
+    return dict(updated)
+
+
+class AgentStatusReport(BaseModel):
+    project: str
+    task: str
+    status: str  # start | step | done
+
+
+@app.post("/api/agent-status")
+def post_agent_status(report: AgentStatusReport):
+    conn = get_db()
+    conn.execute(
+        """INSERT INTO agent_status (project, task, status, updated_at)
+           VALUES (?, ?, ?, datetime('now','localtime'))
+           ON CONFLICT(project) DO UPDATE SET
+             task=excluded.task, status=excluded.status, updated_at=excluded.updated_at""",
+        (report.project, report.task, report.status)
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+@app.get("/api/agent-status")
+def get_agent_status():
+    conn = get_db()
+    rows = conn.execute(
+        """SELECT project, task, status, updated_at,
+                  CAST((julianday('now','localtime') - julianday(updated_at)) * 1440 AS INTEGER) AS minutes_ago
+           FROM agent_status
+           ORDER BY updated_at DESC"""
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
