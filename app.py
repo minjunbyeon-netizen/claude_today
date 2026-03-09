@@ -59,6 +59,7 @@ def init_db():
             project TEXT PRIMARY KEY,
             task    TEXT NOT NULL,
             status  TEXT NOT NULL,
+            url     TEXT DEFAULT '',
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
     """)
@@ -1676,17 +1677,19 @@ class AgentStatusReport(BaseModel):
     project: str
     task: str
     status: str  # start | step | done
+    url: Optional[str] = ""
 
 
 @app.post("/api/agent-status")
 def post_agent_status(report: AgentStatusReport):
     conn = get_db()
+    ensure_table_column(conn, "agent_status", "url", "TEXT DEFAULT ''")
     conn.execute(
-        """INSERT INTO agent_status (project, task, status, updated_at)
-           VALUES (?, ?, ?, datetime('now','localtime'))
+        """INSERT INTO agent_status (project, task, status, url, updated_at)
+           VALUES (?, ?, ?, ?, datetime('now','localtime'))
            ON CONFLICT(project) DO UPDATE SET
-             task=excluded.task, status=excluded.status, updated_at=excluded.updated_at""",
-        (report.project, report.task, report.status)
+             task=excluded.task, status=excluded.status, url=excluded.url, updated_at=excluded.updated_at""",
+        (report.project, report.task, report.status, report.url or "")
     )
     conn.commit()
     conn.close()
@@ -1696,8 +1699,9 @@ def post_agent_status(report: AgentStatusReport):
 @app.get("/api/agent-status")
 def get_agent_status():
     conn = get_db()
+    ensure_table_column(conn, "agent_status", "url", "TEXT DEFAULT ''")
     rows = conn.execute(
-        """SELECT project, task, status, updated_at,
+        """SELECT project, task, status, url, updated_at,
                   CAST((julianday('now','localtime') - julianday(updated_at)) * 1440 AS INTEGER) AS minutes_ago
            FROM agent_status
            ORDER BY updated_at DESC"""

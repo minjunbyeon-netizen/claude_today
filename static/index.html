@@ -514,6 +514,17 @@ body {
 .btn-cc:hover { background: #0d2010; border-color: #3fb950aa; color: #a8f5b0; }
 .btn-cc:active { transform: scale(.95); }
 
+/* ── VIEW button ── */
+.btn-view {
+  background: #0a0d1a; border: 1px solid #4493f850; color: #79b8ff;
+  border-radius: 4px; padding: 2px 8px; font-size: 10px; font-weight: 700;
+  cursor: pointer; transition: all .15s; flex-shrink: 0;
+  font-family: 'Courier New', monospace; letter-spacing: .04em;
+}
+.btn-view:hover { background: #0d1525; border-color: #4493f8aa; color: #a5c8ff; }
+.btn-view:active { transform: scale(.95); }
+.btn-view.disabled { opacity: .35; cursor: default; pointer-events: none; }
+
 /* ── Project filter notice ── */
 .filter-bar {
   display: flex;
@@ -1053,6 +1064,7 @@ function renderAccordion(tasks) {
           <span class="acc-badge ${allDone?'done':''}">${done}/${total}</span>
           <span class="acc-badge">${totalMin}분</span>
           <button class="btn-cc" onclick="event.stopPropagation();openClaude('${esc(proj)}')" title="Claude Code 열기">CC</button>
+          <button class="btn-view${agentUrls[proj]?'':' disabled'}" onclick="event.stopPropagation();openView('${esc(proj)}')" title="프로젝트 웹 홈">VIEW</button>
         </div>
         <div class="acc-body ${isOpen?'open':''}">${todoHtml}${doneHtml}</div>
       </div>`;
@@ -1405,6 +1417,12 @@ async function saveLimit() {
   await loadClaudeUsage();
 }
 
+// ── Open Project Web View ──────────────────────────────────────
+function openView(proj) {
+  const url = agentUrls[proj];
+  if (url) window.open(url, '_blank');
+}
+
 // ── Open Claude Code ──────────────────────────────────────────
 async function openClaude(proj) {
   const r = await fetch(`/api/open-claude?proj=${encodeURIComponent(proj)}`, {method:'POST'});
@@ -1427,6 +1445,9 @@ loadTodayByDate(currentViewDate);
 loadClaudeUsage();
 setInterval(loadClaudeUsage, 30000);
 
+// agentUrls: project -> url (populated by loadAgentStatus)
+const agentUrls = {};
+
 // 4) 세션 현황 로드
 async function loadAgentStatus() {
   try {
@@ -1434,6 +1455,8 @@ async function loadAgentStatus() {
     const el = document.getElementById('sessionsList');
     document.getElementById('sessionsTime').textContent =
       new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+    // update url map
+    rows.forEach(r => { if (r.url) agentUrls[r.project] = r.url; });
     if (!rows.length) {
       el.innerHTML = '<span class="sessions-empty">연결된 세션 없음</span>';
       return;
