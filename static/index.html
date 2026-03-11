@@ -1661,6 +1661,7 @@ let calViewYear      = new Date().getFullYear();
 let calViewMonth     = new Date().getMonth();  // 0-based
 let autoRefreshBusy  = false;
 let lastAutoRefreshAt = null;
+let _syncGitTick = 0;  // autoRefreshTick 카운터 (5틱마다 silent sync-git)
 let claudePanelOpen = localStorage.getItem('claude_open') === '1';
 
 // Accordion state
@@ -2466,15 +2467,33 @@ function refreshTaskProgress(event, id) {
   return refreshMain();
 }
 
+async function syncGitSilent() {
+  // autoRefreshTick 내부에서 조용히 호출 — UI 버튼 건드리지 않음
+  try {
+    const r = await fetch(appUrl('api/sync-git'), { method: 'POST' });
+    const data = await r.json();
+    if ((data.count || 0) > 0) {
+      const msg = document.getElementById('syncMsg');
+      if (msg) {
+        msg.style.display = 'block';
+        msg.style.color = 'var(--success)';
+        msg.textContent = `Git 자동: ${data.count}개 완료 처리됨`;
+        setTimeout(() => { msg.style.display = 'none'; }, 8000);
+      }
+      await Promise.all([refreshMain(), loadWeekTaskMap()]);
+    }
+  } catch (_) { /* silent */ }
+}
+
 async function autoRefreshTick() {
   if (autoRefreshBusy) return;
   autoRefreshBusy = true;
+  _syncGitTick++;
   try {
-    await Promise.all([
-      refreshMain(),
-      loadWeekTaskMap(),
-      loadAgentStatus(),
-    ]);
+    const base = [refreshMain(), loadWeekTaskMap(), loadAgentStatus()];
+    // 5분(5틱)마다 git 활동 감지 자동 실행
+    if (_syncGitTick % 5 === 0) base.push(syncGitSilent());
+    await Promise.all(base);
     lastAutoRefreshAt = new Date();
     if (_lastStats && allTasks.length) {
       renderMonitorPanel(allTasks, _lastStats);
