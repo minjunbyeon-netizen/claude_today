@@ -1,11 +1,11 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="오늘 할 일 관리 + Claude Code 토큰 사용량 실시간 확인">
-<title>Daily Focus — 오늘의 작업 & Claude 현황</title>
-<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<meta name="description" content="Daily Focus CC / VIEW dashboard for Claude Code sessions, shortcuts, and today's work.">
+<title>Daily Focus CC / VIEW</title>
+<link rel="icon" type="image/svg+xml" href="static/favicon.svg">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -25,7 +25,7 @@
   --claude:    #e8914a;
   --claude-bg: #130d06;
   --r: 10px;
-  --sidebar-w: 240px;
+  --sidebar-w: 216px;
 }
 
 html, body {
@@ -249,8 +249,8 @@ body {
 .main-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
 
 .main-inner {
-  padding: 24px 28px;
-  max-width: 960px;
+  padding: 30px 44px 44px;
+  max-width: 1280px;
   width: 100%;
   margin: 0 auto;
 }
@@ -333,22 +333,639 @@ body {
 .session-ago  { font-size: 10px; color: var(--muted); white-space: nowrap; margin-left: auto; }
 .sessions-empty { font-size: 12px; color: var(--muted); }
 
+/* ── Monitor ── */
+.watch-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 14px 18px;
+  margin-bottom: 12px;
+}
+.watch-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.watch-live {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text2);
+}
+.watch-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.watch-dot.live {
+  background: var(--success);
+  box-shadow: 0 0 10px rgba(63, 185, 80, 0.35);
+}
+.watch-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.watch-pill {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--bg);
+}
+.watch-pill.ok { color: #7ee787; border-color: #3fb95044; background: #0f1813; }
+.watch-pill.watch { color: #f2cc60; border-color: #d2992244; background: #1a1408; }
+.watch-pill.stale { color: #ffb86b; border-color: #f0883e44; background: #1b120a; }
+.watch-pill.critical { color: #ff8e8e; border-color: #f8514944; background: #1d1010; }
+.blink {
+  animation: blinkPulse 1.2s ease-in-out infinite;
+}
+@keyframes blinkPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .34; }
+}
+.watch-alerts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.watch-alert-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--bg);
+}
+.watch-alert-row.critical { border-color: #f8514960; }
+.watch-alert-row.stale { border-color: #f0883e50; }
+.watch-alert-row.watch { border-color: #d2992250; }
+.watch-alert-level {
+  flex-shrink: 0;
+  min-width: 58px;
+  text-align: center;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+.watch-alert-level.critical { background: #241111; color: #ff8e8e; }
+.watch-alert-level.stale { background: #24170d; color: #ffb86b; }
+.watch-alert-level.watch { background: #20180c; color: #f2cc60; }
+.watch-alert-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+.watch-alert-title {
+  font-size: 12px;
+  color: var(--text2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.watch-alert-reason {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.watch-empty { font-size: 12px; color: var(--muted); }
+
+/* ── Morning Board ── */
+.morning-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 18px 20px;
+  margin-bottom: 12px;
+}
+.morning-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.morning-headline {
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--text2);
+  line-height: 1.5;
+}
+.morning-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.morning-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--bg);
+}
+.morning-pill.ok { color: #7ee787; border-color: #3fb95044; background: #0f1813; }
+.morning-pill.warn { color: #f2cc60; border-color: #d2992244; background: #1a1408; }
+.morning-pill.info { color: #9cc3ff; border-color: #4493f850; background: #0d1525; }
+.morning-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.28fr) minmax(320px, .92fr);
+  gap: 18px;
+  align-items: start;
+}
+.morning-primary {
+  min-width: 0;
+}
+.morning-primary,
+.morning-side-card {
+  background: #131820;
+  border: 1px solid #2d333c;
+  border-radius: 10px;
+  padding: 14px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+}
+.morning-question-block {
+  margin-bottom: 12px;
+}
+.morning-block-head,
+.morning-side-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.morning-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.morning-block-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.morning-question {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #d0d7de;
+  line-height: 1.55;
+}
+.morning-goal-feature,
+.morning-goal-confirmed {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 15px;
+  border: 1px solid #343b46;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015));
+}
+.morning-goal-confirmed {
+  margin-top: 10px;
+  background: rgba(255,255,255,0.01);
+}
+.morning-goal-pill-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.morning-goal-feature-value {
+  font-size: 15px;
+  color: #f0f3f6;
+  font-weight: 600;
+  line-height: 1.58;
+  letter-spacing: -0.01em;
+  max-width: 72ch;
+}
+.morning-goal-pill-value {
+  font-size: 12.5px;
+  color: #d8dee4;
+  line-height: 1.55;
+}
+.morning-goal-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.morning-goal-state {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #364152;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #b7cdf5;
+  background: #151d2b;
+}
+.morning-goal-meta,
+.morning-week-hint,
+.morning-prompt,
+.morning-time-status {
+  font-size: 12px;
+  color: #9ea7b3;
+  line-height: 1.5;
+}
+.morning-prompt {
+  margin-top: 12px;
+}
+.morning-time-status {
+  margin-top: 8px;
+}
+.morning-goal-actions,
+.morning-week-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.morning-goal-actions {
+  margin-top: 12px;
+}
+.morning-goal-input,
+.morning-week-input {
+  width: 100%;
+  min-height: 48px;
+}
+.morning-time-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.morning-time-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.morning-time-input {
+  min-width: 108px;
+  font-family: 'Courier New', monospace;
+}
+.morning-week-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.morning-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid #2f3743;
+  border-radius: 8px;
+  background: #10151c;
+}
+.morning-metric-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.morning-metric b {
+  color: var(--text2);
+}
+.mini-progress {
+  height: 5px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.mini-progress-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  transition: width .4s ease;
+}
+.mini-progress-fill.goal { background: var(--accent); }
+.mini-progress-fill.task { background: var(--success); }
+.morning-week-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.week-goal-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid #2f3743;
+  border-radius: 8px;
+  background: #0f141b;
+}
+.week-goal-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.week-goal-check.on {
+  background: var(--success);
+  border-color: var(--success);
+  color: var(--bg);
+}
+.week-goal-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.5;
+}
+.week-goal-text.done {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.week-goal-delete {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 10px;
+  cursor: pointer;
+}
+.week-goal-delete:hover {
+  border-color: var(--danger);
+  color: #ff8e8e;
+}
+.week-goal-empty {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ── Ops Brief ── */
+.ops-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 14px 18px;
+  margin-bottom: 12px;
+}
+.ops-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.ops-headline {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #9ea7b3;
+}
+.ops-objective {
+  margin-bottom: 10px;
+  padding: 12px 14px;
+  border: 1px solid #2f3743;
+  border-radius: 10px;
+  background: #11161e;
+}
+.ops-objective-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #f0f3f6;
+  line-height: 1.55;
+  letter-spacing: -0.01em;
+}
+.ops-objective-title::before {
+  content: none;
+}
+.ops-objective-detail {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #9ea7b3;
+  line-height: 1.55;
+}
+.ops-focus {
+  padding: 10px 0 12px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+  color: #d0d7de;
+}
+.ops-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  padding-top: 12px;
+}
+.ops-block-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 8px;
+}
+.ops-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ops-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-left: 10px;
+  border-left: 2px solid var(--border);
+}
+.ops-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ops-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ops-mini-btn {
+  background: #0d1525;
+  border: 1px solid #4493f850;
+  color: #9cc3ff;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  cursor: pointer;
+}
+.ops-mini-btn:hover {
+  border-color: #4493f8aa;
+  color: #d5e5ff;
+}
+.ops-action-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 10px;
+  cursor: pointer;
+}
+.ops-action-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.ops-cmd {
+  font-size: 10px;
+  color: var(--muted);
+  font-family: 'Courier New', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ops-item.focus { border-left-color: var(--accent); }
+.ops-item.watch { border-left-color: #d29922; }
+.ops-item.stale { border-left-color: #f0883e; }
+.ops-item.critical { border-left-color: #f85149; }
+.ops-item.note { border-left-color: #6e7681; }
+.ops-item-title {
+  font-size: 12px;
+  color: var(--text2);
+  font-weight: 600;
+}
+.ops-item-detail {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.ops-note {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--muted);
+}
+.ops-empty {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 /* ── Claude Usage ── */
 .claude-card {
   background: var(--claude-bg);
   border: 1px solid #e8914a28;
   border-radius: var(--r);
-  padding: 18px;
+  overflow: hidden;
   margin-bottom: 12px;
 }
-.claude-hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.claude-summary {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+}
+.claude-summary:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+.claude-summary-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.claude-summary-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.claude-summary-label {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.claude-summary-value {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--claude);
+  letter-spacing: -0.04em;
+  font-family: 'Courier New', monospace;
+  white-space: nowrap;
+}
+.claude-summary-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.claude-toggle-arrow {
+  display: inline-flex;
+  transition: transform .2s ease;
+}
+.claude-toggle-arrow.open {
+  transform: rotate(180deg);
+}
+.claude-detail {
+  display: none;
+  padding: 0 18px 18px;
+  border-top: 1px solid #e8914a20;
+}
+.claude-detail.open {
+  display: block;
+}
 .claude-title {
   font-size: 11px; font-weight: 700; color: var(--claude);
   text-transform: uppercase; letter-spacing: .1em;
   display: flex; align-items: center; gap: 6px;
 }
 .claude-title::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--claude); box-shadow: 0 0 6px var(--claude); }
-.claude-hd-right { display: flex; align-items: center; gap: 10px; }
+.claude-detail-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 14px;
+  margin-bottom: 14px;
+}
+.claude-detail-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .claude-time { font-size: 11px; color: var(--muted); font-family: 'Courier New', monospace; }
 .claude-link { font-size: 11px; color: var(--muted); text-decoration: none; }
 .claude-link:hover { color: var(--claude); }
@@ -447,24 +1064,45 @@ body {
 .done-toggle-arrow.open { transform: rotate(90deg); }
 .done-list { display: none; }
 .done-list.open { display: block; }
+.parked-toggle { border-top: 1px solid var(--border); }
 
 /* ── Task items ── */
-.task { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.task { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
 .task:last-child { border-bottom: none; }
-.task.done { opacity: .38; }
+.task.done { opacity: .56; }
 .task.done .task-title { text-decoration: line-through; }
+.task.parked { opacity: .62; }
+.task.parked .task-title { color: var(--muted); }
 
-.pri-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 1px; }
+.pri-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 7px; }
 .pri-dot[data-p="1"] { background: var(--danger); }
 .pri-dot[data-p="2"] { background: var(--warning); }
 .pri-dot[data-p="3"] { background: var(--border); }
 
-.cb { width: 18px; height: 18px; border: 2px solid var(--border); border-radius: 50%; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+.cb { width: 18px; height: 18px; border: 2px solid var(--border); border-radius: 50%; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all .15s; margin-top: 1px; }
 .cb.on { background: var(--success); border-color: var(--success); }
 .cb.on::after { content: "✓"; font-size: 10px; color: #0d1117; font-weight: 800; }
 
-.task-title { flex: 1; font-size: 14px; color: var(--text2); line-height: 1.4; }
+.task-main { flex: 1; min-width: 0; }
+.task-top { display: flex; align-items: flex-start; gap: 12px; }
+.task-title { flex: 1; font-size: 13px; color: #d5dbe3; line-height: 1.55; min-width: 0; }
+.task-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .carry-badge { font-size: 10px; color: var(--muted); background: var(--surface); border-radius: 4px; padding: 1px 5px; margin-right: 5px; border: 1px solid var(--border); }
+.task-state-badge { font-size: 10px; color: var(--muted); background: var(--surface2); border-radius: 4px; padding: 1px 5px; margin-left: 6px; border: 1px solid var(--border); }
+.task-attn {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  vertical-align: middle;
+}
+.task-attn.watch { color: #f2cc60; background: #20180c; border: 1px solid #d2992244; }
+.task-attn.stale { color: #ffb86b; background: #24170d; border: 1px solid #f0883e44; }
+.task-attn.critical { color: #ff8e8e; background: #241111; border: 1px solid #f8514944; }
 
 .task-min-wrap { position: relative; }
 .task-min {
@@ -480,6 +1118,42 @@ body {
 }
 .task-min-input.show { display: inline-block; }
 .task-min.hide { display: none; }
+
+.task-refresh {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color .15s;
+}
+.task-refresh:hover { color: var(--text); }
+
+.task-progress-row { display: flex; align-items: center; gap: 10px; margin-top: 7px; }
+.task-progress-bar {
+  flex: 1;
+  height: 5px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+  min-width: 80px;
+}
+.task-progress-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width .35s ease;
+}
+.task-progress-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  white-space: nowrap;
+}
+.task-progress-text { font-size: 11px; color: var(--text2); }
+.task-progress-source { font-size: 10px; color: var(--muted); }
 
 .task-del { background: none; border: none; color: var(--border); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 4px; transition: color .15s; flex-shrink: 0; }
 .task-del:hover { color: var(--danger); }
@@ -499,6 +1173,32 @@ body {
 
 .ci-hist { display: flex; flex-direction: column; gap: 6px; }
 .ci-entry { background: var(--surface2); border-radius: 6px; padding: 9px 12px; border: 1px solid var(--border); }
+.ci-entry.agent { background: #111723; }
+.ci-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.ci-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ci-subtitle { margin-top: 4px; font-size: 11px; color: var(--muted); }
+.ci-badge {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  color: var(--muted);
+  background: var(--bg);
+  letter-spacing: .04em;
+}
+.ci-badge.auto { color: #7ee787; border-color: #3fb95044; background: #0f1813; }
+.ci-badge.status { color: #79c0ff; border-color: #1f6feb44; background: #0d1624; letter-spacing: 0; }
+.ci-badge.muted { letter-spacing: 0; }
+.ci-project { font-size: 13px; font-weight: 600; color: var(--text2); margin-top: 6px; }
+.ci-link {
+  color: var(--accent);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+}
+.ci-link:hover { border-color: var(--accent); }
 .ci-time   { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
 .ci-counts { font-size: 13px; font-weight: 600; color: var(--text2); }
 .ci-note-disp { font-size: 12px; color: var(--muted); margin-top: 4px; font-style: italic; line-height: 1.5; }
@@ -513,6 +1213,7 @@ body {
 }
 .btn-cc:hover { background: #0d2010; border-color: #3fb950aa; color: #a8f5b0; }
 .btn-cc:active { transform: scale(.95); }
+.btn-cc.disabled { opacity: .35; cursor: default; pointer-events: none; }
 
 /* ── VIEW button ── */
 .btn-view {
@@ -569,6 +1270,34 @@ body {
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+@media (max-width: 900px) {
+  .claude-summary {
+    align-items: flex-start;
+  }
+  .claude-summary-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .claude-summary-value {
+    font-size: 22px;
+  }
+  .morning-layout {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .morning-week-metrics {
+    grid-template-columns: 1fr;
+  }
+  .ops-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .main-inner {
+    padding: 20px 18px 28px;
+    max-width: 100%;
+  }
+}
 </style>
 </head>
 <body>
@@ -577,6 +1306,14 @@ body {
 
   <!-- ════════ SIDEBAR ════════ -->
   <aside class="sidebar">
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Daily Focus</div>
+      <div style="font-size:18px;font-weight:700;color:var(--text);letter-spacing:-0.03em;">CC / VIEW</div>
+      <div style="margin-top:6px;font-size:12px;color:var(--muted);line-height:1.5;">
+        Claude Code sessions, VIEW shortcuts, and daily work tracking live here.
+      </div>
+    </div>
 
     <!-- 1. 월별 캘린더 -->
     <div class="sidebar-section">
@@ -620,40 +1357,71 @@ body {
 
       <!-- Claude Usage (compact) -->
       <div class="claude-card">
-        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-          <span class="claude-title">Claude</span>
-          <div class="claude-bar-wrap" style="flex:1;min-width:80px;margin:0">
+        <button class="claude-summary" type="button" onclick="toggleClaudePanel()">
+          <div class="claude-summary-main">
+            <span class="claude-title">CC / VIEW</span>
+            <div class="claude-summary-copy">
+              <span class="claude-summary-label">Claude 잔여량</span>
+              <span class="claude-summary-value" id="claudeSummaryValue">—</span>
+            </div>
+          </div>
+          <div class="claude-summary-toggle">
+            <span id="claudeSummaryState">상세 보기</span>
+            <span class="claude-toggle-arrow" id="claudeToggleArrow">⌄</span>
+          </div>
+        </button>
+        <div class="claude-detail" id="claudeDetail">
+          <div class="claude-detail-top">
+            <div class="claude-detail-right">
+              <span id="claudeMonthLabel" style="font-size:11px;color:var(--muted)"></span>
+              <span id="claudeUsedTok" style="font-size:11px;color:var(--muted);font-family:'Courier New',monospace"></span>
+              <span style="font-size:11px;color:var(--muted)">오늘 <span id="claudeToday" style="color:var(--claude)">-</span></span>
+            </div>
+            <div class="claude-detail-right">
+              <button onclick="event.stopPropagation();loadClaudeUsage()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0" title="새로고침">↻</button>
+              <a class="claude-link" href="https://claude.ai/settings/usage" target="_blank" onclick="event.stopPropagation()">↗</a>
+            </div>
+          </div>
+          <div class="claude-bar-wrap" style="margin:0 0 6px">
             <div class="claude-bar-fill ok" id="claudeBar" style="width:0%"></div>
           </div>
-          <span class="claude-remain ok" id="claudeRemain" style="font-size:13px">—</span>
-          <span id="claudeUsedTok" style="font-size:11px;color:var(--muted);font-family:'Courier New',monospace"></span>
-          <span style="font-size:11px;color:var(--muted)">오늘 <span id="claudeToday" style="color:var(--claude)">-</span></span>
-          <span id="claudeMonthLabel" style="font-size:11px;color:var(--muted)"></span>
-          <button onclick="loadClaudeUsage()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0" title="새로고침">↻</button>
-          <a class="claude-link" href="https://claude.ai/settings/usage" target="_blank">↗</a>
+          <div class="claude-bar-labels">
+            <span id="claudeRemain">—</span>
+            <span id="claudeLimitTok"></span>
+          </div>
+          <div class="claude-sub-row" style="margin-top:14px">
+            <div class="claude-sub">
+              <div class="sl">이번 달 입력</div>
+              <div class="sv" id="claudeInput">-</div>
+            </div>
+            <div class="claude-sub">
+              <div class="sl">이번 달 출력</div>
+              <div class="sv" id="claudeOutput">-</div>
+            </div>
+            <div class="claude-sub">
+              <div class="sl">캐시 리드</div>
+              <div class="sv orange" id="claudeCache">-</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-size:11px;color:var(--muted)">한도</span>
+            <input class="limit-inp" id="limitInp" type="text" placeholder="예: 2000000000" style="width:130px">
+            <button class="limit-btn" onclick="saveLimit()">저장</button>
+            <div class="claude-projects" id="claudeProjects" style="flex:1"></div>
+          </div>
+          <div class="claude-note" id="claudeNote"></div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">
-          <span style="font-size:11px;color:var(--muted)">한도</span>
-          <input class="limit-inp" id="limitInp" type="text" placeholder="예: 2000000000" style="width:130px">
-          <button class="limit-btn" onclick="saveLimit()">저장</button>
-          <div class="claude-projects" id="claudeProjects" style="flex:1"></div>
-        </div>
-        <div class="claude-note" id="claudeNote"></div>
         <!-- hidden elements for JS compatibility -->
 
         <span id="claudeTime" style="display:none"></span>
         <span id="claudeUsedPct" style="display:none">0</span>
-        <span id="claudeLimitTok" style="display:none"></span>
-        <span id="claudeInput" style="display:none"></span>
-        <span id="claudeOutput" style="display:none"></span>
-        <span id="claudeCache" style="display:none"></span>
         <span id="limitHint" style="display:none"></span>
       </div>
 
       <!-- Agent Sessions -->
       <div class="sessions-card">
         <div class="sessions-title">
-          <span>세션 현황</span>
+            <span>CC / VIEW Sessions</span>
           <span id="sessionsTime" style="font-size:10px;font-weight:400;color:var(--muted);font-family:'Courier New',monospace"></span>
         </div>
         <div class="sessions-list" id="sessionsList">
@@ -661,22 +1429,160 @@ body {
         </div>
       </div>
 
+      <div class="watch-card">
+        <div class="watch-top">
+          <div>
+            <span class="sec-title">자동 감시</span>
+            <div class="watch-live">
+              <span class="watch-dot live" id="watchDot"></span>
+              <span id="watchStatus">자동 최신화가 동작 중입니다</span>
+            </div>
+          </div>
+          <div class="watch-meta">
+            <span class="watch-pill" id="watchRefresh">20초 주기</span>
+            <span class="watch-pill ok" id="watchSummary">정체 없음</span>
+          </div>
+        </div>
+        <div class="watch-alerts" id="watchAlerts">
+          <span class="watch-empty">감시 데이터를 준비하는 중입니다</span>
+        </div>
+      </div>
+
+      <div class="morning-card">
+        <div class="morning-top">
+          <div>
+            <span class="sec-title">아침 보드</span>
+            <div class="morning-headline" id="morningHeadline">오늘 목표와 이번 주 흐름을 준비하는 중입니다</div>
+          </div>
+          <button class="icon-btn" onclick="refreshMain()" title="아침 보드 새로고침">↻</button>
+        </div>
+        <div class="morning-pills">
+          <span class="morning-pill info" id="morningTimePill">매일 09:00</span>
+          <span class="morning-pill warn" id="morningConfirmPill">오늘 목표 확정 필요</span>
+          <span class="morning-pill ok" id="morningWeekPill">이번 주 0/0</span>
+        </div>
+        <div class="morning-layout">
+          <div class="morning-primary">
+            <div class="morning-question-block">
+              <span class="morning-block-title">오늘 목표</span>
+              <div class="morning-question" id="morningGoalQuestion">오늘 목표 질문을 준비하는 중입니다</div>
+            </div>
+            <div class="morning-goal-feature">
+              <span class="morning-goal-pill-label">오늘의 추천 목표</span>
+              <div class="morning-goal-feature-value" id="morningGoalRecommended">추천 목표를 계산하는 중입니다</div>
+              <div class="morning-goal-meta-row">
+                <span class="morning-goal-state" id="morningGoalState">추천 대기</span>
+                <span class="morning-goal-meta" id="morningGoalMeta">아직 오늘 목표가 확정되지 않았습니다</span>
+              </div>
+            </div>
+            <div class="morning-goal-confirmed" id="morningGoalConfirmedWrap" style="display:none">
+              <span class="morning-goal-pill-label">현재 확정된 목표</span>
+              <span class="morning-goal-pill-value" id="morningGoalEffective">아직 확정된 목표가 없습니다</span>
+            </div>
+            <div class="morning-week-hint" id="morningGoalWeeklyHint">주간 목표와 연결되는 힌트가 여기에 표시됩니다</div>
+            <textarea class="ci-note morning-goal-input" id="morningGoalInput" placeholder="직접 정하고 싶은 오늘 목표를 입력하세요"></textarea>
+            <div class="morning-goal-actions">
+              <button class="ops-mini-btn" id="acceptRecommendedGoalBtn" onclick="acceptRecommendedGoal()">추천 목표 확정</button>
+              <button class="ops-action-btn" onclick="saveCustomGoal()">직접 입력 저장</button>
+            </div>
+          </div>
+          <div class="morning-side">
+            <div class="morning-side-card morning-time-card">
+              <div class="morning-side-top">
+                <span class="morning-block-title">아침 브리핑</span>
+              </div>
+              <div class="morning-time-status" id="morningTimeStatus">아침 브리핑 시간을 불러오는 중입니다</div>
+              <div class="morning-time-actions">
+                <input class="inp morning-time-input" id="morningTimeInput" type="time">
+                <button class="btn-ci" onclick="saveMorningBriefTime()">저장</button>
+              </div>
+            </div>
+            <div class="morning-side-card">
+              <div class="morning-side-top">
+                <span class="morning-block-title">이번 주 목표</span>
+              </div>
+              <div class="morning-week-metrics">
+                <div class="morning-metric">
+                  <div class="morning-metric-head">
+                    <span>목표 진행</span>
+                    <b id="weekGoalMetric">0/0</b>
+                  </div>
+                  <div class="mini-progress"><div class="mini-progress-fill goal" id="weekGoalFill"></div></div>
+                </div>
+                <div class="morning-metric">
+                  <div class="morning-metric-head">
+                    <span>작업 진행</span>
+                    <b id="weekTaskMetric">0/0</b>
+                  </div>
+                  <div class="mini-progress"><div class="mini-progress-fill task" id="weekTaskFill"></div></div>
+                </div>
+              </div>
+              <div class="morning-week-list" id="weekGoalList">
+                <span class="week-goal-empty">이번 주 목표를 불러오는 중입니다</span>
+              </div>
+              <div class="morning-week-add">
+                <input class="inp inp-title morning-week-input" id="weekGoalInput" placeholder="이번 주 목표 추가..." onkeydown="if(e(event))addWeeklyGoal()">
+                <button class="btn-add" onclick="addWeeklyGoal()">추가</button>
+              </div>
+              <div class="morning-week-hint" id="weekGoalHint">주간 진행 상황이 여기에 표시됩니다</div>
+            </div>
+          </div>
+        </div>
+        <div class="morning-prompt" id="morningPrompt">오늘 가장 중요한 목표를 먼저 확정하세요.</div>
+      </div>
+
+      <div class="ops-card">
+        <div class="ops-top">
+          <div>
+            <span class="sec-title">운영 브리프</span>
+            <div class="ops-headline" id="opsHeadline">오늘 운영 요약을 준비하는 중입니다</div>
+          </div>
+          <button class="icon-btn" onclick="refreshMain()" title="운영 브리프 새로고침">↻</button>
+        </div>
+        <div class="ops-objective">
+          <div class="ops-objective-title" id="opsObjective">오늘의 목적을 계산하는 중입니다</div>
+          <div class="ops-objective-detail" id="opsObjectiveDetail">작업 흐름을 바탕으로 가장 중요한 목적을 뽑아냅니다.</div>
+        </div>
+        <div class="ops-focus" id="opsFocus">작업 흐름을 분석하는 중입니다.</div>
+        <div class="ops-grid">
+          <div>
+            <div class="ops-block-title">다음 액션</div>
+            <div class="ops-list" id="opsActions">
+              <span class="ops-empty">다음 액션을 계산하는 중입니다</span>
+            </div>
+          </div>
+          <div>
+            <div class="ops-block-title">추천 순서</div>
+            <div class="ops-list" id="opsQueue">
+              <span class="ops-empty">추천 순서를 계산하는 중입니다</span>
+            </div>
+          </div>
+          <div>
+            <div class="ops-block-title">리스크</div>
+            <div class="ops-list" id="opsRisks">
+              <span class="ops-empty">리스크를 계산하는 중입니다</span>
+            </div>
+          </div>
+        </div>
+        <div class="ops-note" id="opsNote">최근 체크인 메모가 표시됩니다.</div>
+      </div>
+
       <!-- Progress -->
       <div class="card">
         <div class="prog-hd">
           <div>
-            <span class="prog-label">완료율</span>
+            <span class="prog-label">실시간 진행률</span>
             <span id="progRefreshTime" style="font-size:10px;color:var(--muted);margin-left:8px;font-family:'Courier New',monospace"></span>
           </div>
           <div style="display:flex;align-items:center;gap:10px">
-            <button class="icon-btn" onclick="refreshMain()" title="새로고침">↻</button>
+            <button class="icon-btn" onclick="refreshMain()" title="현재 진행률 반영">↻</button>
             <span class="prog-pct" id="progPct">-</span>
           </div>
         </div>
         <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
         <div class="prog-stats">
           <div class="stat">작업 <b id="stTasks">-/-</b></div>
-          <div class="stat">예상 시간 <b id="stTime">-</b></div>
+          <div class="stat">AI 시간 <b id="stTime">-</b></div>
           <div class="stat">남은 <b id="stLeft">-</b></div>
         </div>
       </div>
@@ -691,7 +1597,7 @@ body {
       <div class="card">
         <div class="add-row">
           <input class="inp inp-title" id="inTitle" placeholder="할 일 추가..." onkeydown="if(e(event))addTask()">
-          <input class="inp inp-min"   id="inMin" type="number" value="30" min="5" max="480" title="예상 시간 (분)">
+          <input class="inp inp-min"   id="inMin" type="number" value="15" min="5" max="480" title="기준 시간 (분)">
           <select class="sel" id="inPri">
             <option value="1">높음</option>
             <option value="2" selected>보통</option>
@@ -699,6 +1605,7 @@ body {
           </select>
           <button class="btn-add"  onclick="addTask()">+ 추가</button>
           <button class="btn-sync" id="syncBtn" onclick="syncLogs()">↻ 동기화</button>
+          <button class="btn-sync" id="syncGitBtn" onclick="syncGit()" style="border-color:#4493f844;color:#79c0ff;" title="git 커밋 감지로 완료 자동 처리">↻ Git 감지</button>
           <input type="file" id="logFolderInput" webkitdirectory multiple accept=".md" style="display:none" onchange="uploadLogsFromFolder(this)">
         </div>
         <div class="sync-msg" id="syncMsg"></div>
@@ -716,8 +1623,11 @@ body {
       <!-- Check-in -->
       <div class="card">
         <div class="ci-hd">
-          <span class="sec-title">체크인 기록</span>
-          <button class="btn-ci" onclick="toggleCi()">체크인 남기기</button>
+          <div>
+            <span class="sec-title">체크인 기록</span>
+            <div class="ci-subtitle">수동 체크인과 CC 자동 활동이 함께 표시됩니다</div>
+          </div>
+          <button class="btn-ci" onclick="toggleCi()">수동 체크인 남기기</button>
         </div>
         <div class="ci-form" id="ciForm">
           <textarea class="ci-note" id="ciNote" placeholder="진행 상황, 막힌 부분, 다음 집중 포인트..."></textarea>
@@ -737,7 +1647,10 @@ const CHECK_HOURS = [9,11,13,15,17,19];
 
 const e   = ev => ev.key === 'Enter';
 const esc = s  => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const escAttr = s => esc(s).replace(/"/g,'&quot;');
 const p2  = n  => String(n).padStart(2,'0');
+const appUrl = path => new URL(String(path || '').replace(/^\/+/, ''), document.baseURI).toString();
+const AUTO_REFRESH_MS = 60000;
 
 // ── State ─────────────────────────────────────────────────────
 let currentViewDate  = todayStr();   // YYYY-MM-DD (선택된 날짜)
@@ -746,13 +1659,37 @@ let allTasks         = [];           // 현재 로드된 전체 태스크
 let weekTaskMap      = {};           // { 'YYYY-MM-DD': { total, done } }
 let calViewYear      = new Date().getFullYear();
 let calViewMonth     = new Date().getMonth();  // 0-based
+let autoRefreshBusy  = false;
+let lastAutoRefreshAt = null;
+let claudePanelOpen = localStorage.getItem('claude_open') === '1';
 
 // Accordion state
 let openGroups = new Set(JSON.parse(localStorage.getItem('acc_open') || '[]'));
 function saveOpen() { localStorage.setItem('acc_open', JSON.stringify([...openGroups])); }
+function syncClaudePanel() {
+  const detail = document.getElementById('claudeDetail');
+  const arrow = document.getElementById('claudeToggleArrow');
+  const state = document.getElementById('claudeSummaryState');
+  if (!detail || !arrow || !state) return;
+  detail.classList.toggle('open', claudePanelOpen);
+  arrow.classList.toggle('open', claudePanelOpen);
+  state.textContent = claudePanelOpen ? '상세 닫기' : '상세 보기';
+}
+function toggleClaudePanel() {
+  claudePanelOpen = !claudePanelOpen;
+  localStorage.setItem('claude_open', claudePanelOpen ? '1' : '0');
+  syncClaudePanel();
+}
 
 function todayStr() {
   const d = new Date();
+  return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
+}
+function getWeekStartFromDate(ds) {
+  const d = new Date(`${ds}T00:00:00`);
+  const dow = d.getDay();
+  const diffToMon = dow === 0 ? -6 : 1 - dow;
+  d.setDate(d.getDate() + diffToMon);
   return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
 }
 function fmtT(iso) {
@@ -988,6 +1925,266 @@ function groupTasks(tasks) {
 }
 
 const FILL_COLOR = { 1: 'var(--danger)', 2: 'var(--warning)', 3: 'var(--border)' };
+function formatMinutes(value) {
+  const safe = Math.max(0, Math.round(Number(value) || 0));
+  return `${safe}분`;
+}
+function progressTone(pct) {
+  if (pct >= 100) return 'var(--success)';
+  if (pct >= 65) return 'var(--accent)';
+  if (pct >= 35) return 'var(--warning)';
+  return '#4b5563';
+}
+function summarizeProgress(tasks) {
+  const total = tasks.length;
+  const done  = tasks.filter(t => t.status === 'done').length;
+  const totalMin = tasks.reduce((sum, task) => sum + (task.display_minutes || task.estimated_minutes || 0), 0);
+  const progressMin = Math.round(tasks.reduce((sum, task) => {
+    const minutes = task.display_minutes || task.estimated_minutes || 0;
+    const pct = task.progress_pct ?? (task.status === 'done' ? 100 : 0);
+    return sum + (minutes * pct / 100);
+  }, 0));
+  const remainingMin = Math.max(0, totalMin - progressMin);
+  const pct = totalMin > 0 ? Math.round(progressMin / totalMin * 100) : 0;
+  return { total, done, totalMin, progressMin, remainingMin, pct };
+}
+
+function attentionRank(level) {
+  return { critical: 3, stale: 2, watch: 1, ok: 0, done: 0 }[level] || 0;
+}
+
+function attentionTone(level) {
+  if (level === 'critical') return 'critical';
+  if (level === 'stale') return 'stale';
+  if (level === 'watch') return 'watch';
+  return 'ok';
+}
+
+function renderMonitorPanel(tasks, stats) {
+  const monitor = (stats && stats.monitor) || {};
+  const alerts = tasks
+    .filter(task => attentionRank(task.attention_level) > 0)
+    .sort((a, b) => attentionRank(b.attention_level) - attentionRank(a.attention_level))
+    .slice(0, 4);
+
+  const summaryEl = document.getElementById('watchSummary');
+  const refreshEl = document.getElementById('watchRefresh');
+  const alertsEl = document.getElementById('watchAlerts');
+  const statusEl = document.getElementById('watchStatus');
+  const dotEl = document.getElementById('watchDot');
+
+  const autoSeconds = monitor.auto_refresh_seconds || Math.round(AUTO_REFRESH_MS / 1000);
+  refreshEl.textContent = `${autoSeconds}초 주기`;
+
+  if (lastAutoRefreshAt) {
+    const diff = Math.max(0, Math.round((Date.now() - lastAutoRefreshAt.getTime()) / 1000));
+    statusEl.textContent = `자동 최신화 동작 중 · 마지막 반영 ${diff}초 전`;
+  } else {
+    statusEl.textContent = '자동 최신화가 동작 중입니다';
+  }
+
+  dotEl.className = `watch-dot live${autoRefreshBusy ? ' blink' : ''}`;
+
+  if ((monitor.critical_count || 0) > 0) {
+    summaryEl.className = 'watch-pill critical blink';
+    summaryEl.textContent = `긴급 ${monitor.critical_count}개`;
+  } else if ((monitor.stale_count || 0) > 0) {
+    summaryEl.className = 'watch-pill stale blink';
+    summaryEl.textContent = `정체 ${monitor.stale_count}개`;
+  } else if ((monitor.watch_count || 0) > 0) {
+    summaryEl.className = 'watch-pill watch';
+    summaryEl.textContent = `주시 ${monitor.watch_count}개`;
+  } else {
+    summaryEl.className = 'watch-pill ok';
+    summaryEl.textContent = '정체 없음';
+  }
+
+  if (!alerts.length) {
+    alertsEl.innerHTML = '<span class="watch-empty">지금은 오래 멈춘 작업이 없습니다</span>';
+    return;
+  }
+
+  alertsEl.innerHTML = alerts.map(task => {
+    const level = attentionTone(task.attention_level);
+    const cleanTitle = task.title.replace(/^\[[^\]]+\]\s*/, '');
+    return `<div class="watch-alert-row ${level}${level === 'critical' || level === 'stale' ? ' blink' : ''}">
+      <span class="watch-alert-level ${level}">${esc(task.attention_label || '체크')}</span>
+      <div class="watch-alert-main">
+        <span class="watch-alert-title">${esc(cleanTitle)}</span>
+        <span class="watch-alert-reason">${esc(task.attention_reason || '업데이트 상태 확인 필요')}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderWeeklyGoals(weekly) {
+  const goals = weekly?.goals || [];
+  const listEl = document.getElementById('weekGoalList');
+  const goalPct = Math.max(0, Math.min(100, weekly?.goal_progress_pct || 0));
+  const taskPct = Math.max(0, Math.min(100, weekly?.task_progress_pct || 0));
+
+  document.getElementById('weekGoalMetric').textContent =
+    `${weekly?.done_goals || 0}/${weekly?.total_goals || 0}`;
+  document.getElementById('weekTaskMetric').textContent =
+    `${weekly?.week_done_tasks || 0}/${weekly?.week_total_tasks || 0}`;
+  document.getElementById('weekGoalFill').style.width = `${goalPct}%`;
+  document.getElementById('weekTaskFill').style.width = `${taskPct}%`;
+
+  if (!goals.length) {
+    listEl.innerHTML = '<span class="week-goal-empty">아직 이번 주 목표가 없습니다</span>';
+  } else {
+    listEl.innerHTML = goals.map(goal => {
+      const done = Number(goal.done || 0) === 1;
+      return `<div class="week-goal-row">
+        <button class="week-goal-check ${done ? 'on' : ''}" onclick="toggleWeeklyGoal(${goal.id}, ${done ? 0 : 1})" title="${done ? '미완료로 되돌리기' : '완료 처리'}">${done ? '✓' : ''}</button>
+        <span class="week-goal-text ${done ? 'done' : ''}">${esc(goal.goal || '')}</span>
+        <button class="week-goal-delete" onclick="deleteWeeklyGoal(${goal.id})">삭제</button>
+      </div>`;
+    }).join('');
+  }
+
+  const range = weekly?.week_start && weekly?.week_end
+    ? `${weekly.week_start} ~ ${weekly.week_end}`
+    : '이번 주 범위를 계산하는 중입니다';
+  const hint = weekly?.recommended_week_goal
+    || `이번 주 목표 ${weekly?.done_goals || 0}/${weekly?.total_goals || 0} 완료 · 작업 ${weekly?.week_done_tasks || 0}/${weekly?.week_total_tasks || 0} 진행`;
+  document.getElementById('weekGoalHint').textContent = `${range} · ${hint}`;
+}
+
+function renderMorningBoard(morning) {
+  const safe = morning || {};
+  const todayGoal = safe.today_goal || {};
+  const weekly = safe.weekly || {};
+  const timeValue = safe.time || '09:00';
+  const timeInput = document.getElementById('morningTimeInput');
+
+  if (document.activeElement !== timeInput) {
+    timeInput.value = timeValue;
+  }
+
+  const headline = safe.needs_confirmation
+    ? '오늘 목표를 확정하고 이번 주 흐름에 연결하세요'
+    : '오늘 목표가 확정되었습니다. 이제 추천 순서대로 밀면 됩니다';
+  document.getElementById('morningHeadline').textContent = headline;
+
+  const timePill = document.getElementById('morningTimePill');
+  const confirmPill = document.getElementById('morningConfirmPill');
+  const weekPill = document.getElementById('morningWeekPill');
+  const timeStatusParts = [`매일 ${timeValue}`];
+  if (safe.time_status) timeStatusParts.push(safe.time_status);
+  if (safe.needs_confirmation) {
+    timeStatusParts.push('오늘 목표 확정 필요');
+  } else {
+    timeStatusParts.push('오늘 목표 확정됨');
+  }
+  document.getElementById('morningTimeStatus').textContent = timeStatusParts.join(' · ');
+  timePill.textContent = `매일 ${timeValue}`;
+  timePill.className = `morning-pill ${safe.is_due ? 'warn' : 'info'}`;
+  confirmPill.textContent = safe.needs_confirmation ? '오늘 목표 확정 필요' : '오늘 목표 확정됨';
+  confirmPill.className = `morning-pill ${safe.needs_confirmation ? 'warn' : 'ok'}`;
+  weekPill.textContent = weekly.total_goals
+    ? `이번 주 ${weekly.done_goals}/${weekly.total_goals}`
+    : '이번 주 목표 설정 필요';
+  weekPill.className = `morning-pill ${weekly.total_goals ? 'ok' : 'info'}`;
+
+  document.getElementById('morningGoalQuestion').textContent =
+    todayGoal.question || '오늘 목표 질문을 준비하는 중입니다';
+  document.getElementById('morningGoalRecommended').textContent =
+    todayGoal.recommended_goal || '추천 목표를 계산하는 중입니다';
+  document.getElementById('morningGoalEffective').textContent =
+    todayGoal.effective_goal || '아직 확정된 목표가 없습니다';
+  document.getElementById('morningGoalWeeklyHint').textContent =
+    todayGoal.weekly_hint || '주간 목표와 연결되는 힌트가 여기에 표시됩니다';
+
+  const metaParts = [];
+  if (todayGoal.confirmed_at) metaParts.push(`확정 시각 ${fmtT(todayGoal.confirmed_at)}`);
+  if (todayGoal.user_goal) metaParts.push('직접 입력 목표 사용 중');
+  else if (todayGoal.confirmed) metaParts.push('추천 목표 사용 중');
+  if (!metaParts.length) metaParts.push('아직 질문에 답하지 않았습니다');
+  document.getElementById('morningGoalMeta').textContent = metaParts.join(' · ');
+  document.getElementById('morningGoalState').textContent = todayGoal.user_goal
+    ? '직접 입력 목표'
+    : todayGoal.confirmed
+      ? '추천 목표 확정'
+      : '추천 검토 필요';
+
+  const confirmedWrap = document.getElementById('morningGoalConfirmedWrap');
+  const recommended = (todayGoal.recommended_goal || '').trim();
+  const effective = (todayGoal.effective_goal || '').trim();
+  const showConfirmed = Boolean(effective) && effective !== recommended;
+  confirmedWrap.style.display = showConfirmed ? 'flex' : 'none';
+
+  const goalInput = document.getElementById('morningGoalInput');
+  if (document.activeElement !== goalInput) {
+    goalInput.value = todayGoal.user_goal || '';
+  }
+
+  const acceptBtn = document.getElementById('acceptRecommendedGoalBtn');
+  acceptBtn.textContent = todayGoal.confirmed && !todayGoal.user_goal
+    ? '추천 목표 다시 확정'
+    : '추천 목표 확정';
+
+  renderWeeklyGoals(weekly);
+  document.getElementById('morningPrompt').textContent =
+    safe.prompt || '오늘 가장 중요한 목표를 먼저 확정하세요.';
+}
+
+function renderOpsList(targetId, items, emptyText) {
+  const el = document.getElementById(targetId);
+  if (!items || !items.length) {
+    el.innerHTML = `<span class="ops-empty">${esc(emptyText)}</span>`;
+    return;
+  }
+  el.innerHTML = items.map(item => {
+    const tone = item.tone || 'focus';
+    const textAction = item.can_launch && item.project && item.launch_prompt
+      ? `<button class="ops-mini-btn" onclick="launchBriefItem('${escAttr(item.project)}','${escAttr(item.launch_prompt)}')" title="추천 텍스트로 Claude Code 열기">TEXT</button>`
+      : '';
+    const decisionActions = item.task_id
+      ? `
+          <button class="ops-action-btn" onclick="applyTaskDecision(${item.task_id},'continue')" title="현재 작업으로 계속 밀기">계속</button>
+          <button class="ops-action-btn" onclick="applyTaskDecision(${item.task_id},'hold')" title="오늘 우선순위에서 잠시 내리기">보류</button>
+          <button class="ops-action-btn" onclick="applyTaskDecision(${item.task_id},'carry')" title="내일 작업으로 넘기기">이월</button>
+          <button class="ops-action-btn" onclick="applyTaskDecision(${item.task_id},'split')" title="하위 작업으로 쪼개기">분해</button>
+        `
+      : '';
+    const command = item.command_preview
+      ? `<div class="ops-cmd" title="${escAttr(item.command_preview)}">${esc(item.command_preview)}</div>`
+      : '';
+    return `<div class="ops-item ${escAttr(tone)}">
+      <div class="ops-item-head">
+        <span class="ops-item-title">${esc(item.title || '항목')}</span>
+        <div class="ops-item-actions">
+          ${textAction}
+          ${decisionActions}
+        </div>
+      </div>
+      <span class="ops-item-detail">${esc(item.detail || '')}</span>
+      ${command}
+    </div>`;
+  }).join('');
+}
+
+function renderOpsBrief(brief) {
+  const safeBrief = brief || {};
+  document.getElementById('opsHeadline').textContent =
+    safeBrief.headline || '오늘 운영 요약을 준비하는 중입니다';
+  document.getElementById('opsObjective').textContent =
+    safeBrief.objective_title || '오늘의 목적을 계산하는 중입니다';
+  document.getElementById('opsObjectiveDetail').textContent =
+    safeBrief.objective_detail || '작업 흐름을 바탕으로 가장 중요한 목적을 뽑아냅니다.';
+  document.getElementById('opsFocus').textContent =
+    safeBrief.focus_message || '작업 흐름을 분석하는 중입니다.';
+
+  renderOpsList('opsActions', safeBrief.next_actions, '지금은 별도 액션 없이 흐름을 유지해도 좋습니다');
+  renderOpsList('opsQueue', safeBrief.recommended_queue || safeBrief.wins, '아직 추천 순서가 없습니다');
+  renderOpsList('opsRisks', safeBrief.risks, '지금은 큰 리스크가 보이지 않습니다');
+
+  const note = safeBrief.latest_note
+    ? `최근 체크인 · ${safeBrief.latest_note}`
+    : '최근 체크인 메모가 없으면 다음 집중 포인트를 한 줄 남겨두는 편이 좋습니다.';
+  document.getElementById('opsNote').textContent = note;
+}
 
 // ── Render accordion ──────────────────────────────────────────
 function renderAccordion(tasks) {
@@ -1014,33 +2211,74 @@ function renderAccordion(tasks) {
 
   list.innerHTML = sortedKeys.map(proj => {
     const items    = groups[proj];
-    const total    = items.length, done = items.filter(t=>t.status==='done').length;
-    const pct      = total > 0 ? Math.round(done/total*100) : 0;
+    const summary  = summarizeProgress(items);
+    const total    = summary.total;
+    const done     = summary.done;
+    const pct      = summary.pct;
     const allDone  = done === total && total > 0;
-    const fillColor= allDone ? 'var(--success)' : 'var(--accent)';
-    const totalMin = items.reduce((s,t) => s+t.estimated_minutes, 0);
+    const fillColor= progressTone(pct);
+    const totalMin = summary.totalMin;
     const isOpen   = openGroups.has(proj);
+    const canOpenClaude = items.some(t => !!t.can_open_claude || !!t.repo_path);
 
-    const todoItems = items.filter(t => t.status !== 'done');
+    const todoItems = items
+      .filter(t => t.is_actionable)
+      .sort((a, b) => {
+        const rankDiff = attentionRank(b.attention_level) - attentionRank(a.attention_level);
+        if (rankDiff !== 0) return rankDiff;
+        return (a.priority || 9) - (b.priority || 9);
+      });
     const doneItems = items.filter(t => t.status === 'done');
+    const parkedItems = items.filter(t => !t.is_actionable && t.status !== 'done');
 
     const renderTask = t => {
       const isDone = t.status === 'done';
+      const isParked = !isDone && !t.is_actionable;
       const title  = t.title.replace(/^\[[^\]]+\]\s*/, '');
+      const smartMin = t.smart_estimated_minutes || t.display_minutes || t.estimated_minutes;
+      const heuristicMin = t.heuristic_minutes || t.raw_estimated_minutes || t.estimated_minutes || smartMin;
+      const progress = t.progress_pct ?? (isDone ? 100 : 0);
+      const remaining = t.remaining_minutes ?? Math.max(0, smartMin);
+      const estimateTip = t.estimate_confidence
+        ? `${t.estimate_source || '학습 예측'} ${smartMin}분 · 기준 ${heuristicMin}분 · 신뢰도 ${t.estimate_confidence}% · 샘플 ${t.estimate_samples || 0}개`
+        : `휴리스틱 예측 ${smartMin}분 · 기준 ${heuristicMin}분`;
+      const progressText = progress >= 100
+        ? '완료'
+        : progress > 0
+        ? `${formatMinutes(remaining)} 남음`
+        : `예상 ${formatMinutes(smartMin)}`;
       return `
-        <div class="task ${isDone?'done':''}" data-id="${t.id}">
+        <div class="task ${isDone?'done':''}${isParked?' parked':''}" data-id="${t.id}">
           <div class="pri-dot" data-p="${t.priority}"></div>
           <div class="cb ${isDone?'on':''}" onclick="toggleTask(${t.id},${isDone})"></div>
-          <div class="task-title">
-            ${t.carry_from ? '<span class="carry-badge">이월</span>' : ''}
-            ${esc(title)}
+          <div class="task-main">
+            <div class="task-top">
+              <div class="task-title">
+                ${t.carry_from ? '<span class="carry-badge">이월</span>' : ''}
+                ${esc(title)}
+                ${t.task_state_label ? `<span class="task-state-badge">${esc(t.task_state_label)}</span>` : ''}
+                ${attentionRank(t.attention_level) > 0 ? `<span class="task-attn ${attentionTone(t.attention_level)}${t.attention_level === 'critical' || t.attention_level === 'stale' ? ' blink' : ''}" title="${escAttr(t.attention_reason || '')}">${esc(t.attention_label || '체크')}</span>` : ''}
+              </div>
+              <div class="task-actions">
+                <button class="task-refresh" onclick="refreshTaskProgress(event,${t.id})" title="${escAttr((t.progress_source || '현재 진행률 반영') + ' 기준으로 새로고침')}">↻</button>
+                <div class="task-min-wrap">
+                  <span class="task-min" onclick="editMin(this,${t.id},${t.raw_estimated_minutes || t.estimated_minutes})" title="${escAttr(estimateTip + ' · 클릭해서 기준 시간 수정')}">${smartMin}분</span>
+                  <input class="task-min-input" type="number" min="5" max="480"
+                    onblur="saveMin(this,${t.id})" onkeydown="if(event.key==='Enter')this.blur()">
+                </div>
+                <button class="task-del" onclick="delTask(${t.id})">×</button>
+              </div>
+            </div>
+            <div class="task-progress-row">
+              <div class="task-progress-bar">
+                <div class="task-progress-fill" style="width:${progress}%;background:${progressTone(progress)}"></div>
+              </div>
+              <div class="task-progress-meta">
+                <span class="task-progress-text">${progress}% · ${progressText}</span>
+                <span class="task-progress-source">${esc(t.progress_source || '대기')}</span>
+              </div>
+            </div>
           </div>
-          <div class="task-min-wrap">
-            <span class="task-min" onclick="editMin(this,${t.id})" title="클릭하여 시간 수정">${t.estimated_minutes}분</span>
-            <input class="task-min-input" type="number" min="5" max="480"
-              onblur="saveMin(this,${t.id})" onkeydown="if(event.key==='Enter')this.blur()">
-          </div>
-          <button class="task-del" onclick="delTask(${t.id})">×</button>
         </div>`;
     };
 
@@ -1051,6 +2289,12 @@ function renderAccordion(tasks) {
         <span>완료 ${doneItems.length}개</span>
       </div>
       <div class="done-list">${doneItems.map(renderTask).join('')}</div>` : '';
+    const parkedHtml = parkedItems.length ? `
+      <div class="done-toggle parked-toggle" onclick="toggleDoneSection(this)">
+        <span class="done-toggle-arrow">▶</span>
+        <span>정리됨 ${parkedItems.length}개</span>
+      </div>
+      <div class="done-list">${parkedItems.map(renderTask).join('')}</div>` : '';
 
     return `
       <div class="acc-group">
@@ -1063,10 +2307,10 @@ function renderAccordion(tasks) {
           </div>
           <span class="acc-badge ${allDone?'done':''}">${done}/${total}</span>
           <span class="acc-badge">${totalMin}분</span>
-          <button class="btn-cc" onclick="event.stopPropagation();openClaude('${esc(proj)}')" title="Claude Code 열기">CC</button>
+          <button class="btn-cc${canOpenClaude?'':' disabled'}" onclick="event.stopPropagation();${canOpenClaude ? `openClaude('${esc(proj)}')` : ''}" title="${canOpenClaude ? 'Claude Code 열기' : '연결된 로컬 프로젝트 폴더 없음'}">CC</button>
           <button class="btn-view${agentUrls[proj]?'':' disabled'}" onclick="event.stopPropagation();openView('${esc(proj)}')" title="프로젝트 웹 홈">VIEW</button>
         </div>
-        <div class="acc-body ${isOpen?'open':''}">${todoHtml}${doneHtml}</div>
+        <div class="acc-body ${isOpen?'open':''}">${todoHtml}${parkedHtml}${doneHtml}</div>
       </div>`;
   }).join('');
 }
@@ -1090,16 +2334,16 @@ function toggleDoneSection(toggleEl) {
 }
 
 // ── Inline time editing ───────────────────────────────────────
-function editMin(span, id) {
+function editMin(span, id, rawMinutes) {
   const inp = span.nextElementSibling;
-  inp.value = parseInt(span.textContent);
+  inp.value = rawMinutes || parseInt(span.textContent);
   span.classList.add('hide');
   inp.classList.add('show');
   inp.focus(); inp.select();
 }
 async function saveMin(inp, id) {
-  const val = Math.max(5, Math.min(480, parseInt(inp.value)||30));
-  await fetch(`/api/tasks/${id}`, {
+  const val = Math.max(5, Math.min(480, parseInt(inp.value)||15));
+  await fetch(appUrl(`api/tasks/${id}`), {
     method:'PATCH', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({estimated_minutes: val})
   });
@@ -1108,49 +2352,55 @@ async function saveMin(inp, id) {
 
 // ── Progress update helpers ───────────────────────────────────
 let _lastStats = null;
+let _lastBrief = null;
+let _lastMorning = null;
 
 function updateProgressFromTasks(tasks) {
-  const total = tasks.length;
-  const done  = tasks.filter(t => t.status==='done').length;
-  const pct   = total > 0 ? Math.round(done/total*100) : 0;
-  const totalMin = tasks.reduce((s,t) => s+t.estimated_minutes, 0);
-  const doneMin  = tasks.filter(t=>t.status==='done').reduce((s,t) => s+t.estimated_minutes, 0);
-  const left = totalMin - doneMin;
+  const summary = summarizeProgress(tasks);
 
-  document.getElementById('progPct').textContent  = pct + '%';
-  document.getElementById('progFill').style.width = pct + '%';
-  document.getElementById('stTasks').textContent  = `${done}/${total}`;
-  document.getElementById('stTime').textContent   = `${doneMin}/${totalMin}분`;
-  document.getElementById('stLeft').textContent   = left > 0 ? `${left}분` : '완료!';
+  document.getElementById('progPct').textContent  = summary.pct + '%';
+  document.getElementById('progFill').style.width = summary.pct + '%';
+  document.getElementById('progFill').style.background = progressTone(summary.pct);
+  document.getElementById('stTasks').textContent  = `${summary.done}/${summary.total}`;
+  document.getElementById('stTime').textContent   = `${formatMinutes(summary.progressMin)}/${formatMinutes(summary.totalMin)}`;
+  document.getElementById('stLeft').textContent   = summary.remainingMin > 0 ? formatMinutes(summary.remainingMin) : '완료!';
 }
 
 function updateProgressFromAllStats() {
   if (!_lastStats) return;
   const s = _lastStats;
-  const pct = s.total > 0 ? Math.round(s.done / s.total * 100) : 0;
+  const pct = s.progress_pct ?? (s.total_minutes > 0 ? Math.round((s.progress_minutes || 0) / s.total_minutes * 100) : 0);
+  const progressMinutes = s.progress_minutes ?? s.done_minutes ?? 0;
+  const remainingMinutes = s.remaining_minutes ?? Math.max(0, (s.total_minutes || 0) - progressMinutes);
   document.getElementById('progPct').textContent  = pct + '%';
   document.getElementById('progFill').style.width = pct + '%';
+  document.getElementById('progFill').style.background = progressTone(pct);
   document.getElementById('stTasks').textContent  = `${s.done}/${s.total}`;
-  document.getElementById('stTime').textContent   = `${s.done_minutes}/${s.total_minutes}분`;
-  const left = s.total_minutes - s.done_minutes;
-  document.getElementById('stLeft').textContent   = left > 0 ? `${left}분` : '완료!';
+  document.getElementById('stTime').textContent   = `${formatMinutes(progressMinutes)}/${formatMinutes(s.total_minutes || 0)}`;
+  document.getElementById('stLeft').textContent   = remainingMinutes > 0 ? formatMinutes(remainingMinutes) : '완료!';
 }
 
 // ── Load by date ──────────────────────────────────────────────
 async function loadTodayByDate(ds) {
   try {
     const isToday = ds === todayStr();
-    const url     = isToday ? '/api/today' : `/api/today?d=${ds}`;
+    const url     = isToday ? appUrl('api/today') : appUrl(`api/today?d=${ds}`);
     const r = await fetch(url);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const { tasks, stats } = await r.json();
+    const { tasks, stats, brief, morning } = await r.json();
 
     _lastStats  = stats;
+    _lastBrief  = brief;
+    _lastMorning = morning;
     allTasks    = tasks;
 
     updateProgressFromAllStats();
+    renderMonitorPanel(tasks, stats);
+    renderMorningBoard(morning);
+    renderOpsBrief(brief);
 
     const now = new Date();
+    lastAutoRefreshAt = now;
     document.getElementById('progRefreshTime').textContent =
       `${p2(now.getHours())}:${p2(now.getMinutes())}:${p2(now.getSeconds())} 기준`;
 
@@ -1169,6 +2419,32 @@ async function loadTodayByDate(ds) {
   } catch(err) {
     document.getElementById('progPct').textContent = '오류';
     document.getElementById('progRefreshTime').textContent = '로드 실패';
+    document.getElementById('watchStatus').textContent = '자동 최신화 오류';
+    document.getElementById('watchSummary').className = 'watch-pill critical blink';
+    document.getElementById('watchSummary').textContent = '새로고침 실패';
+    document.getElementById('watchAlerts').innerHTML = '<span class="watch-empty">연결 상태를 다시 확인해주세요</span>';
+    document.getElementById('opsHeadline').textContent = '운영 브리프 로드 실패';
+    document.getElementById('opsObjective').textContent = '오늘의 목적 계산 실패';
+    document.getElementById('opsObjectiveDetail').textContent = '서버 연결이 안정되면 다시 계산됩니다.';
+    document.getElementById('opsFocus').textContent = '연결 상태를 다시 확인해주세요.';
+    document.getElementById('opsActions').innerHTML = '<span class="ops-empty">브리프를 다시 계산할 수 없습니다</span>';
+    document.getElementById('opsQueue').innerHTML = '<span class="ops-empty">브리프를 다시 계산할 수 없습니다</span>';
+    document.getElementById('opsRisks').innerHTML = '<span class="ops-empty">브리프를 다시 계산할 수 없습니다</span>';
+    document.getElementById('opsNote').textContent = '네트워크 또는 서버 상태를 먼저 확인해주세요.';
+    document.getElementById('morningHeadline').textContent = '아침 보드 로드 실패';
+    document.getElementById('morningTimePill').textContent = '아침 브리핑 불러오기 실패';
+    document.getElementById('morningConfirmPill').textContent = '오늘 목표 상태 확인 불가';
+    document.getElementById('morningWeekPill').textContent = '이번 주 진행 불러오기 실패';
+    document.getElementById('morningTimeStatus').textContent = '아침 브리핑 설정을 불러오지 못했습니다';
+    document.getElementById('morningGoalQuestion').textContent = '서버 연결이 안정되면 다시 질문을 계산합니다.';
+    document.getElementById('morningGoalRecommended').textContent = '추천 목표를 계산할 수 없습니다';
+    document.getElementById('morningGoalEffective').textContent = '확정 목표를 불러올 수 없습니다';
+    document.getElementById('morningGoalState').textContent = '불러오기 실패';
+    document.getElementById('morningGoalMeta').textContent = '네트워크 또는 서버 상태를 먼저 확인해주세요.';
+    document.getElementById('morningGoalWeeklyHint').textContent = '주간 목표 힌트를 다시 불러와야 합니다.';
+    document.getElementById('weekGoalList').innerHTML = '<span class="week-goal-empty">주간 목표를 불러올 수 없습니다</span>';
+    document.getElementById('weekGoalHint').textContent = '서버 연결이 안정되면 주간 목표 진행률을 다시 계산합니다.';
+    document.getElementById('morningPrompt').textContent = '연결 상태를 다시 확인해주세요.';
     console.error('loadTodayByDate 실패:', err);
   }
 }
@@ -1179,16 +2455,41 @@ async function loadToday() {
 
 function refreshMain() {
   if (currentProject) {
-    loadTodayByDate(todayStr());
+    return loadTodayByDate(todayStr());
   } else {
-    loadTodayByDate(currentViewDate);
+    return loadTodayByDate(currentViewDate);
+  }
+}
+
+function refreshTaskProgress(event, id) {
+  if (event) event.stopPropagation();
+  return refreshMain();
+}
+
+async function autoRefreshTick() {
+  if (autoRefreshBusy) return;
+  autoRefreshBusy = true;
+  try {
+    await Promise.all([
+      refreshMain(),
+      loadWeekTaskMap(),
+      loadAgentStatus(),
+    ]);
+    lastAutoRefreshAt = new Date();
+    if (_lastStats && allTasks.length) {
+      renderMonitorPanel(allTasks, _lastStats);
+    }
+  } catch (err) {
+    console.error('autoRefreshTick 실패:', err);
+  } finally {
+    autoRefreshBusy = false;
   }
 }
 
 // ── Week task map (for calendar dots) ────────────────────────
 async function loadWeekTaskMap() {
   try {
-    const r = await fetch('/api/week');
+    const r = await fetch(appUrl('api/week'));
     const data = await r.json();
     weekTaskMap = data.daily || {};
     renderCalendar();
@@ -1203,18 +2504,19 @@ async function loadWeekTaskMap() {
 async function addTask() {
   const title = document.getElementById('inTitle').value.trim();
   if (!title) return;
-  const min      = parseInt(document.getElementById('inMin').value)||30;
+  const min      = parseInt(document.getElementById('inMin').value)||15;
   const priority = parseInt(document.getElementById('inPri').value);
-  await fetch('/api/tasks', {
+  await fetch(appUrl('api/tasks'), {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({title, estimated_minutes:min, priority})
   });
   document.getElementById('inTitle').value = '';
+  document.getElementById('inMin').value = '15';
   await refreshMain();
 }
 
 async function toggleTask(id, isDone) {
-  await fetch(`/api/tasks/${id}`, {
+  await fetch(appUrl(`api/tasks/${id}`), {
     method:'PATCH', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({status: isDone ? 'todo' : 'done'})
   });
@@ -1223,12 +2525,12 @@ async function toggleTask(id, isDone) {
 }
 
 async function delTask(id) {
-  await fetch(`/api/tasks/${id}`, {method:'DELETE'});
+  await fetch(appUrl(`api/tasks/${id}`), {method:'DELETE'});
   await refreshMain();
 }
 
 async function checkCarry() {
-  const r = await fetch('/api/yesterday-undone');
+  const r = await fetch(appUrl('api/yesterday-undone'));
   const tasks = await r.json();
   const banner = document.getElementById('carryBanner');
   if (tasks.length) {
@@ -1237,7 +2539,7 @@ async function checkCarry() {
   } else banner.style.display = 'none';
 }
 async function doCarry() {
-  await fetch('/api/carry-over', {method:'POST'});
+  await fetch(appUrl('api/carry-over'), {method:'POST'});
   document.getElementById('carryBanner').style.display = 'none';
   await refreshMain();
 }
@@ -1250,7 +2552,7 @@ function toggleCi() {
 }
 async function saveCheckin() {
   const note = document.getElementById('ciNote').value;
-  await fetch('/api/checkin', {
+  await fetch(appUrl('api/checkin'), {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({note})
   });
@@ -1259,21 +2561,50 @@ async function saveCheckin() {
   await loadCheckins();
   await refreshMain();
 }
+function agentStatusLabel(status) {
+  if (status === 'start') return '작업 시작';
+  if (status === 'step') return '진행 업데이트';
+  if (status === 'done') return '작업 완료';
+  return status || '상태 업데이트';
+}
+function renderCheckinEntry(c) {
+  if (c.kind === 'agent') {
+    const sourceLabel = c.synthetic ? '최근 세션' : 'CC 자동';
+    return `<div class="ci-entry agent">
+      <div class="ci-row">
+        <div class="ci-time">${fmtT(c.timestamp)}</div>
+        <div class="ci-meta">
+          <span class="ci-badge auto">${sourceLabel}</span>
+          <span class="ci-badge status">${agentStatusLabel(c.status)}</span>
+          ${c.url ? `<a class="ci-link" href="${escAttr(c.url)}" target="_blank" rel="noopener noreferrer">VIEW</a>` : ''}
+        </div>
+      </div>
+      <div class="ci-project">${esc(c.project || '프로젝트')}</div>
+      <div class="ci-note-disp">${esc(c.task || '최근 작업 내용이 아직 없습니다')}</div>
+    </div>`;
+  }
+
+  const pct = c.total_count > 0 ? Math.round(c.completed_count / c.total_count * 100) : 0;
+  const progress = c.total_count > 0
+    ? `${c.completed_count}/${c.total_count} 완료 (${pct}%)`
+    : '수동 체크인';
+  return `<div class="ci-entry">
+    <div class="ci-row">
+      <div class="ci-time">${fmtT(c.timestamp || c.checkin_time)}</div>
+      <div class="ci-meta"><span class="ci-badge">수동</span></div>
+    </div>
+    <div class="ci-counts">${progress}</div>
+    ${c.note ? `<div class="ci-note-disp">${esc(c.note)}</div>` : ''}
+  </div>`;
+}
 async function loadCheckins() {
-  const r = await fetch('/api/checkins');
+  const r = await fetch(appUrl('api/checkins'));
   const list = await r.json();
   const el = document.getElementById('ciHist');
   if (!list.length) {
-    el.innerHTML = '<div class="ci-empty">아직 체크인 기록이 없습니다</div>'; return;
+    el.innerHTML = '<div class="ci-empty">아직 수동 체크인이나 CC 활동 기록이 없습니다</div>'; return;
   }
-  el.innerHTML = [...list].reverse().map(c => {
-    const pct = c.total_count>0 ? Math.round(c.completed_count/c.total_count*100) : 0;
-    return `<div class="ci-entry">
-      <div class="ci-time">${fmtT(c.checkin_time)}</div>
-      <div class="ci-counts">${c.completed_count}/${c.total_count} 완료 (${pct}%)</div>
-      ${c.note ? `<div class="ci-note-disp">${esc(c.note)}</div>` : ''}
-    </div>`;
-  }).join('');
+  el.innerHTML = list.map(renderCheckinEntry).join('');
 }
 
 // ── Sync ──────────────────────────────────────────────────────
@@ -1312,7 +2643,7 @@ async function uploadLogsFromFolder(input) {
 
   try {
     msg.textContent = '서버에 전송 중...';
-    const r = await fetch('/api/sync-logs-upload', {
+    const r = await fetch(appUrl('api/sync-logs-upload'), {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({log_files: logFiles, current_task: currentTask}),
@@ -1337,6 +2668,35 @@ async function uploadLogsFromFolder(input) {
   btn.disabled = false; btn.textContent = '↻ 동기화';
 }
 
+// ── Sync Git ───────────────────────────────────────────────────
+async function syncGit() {
+  const btn = document.getElementById('syncGitBtn');
+  const msg = document.getElementById('syncMsg');
+  btn.disabled = true; btn.textContent = '감지 중...';
+  msg.style.display = 'block';
+  msg.style.color = 'var(--muted)';
+  msg.textContent = 'git 레포 스캔 중...';
+  try {
+    const r = await fetch(appUrl('api/sync-git'), { method: 'POST' });
+    const data = await r.json();
+    const cnt = data.count || 0;
+    const scanned = (data.scanned || []).length;
+    if (cnt > 0) {
+      msg.style.color = 'var(--success)';
+      msg.textContent = `Git: ${cnt}개 완료 처리됨 (레포 ${scanned}개 스캔)`;
+      await refreshMain();
+      await loadWeekTaskMap();
+    } else {
+      msg.style.color = 'var(--muted)';
+      msg.textContent = `Git: 변경 없음 (레포 ${scanned}개 스캔)`;
+    }
+  } catch(err) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = 'Git 감지 오류';
+  }
+  btn.disabled = false; btn.textContent = '↻ Git 감지';
+}
+
 // ── Claude Usage ──────────────────────────────────────────────
 function barClass(pct) {
   if (pct >= 90) return 'crit';
@@ -1347,7 +2707,7 @@ function barClass(pct) {
 async function loadClaudeUsage() {
   try {
     const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-    const endpoint = isLocal ? '/api/claude-usage' : '/api/claude-usage-cached';
+    const endpoint = isLocal ? appUrl('api/claude-usage') : appUrl('api/claude-usage-cached');
     const r = await fetch(endpoint);
     const d = await r.json();
 
@@ -1363,6 +2723,7 @@ async function loadClaudeUsage() {
     bar.className   = `claude-bar-fill ${cls}`;
 
     document.getElementById('claudeUsedPct').textContent = pct.toFixed(1);
+    document.getElementById('claudeSummaryValue').textContent = `${d.remain_pct.toFixed(1)}% 남음`;
 
     const rem = document.getElementById('claudeRemain');
     rem.className   = `claude-remain ${cls}`;
@@ -1404,6 +2765,7 @@ async function loadClaudeUsage() {
     document.getElementById('claudeNote').textContent =
       d.month_tokens === 0 ? '(현재 진행 중인 세션은 종료 후 집계됩니다)' : '';
   } catch(err) {
+    document.getElementById('claudeSummaryValue').textContent = '불러오기 실패';
     document.getElementById('claudeRemain').textContent = '불러오기 실패';
   }
 }
@@ -1412,9 +2774,105 @@ async function saveLimit() {
   const raw = document.getElementById('limitInp').value.replace(/,/g,'').trim();
   const val = parseInt(raw);
   if (!val || val < 1000) { alert('올바른 토큰 수를 입력하세요 (예: 2000000000)'); return; }
-  await fetch(`/api/settings/token-limit?limit=${val}`, {method:'POST'});
+  await fetch(appUrl(`api/settings/token-limit?limit=${val}`), {method:'POST'});
   document.getElementById('limitInp').dataset.init = '';
   await loadClaudeUsage();
+}
+
+async function saveMorningBriefTime() {
+  const input = document.getElementById('morningTimeInput');
+  const time = input.value;
+  if (!time) {
+    alert('아침 브리핑 시간을 입력하세요');
+    return;
+  }
+  const r = await fetch(appUrl('api/settings/morning-brief-time'), {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ time }),
+  });
+  const d = await r.json();
+  if (!r.ok) {
+    alert(`아침 브리핑 시간 저장 실패\n${d.detail || '오류'}`);
+    return;
+  }
+  input.value = d.time || time;
+  await refreshMain();
+}
+
+async function saveTodayGoal(useRecommended = false) {
+  const userGoal = document.getElementById('morningGoalInput').value.trim();
+  if (!useRecommended && !userGoal) {
+    alert('직접 저장할 목표를 입력하세요');
+    return;
+  }
+  const r = await fetch(appUrl('api/today-goal'), {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      date: currentViewDate,
+      user_goal: userGoal,
+      use_recommended: useRecommended,
+    }),
+  });
+  const d = await r.json();
+  if (!r.ok) {
+    alert(`오늘 목표 저장 실패\n${d.detail || '오류'}`);
+    return;
+  }
+  _lastMorning = d;
+  renderMorningBoard(d);
+}
+
+function acceptRecommendedGoal() {
+  return saveTodayGoal(true);
+}
+
+function saveCustomGoal() {
+  return saveTodayGoal(false);
+}
+
+async function addWeeklyGoal() {
+  const input = document.getElementById('weekGoalInput');
+  const goal = input.value.trim();
+  if (!goal) return;
+  const weekStart = (_lastMorning?.weekly?.week_start) || getWeekStartFromDate(currentViewDate);
+  const r = await fetch(appUrl('api/week/goals'), {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ goal, week_start: weekStart }),
+  });
+  if (!r.ok) {
+    const d = await r.json();
+    alert(`주간 목표 추가 실패\n${d.detail || '오류'}`);
+    return;
+  }
+  input.value = '';
+  await Promise.all([refreshMain(), loadWeekTaskMap()]);
+}
+
+async function toggleWeeklyGoal(goalId, done) {
+  const r = await fetch(appUrl(`api/week/goals/${goalId}`), {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ done }),
+  });
+  if (!r.ok) {
+    const d = await r.json();
+    alert(`주간 목표 상태 변경 실패\n${d.detail || '오류'}`);
+    return;
+  }
+  await refreshMain();
+}
+
+async function deleteWeeklyGoal(goalId) {
+  const r = await fetch(appUrl(`api/week/goals/${goalId}`), { method: 'DELETE' });
+  if (!r.ok) {
+    const d = await r.json();
+    alert(`주간 목표 삭제 실패\n${d.detail || '오류'}`);
+    return;
+  }
+  await refreshMain();
 }
 
 // ── Open Project Web View ──────────────────────────────────────
@@ -1425,12 +2883,41 @@ function openView(proj) {
 
 // ── Open Claude Code ──────────────────────────────────────────
 async function openClaude(proj) {
-  const r = await fetch(`/api/open-claude?proj=${encodeURIComponent(proj)}`, {method:'POST'});
+  const r = await fetch(appUrl(`api/open-claude?proj=${encodeURIComponent(proj)}`), {method:'POST'});
   const d = await r.json();
   if (!d.ok) alert(`Claude Code 열기 실패\n${d.error}`);
 }
 
+async function launchBriefItem(project, prompt) {
+  const r = await fetch(appUrl(`api/open-claude?proj=${encodeURIComponent(project)}&prompt=${encodeURIComponent(prompt)}`), {method:'POST'});
+  const d = await r.json();
+  if (!d.ok) alert(`추천 작업 열기 실패\n${d.error}`);
+}
+
+async function applyTaskDecision(taskId, action) {
+  const payload = { action, note: '' };
+  if (action === 'split') {
+    const raw = prompt('분해할 하위 작업을 줄바꿈으로 입력하세요.\n비워두면 기본 2단계로 자동 분해됩니다.', '');
+    if (raw === null) return;
+    const titles = raw.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    payload.split_titles = titles;
+  }
+
+  const r = await fetch(appUrl(`api/tasks/${taskId}/decision`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const d = await r.json();
+  if (!d.ok && d.error) {
+    alert(`작업 결정 반영 실패\n${d.error}`);
+    return;
+  }
+  await Promise.all([refreshMain(), loadWeekTaskMap()]);
+}
+
 // ── Boot ──────────────────────────────────────────────────────
+syncClaudePanel();
 updateMainHeader();
 updateCountdown();
 setInterval(updateCountdown, 60000);
@@ -1440,10 +2927,20 @@ loadWeekTaskMap();
 
 // 2) 오늘 태스크 로드
 loadTodayByDate(currentViewDate);
+setInterval(autoRefreshTick, AUTO_REFRESH_MS);
+setInterval(() => {
+  if (_lastStats) renderMonitorPanel(allTasks, _lastStats);
+}, 5000);
+window.addEventListener('focus', () => {
+  autoRefreshTick();
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') autoRefreshTick();
+});
 
 // 3) Claude 사용량 로드
 loadClaudeUsage();
-setInterval(loadClaudeUsage, 30000);
+setInterval(loadClaudeUsage, 60000);
 
 // agentUrls: project -> url (populated by loadAgentStatus)
 const agentUrls = {};
@@ -1451,7 +2948,7 @@ const agentUrls = {};
 // 4) 세션 현황 로드
 async function loadAgentStatus() {
   try {
-    const rows = await fetch('/api/agent-status').then(r => r.json());
+    const rows = await fetch(appUrl('api/agent-status')).then(r => r.json());
     const el = document.getElementById('sessionsList');
     document.getElementById('sessionsTime').textContent =
       new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
@@ -1467,7 +2964,7 @@ async function loadAgentStatus() {
       const agoTxt = r.minutes_ago < 1 ? '방금' :
                      r.minutes_ago < 60 ? `${r.minutes_ago}분 전` :
                      `${Math.floor(r.minutes_ago/60)}시간 전`;
-      return `<div class="session-row">
+      return `<div class="session-row" title="${esc(r.task)}">
         <div class="session-dot ${dotCls}"></div>
         <span class="session-proj">${esc(r.project)}</span>
         <span class="session-task">${esc(r.task)}</span>
@@ -1477,7 +2974,7 @@ async function loadAgentStatus() {
   } catch(e) {}
 }
 loadAgentStatus();
-setInterval(loadAgentStatus, 15000);
+setInterval(loadAgentStatus, 60000);
 </script>
 </body>
 </html>
