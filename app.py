@@ -1563,6 +1563,12 @@ def build_recommended_queue(tasks: list[dict], focus_task: Optional[dict]) -> li
             "짧게 끝낼 수 있는 작업이라 흐름을 만들기 좋습니다.",
         )
 
+    # fallback: 위 조건 중 아무것도 안 걸려도 우선순위 상위 태스크를 채워줌
+    for task in sorted(todo_tasks, key=lambda t: ((t.get("priority") or 9), t.get("id", 0))):
+        if len(queue) >= 3:
+            break
+        push(task, "focus", f"우선순위 {task.get('priority', '-')}순 작업입니다.")
+
     return queue[:3]
 
 
@@ -1691,6 +1697,7 @@ def build_ops_brief(conn, target_date: str, tasks: list[dict], stats: dict[str, 
     risks: list[dict[str, str]] = []
     for task in (critical_tasks + stale_tasks + watch_tasks)[:3]:
         risks.append({
+            "task_id": task.get("id"),
             "tone": task.get("attention_level") or "watch",
             "title": strip_task_project(task.get("title", "주의 작업")),
             "detail": task.get("attention_reason") or "상태 확인 필요",
