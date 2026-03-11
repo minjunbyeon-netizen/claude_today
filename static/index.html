@@ -2151,7 +2151,7 @@ function renderOpsList(targetId, items, emptyText) {
     const command = item.command_preview
       ? `<div class="ops-cmd" title="${escAttr(item.command_preview)}">${esc(item.command_preview)}</div>`
       : '';
-    return `<div class="ops-item ${escAttr(tone)}">
+    return `<div class="ops-item ${escAttr(tone)}" ${item.task_id ? `data-task-id="${item.task_id}"` : ''}>
       <div class="ops-item-head">
         <span class="ops-item-title">${esc(item.title || '항목')}</span>
         <div class="ops-item-actions">
@@ -2903,19 +2903,12 @@ async function applyTaskDecision(taskId, action) {
     payload.split_titles = titles;
   }
 
-  // 클릭된 버튼 즉시 비활성화 + 로딩 표시
-  const allBtns = document.querySelectorAll(`.ops-action-btn`);
-  const clickedBtn = [...allBtns].find(b => b.onclick && b.onclick.toString().includes(`${taskId},'${action}'`));
-  const rowBtns = clickedBtn ? clickedBtn.closest('.ops-actions')?.querySelectorAll('.ops-action-btn') : allBtns;
-  const originalTexts = {};
-  rowBtns?.forEach(b => {
-    originalTexts[b.textContent] = b.textContent;
-    b.disabled = true;
-    b.style.opacity = '0.4';
-  });
-  if (clickedBtn) {
-    clickedBtn.textContent = '...';
-    clickedBtn.style.opacity = '1';
+  // 즉시 해당 항목 fade out (Optimistic Update)
+  const opsItem = document.querySelector(`.ops-item[data-task-id="${taskId}"]`);
+  if (opsItem) {
+    opsItem.style.transition = 'opacity 150ms ease, transform 150ms ease';
+    opsItem.style.opacity = '0.3';
+    opsItem.style.pointerEvents = 'none';
   }
 
   try {
@@ -2926,13 +2919,16 @@ async function applyTaskDecision(taskId, action) {
     });
     const d = await r.json();
     if (!d.ok && d.error) {
+      if (opsItem) { opsItem.style.opacity = ''; opsItem.style.pointerEvents = ''; }
       alert(`작업 결정 반영 실패\n${d.error}`);
       return;
     }
-    await Promise.all([refreshMain(), loadWeekTaskMap()]);
+    // 즉시 DOM에서 제거
+    if (opsItem) opsItem.remove();
+    // 백그라운드에서 전체 갱신
+    Promise.all([refreshMain(), loadWeekTaskMap()]);
   } catch(e) {
-    rowBtns?.forEach(b => { b.disabled = false; b.style.opacity = ''; });
-    if (clickedBtn) clickedBtn.textContent = Object.keys(originalTexts)[0] || action;
+    if (opsItem) { opsItem.style.opacity = ''; opsItem.style.pointerEvents = ''; }
     alert('요청 실패: ' + e.message);
   }
 }
