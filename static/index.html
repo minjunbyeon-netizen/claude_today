@@ -328,6 +328,7 @@ body {
 .session-dot.step   { background: var(--warning); }
 .session-dot.done   { background: var(--success); }
 .session-dot.stale  { background: var(--border); }
+.session-dot.idle   { background: #30363d; border: 1px solid #484f58; }
 .session-proj { font-weight: 600; color: var(--text2); white-space: nowrap; }
 .session-task { color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .session-ago  { font-size: 10px; color: var(--muted); white-space: nowrap; margin-left: auto; }
@@ -843,6 +844,16 @@ body {
 .ops-action-btn:hover {
   border-color: var(--accent);
   color: var(--text);
+}
+.ops-continue-btn {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+.ops-continue-btn:hover {
+  opacity: 0.85;
+  color: #fff;
 }
 .ops-cmd {
   font-size: 10px;
@@ -1382,14 +1393,59 @@ body {
               <a class="claude-link" href="https://claude.ai/settings/usage" target="_blank" onclick="event.stopPropagation()">↗</a>
             </div>
           </div>
-          <div class="claude-bar-wrap" style="margin:0 0 6px">
-            <div class="claude-bar-fill ok" id="claudeBar" style="width:0%"></div>
+
+          <!-- 플랜 사용량 한도: 3개 바 (세션 / 주간 전체 / 주간 Sonnet) -->
+          <div style="margin-bottom:14px">
+            <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px">플랜 사용량 한도</div>
+
+            <div style="margin-bottom:8px">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
+                <span style="font-size:12px;color:var(--text)">현재 세션</span>
+                <span style="font-size:12px;color:var(--text)" id="claudeSessionPct">-</span>
+              </div>
+              <span id="claudeSessionReset" style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px"></span>
+              <div class="claude-bar-wrap" style="margin:0">
+                <div class="claude-bar-fill ok" id="claudeSessionBar" style="width:0%"></div>
+              </div>
+            </div>
+
+            <div style="font-size:12px;font-weight:700;color:var(--text);margin:12px 0 8px">주간 한도</div>
+
+            <div style="margin-bottom:8px">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
+                <span style="font-size:12px;color:var(--text)">모든 모델</span>
+                <span style="font-size:12px;color:var(--text)" id="claudeWeeklyPct">-</span>
+              </div>
+              <span id="claudeWeeklyReset" style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px"></span>
+              <div class="claude-bar-wrap" style="margin:0">
+                <div class="claude-bar-fill ok" id="claudeWeeklyBar" style="width:0%"></div>
+              </div>
+            </div>
+
+            <div style="margin-bottom:8px">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
+                <span style="font-size:12px;color:var(--text)">Sonnet만</span>
+                <span style="font-size:12px;color:var(--text)" id="claudeSonnetPct">-</span>
+              </div>
+              <div class="claude-bar-wrap" style="margin:0">
+                <div class="claude-bar-fill ok" id="claudeSonnetBar" style="width:0%"></div>
+              </div>
+            </div>
           </div>
-          <div class="claude-bar-labels">
-            <span id="claudeRemain">—</span>
-            <span id="claudeLimitTok"></span>
+
+          <!-- 월간 단순 바 (기존 호환) -->
+          <div style="margin-bottom:6px">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px" id="claudeMonthBarLabel">월간 토큰</div>
+            <div class="claude-bar-wrap" style="margin:0 0 4px">
+              <div class="claude-bar-fill ok" id="claudeBar" style="width:0%"></div>
+            </div>
+            <div class="claude-bar-labels">
+              <span id="claudeRemain">—</span>
+              <span id="claudeLimitTok"></span>
+            </div>
           </div>
-          <div class="claude-sub-row" style="margin-top:14px">
+
+          <div class="claude-sub-row" style="margin-top:10px">
             <div class="claude-sub">
               <div class="sl">이번 달 입력</div>
               <div class="sv" id="claudeInput">-</div>
@@ -1403,8 +1459,8 @@ body {
               <div class="sv orange" id="claudeCache">-</div>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <span style="font-size:11px;color:var(--muted)">한도</span>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
+            <span style="font-size:11px;color:var(--muted)">월간 한도</span>
             <input class="limit-inp" id="limitInp" type="text" placeholder="예: 2000000000" style="width:130px">
             <button class="limit-btn" onclick="saveLimit()">저장</button>
             <div class="claude-projects" id="claudeProjects" style="flex:1"></div>
@@ -2138,12 +2194,10 @@ function renderOpsList(targetId, items, emptyText) {
   }
   el.innerHTML = items.map(item => {
     const tone = item.tone || 'focus';
-    const textAction = item.can_launch && item.project && item.launch_prompt
-      ? `<button class="ops-mini-btn" onclick="launchBriefItem('${escAttr(item.project)}','${escAttr(item.launch_prompt)}')" title="추천 텍스트로 Claude Code 열기">TEXT</button>`
-      : '';
+    const textAction = '';
     const decisionActions = item.task_id
       ? `
-          <button class="ops-action-btn" onclick="applyTaskDecision(${item.task_id},'continue')" title="현재 작업으로 계속 밀기">계속</button>
+          <button class="ops-action-btn ops-continue-btn" onclick="continueAndLaunch(${item.task_id},'${escAttr(item.project||'')}','${escAttr(item.launch_prompt||'')}')" title="Claude Code 열고 바로 작업 시작">계속</button>
           <button class="ops-action-btn" onclick="applyTaskDecision(${item.task_id},'hold')" title="오늘 우선순위에서 잠시 내리기">보류</button>
           <button class="ops-action-btn" onclick="applyTaskDecision(${item.task_id},'carry')" title="내일 작업으로 넘기기">이월</button>
           <button class="ops-action-btn" onclick="applyTaskDecision(${item.task_id},'split')" title="하위 작업으로 쪼개기">분해</button>
@@ -2314,6 +2368,19 @@ function renderAccordion(tasks) {
         <div class="acc-body ${isOpen?'open':''}">${todoHtml}${parkedHtml}${doneHtml}</div>
       </div>`;
   }).join('');
+
+  // 프로그레스바 애니메이션: innerHTML 교체 후 0%→실제값 transition 트리거
+  requestAnimationFrame(() => {
+    list.querySelectorAll('.task-progress-fill, .acc-mini-fill').forEach(el => {
+      const target = el.style.width;
+      el.style.transition = 'none';
+      el.style.width = '0%';
+      requestAnimationFrame(() => {
+        el.style.transition = '';
+        el.style.width = target;
+      });
+    });
+  });
 }
 
 function toggleAcc(proj) {
@@ -2742,7 +2809,33 @@ async function loadClaudeUsage() {
     bar.className   = `claude-bar-fill ${cls}`;
 
     document.getElementById('claudeUsedPct').textContent = pct.toFixed(1);
-    document.getElementById('claudeSummaryValue').textContent = `${d.remain_pct.toFixed(1)}% 남음`;
+
+    // 세션/주간 3개 바 업데이트
+    function setRateLimitBar(barId, pctId, pct) {
+      const b = document.getElementById(barId);
+      const p = document.getElementById(pctId);
+      if (!b || !p) return;
+      const v = Math.min(pct || 0, 100);
+      b.style.width = v + '%';
+      b.className = `claude-bar-fill ${barClass(v)}`;
+      p.textContent = (pct || 0).toFixed(1) + '% 사용됨';
+    }
+    function fmtResetMin(mins) {
+      if (mins === null || mins === undefined) return '';
+      if (mins <= 0) return '곧 재설정';
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      return h > 0 ? `${h}시간 ${m}분 후 재설정` : `${m}분 후 재설정`;
+    }
+    setRateLimitBar('claudeSessionBar', 'claudeSessionPct', d.session_pct);
+    setRateLimitBar('claudeWeeklyBar',  'claudeWeeklyPct',  d.weekly_pct);
+    setRateLimitBar('claudeSonnetBar',  'claudeSonnetPct',  d.weekly_sonnet_pct);
+    document.getElementById('claudeSessionReset').textContent = fmtResetMin(d.session_reset_min);
+    document.getElementById('claudeWeeklyReset').textContent  = fmtResetMin(d.weekly_reset_min);
+
+    // 요약 표시는 세션 % 우선, 없으면 월간 remain
+    const summaryPct = d.session_pct != null ? d.session_pct : pct;
+    document.getElementById('claudeSummaryValue').textContent = `세션 ${(d.session_pct||0).toFixed(1)}%`;
 
     const rem = document.getElementById('claudeRemain');
     rem.className   = `claude-remain ${cls}`;
@@ -2913,6 +3006,27 @@ async function launchBriefItem(project, prompt) {
   if (!d.ok) alert(`추천 작업 열기 실패\n${d.error}`);
 }
 
+async function continueAndLaunch(taskId, project, prompt) {
+  const opsItem = document.querySelector(`.ops-item[data-task-id="${taskId}"]`);
+  if (opsItem) {
+    opsItem.style.transition = 'opacity 150ms ease';
+    opsItem.style.opacity = '0.3';
+    opsItem.style.pointerEvents = 'none';
+  }
+  if (project) {
+    try {
+      const r = await fetch(appUrl(`api/open-claude?proj=${encodeURIComponent(project)}&prompt=${encodeURIComponent(prompt || '')}`), { method: 'POST' });
+      const d = await r.json();
+      if (!d.ok) alert(`Claude Code 열기 실패\n${d.error}`);
+    } catch(e) {
+      alert('요청 실패: ' + e.message);
+    }
+  } else {
+    alert('프로젝트 경로를 찾을 수 없습니다.');
+  }
+  if (opsItem) opsItem.remove();
+}
+
 async function applyTaskDecision(taskId, action) {
   const payload = { action, note: '' };
   if (action === 'split') {
@@ -2995,11 +3109,14 @@ async function loadAgentStatus() {
       return;
     }
     el.innerHTML = rows.map(r => {
-      const stale = r.minutes_ago > 30;
-      const dotCls = stale ? 'stale' : r.status;
-      const agoTxt = r.minutes_ago < 1 ? '방금' :
+      const isIdle = r.status === 'idle';
+      const stale = !isIdle && r.minutes_ago > 30;
+      const dotCls = isIdle ? 'idle' : stale ? 'stale' : r.status;
+      const agoTxt = isIdle ? '대기 중' :
+                     r.minutes_ago < 1 ? '방금' :
                      r.minutes_ago < 60 ? `${r.minutes_ago}분 전` :
-                     `${Math.floor(r.minutes_ago/60)}시간 전`;
+                     r.minutes_ago < 1440 ? `${Math.floor(r.minutes_ago/60)}시간 전` :
+                     `${Math.floor(r.minutes_ago/1440)}일 전`;
       return `<div class="session-row" title="${esc(r.task)}">
         <div class="session-dot ${dotCls}"></div>
         <span class="session-proj">${esc(r.project)}</span>

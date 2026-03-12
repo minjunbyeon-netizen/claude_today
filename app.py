@@ -1357,7 +1357,10 @@ def enrich_task_for_dashboard(
     task["remaining_minutes"] = remaining_minutes
     task["is_active_now"] = bool(agent_snapshot and int(agent_snapshot.get("minutes_ago") or 9999) <= 15)
     task["repo_path"] = repo_snapshot.get("path") if repo_snapshot else ""
-    task["can_open_claude"] = bool(repo_snapshot)
+    _task_project = extract_task_project(task.get("title", ""))
+    task["can_open_claude"] = bool(repo_snapshot) or bool(
+        _task_project and find_repo_for_project(_task_project, repo_snapshots)
+    )
     task["task_state"] = task_state_of(task)
     task["task_state_label"] = task_state_label_of(task)
     task["is_actionable"] = is_task_actionable(task)
@@ -2949,32 +2952,59 @@ def open_claude(proj: str, prompt: str = ""):
 
     CLAUDE_CMD = r"C:\Users\USER\AppData\Roaming\npm\claude.cmd"
 
-    # 1) 새 탭 열기 + claude 실행 (CLAUDECODE 환경변수 제거하여 중첩 세션 오류 우회)
+    # 1) 새 창 열기 + claude 실행
+    # wt.exe 는 App Execution Alias → 백그라운드 프로세스에서 직접 호출 불가
+    # cmd /c 를 통해 shell 컨텍스트에서 wt 를 실행하면 PATH/Alias 정상 동작
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
     prompt_clean = summarize_agent_text(clean_utf8_text(prompt), limit=1200)
     claude_command = subprocess.list2cmdline([CLAUDE_CMD, prompt_clean]) if prompt_clean else subprocess.list2cmdline([CLAUDE_CMD])
+
+    # cmd /c "wt new-window -d <path> -- cmd /k <claude_cmd>"
+    wt_cmd = 'wt new-window -d "%s" -- cmd /k %s' % (target_path.replace('"', ''), claude_command)
     try:
         subprocess.Popen(
-            ["wt", "new-tab", "-d", target_path, "--", "cmd", "/k", claude_command],
+            ["cmd", "/c", wt_cmd],
             shell=False,
             env=env,
+            creationflags=subprocess.CREATE_NO_WINDOW,
         )
     except Exception as ex:
         return {"ok": False, "error": str(ex)}
 
-    # 2) WT 창 강제 포커스 (최소화 복원 + 앞으로 가져오기)
+    # 2) 새 WT 창 최대화 + 최상위 포커스 (화면 강제 표시)
     ps = r"""
 $sig = @'
 [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
 [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+[DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+[DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr hWnd);
+[DllImport("user32.dll")] public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+[DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
+[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 '@
 Add-Type -MemberDefinition $sig -Name 'Win32' -Namespace 'WinAPI' -ErrorAction SilentlyContinue
-$wt = Get-Process -Name 'WindowsTerminal' -ErrorAction SilentlyContinue | Select-Object -First 1
+Start-Sleep -Milliseconds 800
+$wt = Get-Process -Name 'WindowsTerminal' -ErrorAction SilentlyContinue | Sort-Object StartTime -Descending | Select-Object -First 1
 if ($wt) {
-    [WinAPI.Win32]::ShowWindow($wt.MainWindowHandle, 9)        # SW_RESTORE
-    Start-Sleep -Milliseconds 200
-    [WinAPI.Win32]::SetForegroundWindow($wt.MainWindowHandle)
+    $hwnd = $wt.MainWindowHandle
+    # 최대화
+    [WinAPI.Win32]::ShowWindow($hwnd, 3) | Out-Null
+    Start-Sleep -Milliseconds 300
+    # 포커스 강제 전환 (AttachThreadInput trick)
+    $fgHwnd = [WinAPI.Win32]::GetForegroundWindow()
+    $curThread = [WinAPI.Win32]::GetCurrentThreadId()
+    $dummy = 0
+    $fgThread = [WinAPI.Win32]::GetWindowThreadProcessId($fgHwnd, [ref]$dummy)
+    if ($fgThread -ne $curThread) {
+        [WinAPI.Win32]::AttachThreadInput($curThread, $fgThread, $true) | Out-Null
+    }
+    [WinAPI.Win32]::BringWindowToTop($hwnd) | Out-Null
+    [WinAPI.Win32]::SetForegroundWindow($hwnd) | Out-Null
+    if ($fgThread -ne $curThread) {
+        [WinAPI.Win32]::AttachThreadInput($curThread, $fgThread, $false) | Out-Null
+    }
 }
 """
     subprocess.Popen(
@@ -3010,6 +3040,7 @@ def claude_usage():
     cache_creation_input_tokens, cache_read_input_tokens
     """
     import json as _json
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
 
     projects_dir = os.path.expanduser("~/.claude/projects")
     if not os.path.isdir(projects_dir):
@@ -3020,30 +3051,47 @@ def claude_usage():
 
     # 한도 조회
     conn_s = get_db()
-    row = conn_s.execute("SELECT value FROM settings WHERE key='token_limit'").fetchone()
+    row_limit   = conn_s.execute("SELECT value FROM settings WHERE key='token_limit'").fetchone()
+    row_sess    = conn_s.execute("SELECT value FROM settings WHERE key='session_token_limit'").fetchone()
+    row_week    = conn_s.execute("SELECT value FROM settings WHERE key='weekly_token_limit'").fetchone()
+    row_sonnet  = conn_s.execute("SELECT value FROM settings WHERE key='weekly_sonnet_limit'").fetchone()
     conn_s.close()
-    token_limit = int(row["value"]) if row else 2_000_000_000
+    token_limit          = int(row_limit["value"])  if row_limit   else 2_000_000_000
+    session_token_limit  = int(row_sess["value"])   if row_sess    else 450_000_000
+    weekly_token_limit   = int(row_week["value"])   if row_week    else 3_000_000_000
+    weekly_sonnet_limit  = int(row_sonnet["value"]) if row_sonnet  else 2_120_000_000
 
-    today_total  = {"input": 0, "output": 0, "cache_create": 0, "cache_read": 0}
-    month_total  = {"input": 0, "output": 0, "cache_create": 0, "cache_read": 0}
+    now_utc        = _dt.now(_tz.utc)
+    window_5h_start = now_utc - _td(hours=5)
+    window_7d_start = now_utc - _td(days=7)
+
+    today_total   = {"input": 0, "output": 0, "cache_create": 0, "cache_read": 0}
+    month_total   = {"input": 0, "output": 0, "cache_create": 0, "cache_read": 0}
+    session_total = {"input": 0, "output": 0, "cache_create": 0, "cache_read": 0}
+    weekly_total  = {"input": 0, "output": 0, "cache_create": 0, "cache_read": 0}
+    weekly_sonnet = {"input": 0, "output": 0, "cache_create": 0, "cache_read": 0}
     by_project: dict = {}
+
+    # Track oldest timestamps in each window (for reset time calculation)
+    session_oldest_ts: list = []  # mutable container
+    weekly_oldest_ts:  list = []
 
     def scan_jsonl(filepath, project_name):
         try:
             with open(filepath, encoding="utf-8", errors="replace") as f:
                 for line in f:
                     line = line.strip()
-                    if not line or month_prefix not in line:
+                    if not line:
                         continue
                     try:
                         d = _json.loads(line)
                     except Exception:
                         continue
                     ts = d.get("timestamp", "")
-                    if not ts.startswith(month_prefix):
+                    if not ts:
                         continue
                     msg = d.get("message", {})
-                    if msg.get("role") != "assistant":
+                    if not isinstance(msg, dict) or msg.get("role") != "assistant":
                         continue
                     usage = msg.get("usage", {})
                     if not usage:
@@ -3055,26 +3103,61 @@ def claude_usage():
                     cr  = usage.get("cache_read_input_tokens", 0)
 
                     # 월간 누적
-                    month_total["input"]        += inp
-                    month_total["output"]       += out
-                    month_total["cache_create"] += cc
-                    month_total["cache_read"]   += cr
+                    if ts.startswith(month_prefix):
+                        month_total["input"]        += inp
+                        month_total["output"]       += out
+                        month_total["cache_create"] += cc
+                        month_total["cache_read"]   += cr
 
-                    # 오늘 누적
-                    if ts.startswith(today_prefix):
-                        today_total["input"]        += inp
-                        today_total["output"]       += out
-                        today_total["cache_create"] += cc
-                        today_total["cache_read"]   += cr
+                        # 오늘 누적
+                        if ts.startswith(today_prefix):
+                            today_total["input"]        += inp
+                            today_total["output"]       += out
+                            today_total["cache_create"] += cc
+                            today_total["cache_read"]   += cr
 
-                    if project_name not in by_project:
-                        by_project[project_name] = {"input": 0, "output": 0, "cache_create": 0, "cache_read": 0, "turns": 0}
-                    p = by_project[project_name]
-                    p["input"]        += inp
-                    p["output"]       += out
-                    p["cache_create"] += cc
-                    p["cache_read"]   += cr
-                    p["turns"]        += 1
+                        if project_name not in by_project:
+                            by_project[project_name] = {"input": 0, "output": 0, "cache_create": 0, "cache_read": 0, "turns": 0}
+                        p = by_project[project_name]
+                        p["input"]        += inp
+                        p["output"]       += out
+                        p["cache_create"] += cc
+                        p["cache_read"]   += cr
+                        p["turns"]        += 1
+
+                    # 시간대별 윈도우 집계
+                    try:
+                        ts_utc = _dt.fromisoformat(ts.replace("Z", "+00:00"))
+                    except Exception:
+                        continue
+
+                    if ts_utc >= window_7d_start:
+                        weekly_total["input"]        += inp
+                        weekly_total["output"]       += out
+                        weekly_total["cache_create"] += cc
+                        weekly_total["cache_read"]   += cr
+                        if not weekly_oldest_ts or ts_utc < weekly_oldest_ts[0]:
+                            if weekly_oldest_ts:
+                                weekly_oldest_ts[0] = ts_utc
+                            else:
+                                weekly_oldest_ts.append(ts_utc)
+                        model = msg.get("model", "")
+                        if "sonnet" in model.lower():
+                            weekly_sonnet["input"]        += inp
+                            weekly_sonnet["output"]       += out
+                            weekly_sonnet["cache_create"] += cc
+                            weekly_sonnet["cache_read"]   += cr
+
+                    if ts_utc >= window_5h_start:
+                        session_total["input"]        += inp
+                        session_total["output"]       += out
+                        session_total["cache_create"] += cc
+                        session_total["cache_read"]   += cr
+                        if not session_oldest_ts or ts_utc < session_oldest_ts[0]:
+                            if session_oldest_ts:
+                                session_oldest_ts[0] = ts_utc
+                            else:
+                                session_oldest_ts.append(ts_utc)
         except Exception:
             pass
 
@@ -3112,9 +3195,26 @@ def claude_usage():
                 if fname.endswith(".jsonl"):
                     scan_jsonl(os.path.join(root, fname), pname)
 
-    month_tokens = sum(month_total.values())
-    today_tokens = sum(today_total.values())
-    used_pct     = round(month_tokens / token_limit * 100, 1) if token_limit else 0
+    month_tokens  = sum(month_total.values())
+    today_tokens  = sum(today_total.values())
+    session_toks  = sum(session_total.values())
+    weekly_toks   = sum(weekly_total.values())
+    sonnet_toks   = sum(weekly_sonnet.values())
+    used_pct      = round(month_tokens  / token_limit         * 100, 1) if token_limit         else 0
+    session_pct   = round(session_toks  / session_token_limit * 100, 1) if session_token_limit else 0
+    weekly_pct    = round(weekly_toks   / weekly_token_limit  * 100, 1) if weekly_token_limit  else 0
+    sonnet_pct    = round(sonnet_toks   / weekly_sonnet_limit * 100, 1) if weekly_sonnet_limit else 0
+
+    # Reset time: how many minutes until oldest token in window rolls off
+    def reset_min(oldest_list, window_td):
+        if not oldest_list:
+            return None
+        roll_off = oldest_list[0] + window_td
+        delta = int((roll_off - now_utc).total_seconds() / 60)
+        return max(0, delta)
+
+    session_reset = reset_min(session_oldest_ts, _td(hours=5))
+    weekly_reset  = reset_min(weekly_oldest_ts,  _td(days=7))
 
     sorted_projects = sorted(
         [{"name": k, **v} for k, v in by_project.items()],
@@ -3122,13 +3222,25 @@ def claude_usage():
     )
 
     result = {
-        "month_tokens": month_tokens,
-        "today_tokens": today_tokens,
-        "month_total":  month_total,
-        "today_total":  today_total,
-        "token_limit":  token_limit,
-        "used_pct":     used_pct,
-        "remain_pct":   round(100 - used_pct, 1),
+        "month_tokens":  month_tokens,
+        "today_tokens":  today_tokens,
+        "month_total":   month_total,
+        "today_total":   today_total,
+        "token_limit":   token_limit,
+        "used_pct":      used_pct,
+        "remain_pct":    round(100 - used_pct, 1),
+        # 세션/주간 지표
+        "session_tokens":         session_toks,
+        "session_pct":            session_pct,
+        "session_token_limit":    session_token_limit,
+        "session_reset_min":      session_reset,
+        "weekly_tokens":          weekly_toks,
+        "weekly_pct":             weekly_pct,
+        "weekly_token_limit":     weekly_token_limit,
+        "weekly_reset_min":       weekly_reset,
+        "weekly_sonnet_tokens":   sonnet_toks,
+        "weekly_sonnet_pct":      sonnet_pct,
+        "weekly_sonnet_limit":    weekly_sonnet_limit,
         "by_project":   sorted_projects,
         "month_label":  date.today().strftime("%Y년 %m월"),
     }
@@ -3770,6 +3882,9 @@ def post_agent_status(report: AgentStatusReport):
 
 @app.get("/api/agent-status")
 def get_agent_status():
+    import re as _re
+    from datetime import datetime as _dt, timedelta as _td
+
     conn = get_db()
     ensure_table_column(conn, "agent_status", "url", "TEXT DEFAULT ''")
     rows = conn.execute(
@@ -3779,7 +3894,103 @@ def get_agent_status():
            ORDER BY updated_at DESC"""
     ).fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+
+    # DB에 있는 프로젝트명 목록
+    db_projects = {r["project"] for r in rows}
+    # 정규화된 이름으로도 매칭 (06_koo ↔ 06-koo 중복 방지)
+    db_normalized = {_re.sub(r'[-_]', '', p).lower() for p in db_projects}
+    result = [dict(r) for r in rows]
+
+    # JSONL 파일 기반으로 최근 24h 내 활동한 프로젝트 보완 (hook 미보고 세션 포함)
+    # C:/work에 실제 존재하는 폴더만 대상으로 함 (삭제된 폴더 제외)
+    try:
+        projects_dir = os.path.expanduser("~/.claude/projects")
+        work_folders = set(os.listdir("C:/work"))
+        work_folders_norm = {_re.sub(r'[-_]', '', f).lower(): f for f in work_folders}
+        cutoff = _dt.now() - _td(hours=24)
+
+        def _clean_proj(d: str) -> str:
+            cleaned = _re.sub(r'^[A-Z]-+', '', d)
+            for pfx in ['01-work-hive-media-', '01-work-my-project-',
+                        '01-work--agents-', '01-work-agents-', '01-work-', 'work-']:
+                if cleaned.startswith(pfx):
+                    cleaned = cleaned[len(pfx):]
+                    break
+            return cleaned if cleaned and cleaned != 'Users-USER' else ''
+
+        for proj_dir in os.listdir(projects_dir):
+            proj_path = os.path.join(projects_dir, proj_dir)
+            if not os.path.isdir(proj_path):
+                continue
+            pname = _clean_proj(proj_dir)
+            if not pname:
+                continue
+            # C:/work에 실제 존재하지 않는 프로젝트는 건너뜀
+            pname_norm = _re.sub(r'[-_]', '', pname).lower()
+            if pname not in work_folders and pname_norm not in work_folders_norm:
+                continue
+            # 실제 폴더명으로 정규화
+            if pname not in work_folders and pname_norm in work_folders_norm:
+                pname = work_folders_norm[pname_norm]
+            # DB에 이미 있으면 건너뜀
+            if pname in db_projects or pname_norm in db_normalized:
+                continue
+            # Find most recently modified JSONL
+            latest_mtime = None
+            for root, _, files in os.walk(proj_path):
+                for fname in files:
+                    if fname.endswith(".jsonl"):
+                        fpath = os.path.join(root, fname)
+                        try:
+                            mtime = _dt.fromtimestamp(os.path.getmtime(fpath))
+                            if mtime >= cutoff and (latest_mtime is None or mtime > latest_mtime):
+                                latest_mtime = mtime
+                        except OSError:
+                            pass
+            if latest_mtime:
+                minutes_ago = int((_dt.now() - latest_mtime).total_seconds() / 60)
+                result.append({
+                    "project": pname,
+                    "task": "JSONL activity detected",
+                    "status": "step",
+                    "url": "",
+                    "updated_at": latest_mtime.strftime("%Y-%m-%d %H:%M"),
+                    "minutes_ago": minutes_ago,
+                    "from_jsonl": True,
+                })
+    except Exception:
+        pass
+
+    # C:/work 폴더 직접 스캔 — DB/JSONL에 없는 폴더도 전부 표시
+    try:
+        work_dir = "C:/work"
+        already = {_re.sub(r'[-_]', '', r['project']).lower() for r in result}
+        skip = {'log', 'setting', 'config', 'data', 'tools'}
+        for entry in os.listdir(work_dir):
+            if entry.upper() == "CLAUDE.MD":
+                continue
+            full = os.path.join(work_dir, entry)
+            if not os.path.isdir(full):
+                continue
+            if entry.lower() in skip:
+                continue
+            entry_norm = _re.sub(r'[-_]', '', entry).lower()
+            if entry_norm in already:
+                continue
+            result.append({
+                "project": entry,
+                "task": "",
+                "status": "idle",
+                "url": "",
+                "updated_at": "",
+                "minutes_ago": 999999,
+                "from_work_scan": True,
+            })
+    except Exception:
+        pass
+
+    result.sort(key=lambda x: x.get("minutes_ago", 99999))
+    return result
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")

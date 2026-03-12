@@ -26,6 +26,15 @@ const elSessionControls = document.getElementById("sessionControls");
 init();
 
 async function init() {
+  if (!elAccessGate || !elApp || !elSessionBadge || !elUserMeta || !elSessionControls) {
+    document.body.innerHTML = `
+      <div style="padding:24px;font:14px/1.5 'Segoe UI',sans-serif;color:#b42318;">
+        Dashboard shell is incomplete. Reload after updating <code>static/index.html</code>.
+      </div>
+    `;
+    return;
+  }
+
   try {
     const [users, demoAccounts] = await Promise.all([
       api("/api/org/users"),
@@ -55,12 +64,26 @@ function findUser(userId) {
 
 async function startSession(mode, userId) {
   const user = findUser(userId) || state.users[0];
+  if (!user) {
+    renderFatal("No available user was found for this preview.");
+    return;
+  }
   state.sessionMode = mode;
   state.currentUserId = user.id;
   localStorage.setItem(STORAGE_MODE_KEY, mode);
   localStorage.setItem(STORAGE_USER_KEY, String(user.id));
   renderSessionChrome(user);
-  await loadState();
+
+  try {
+    await loadState({ onError: "gate" });
+  } catch (error) {
+    state.sessionMode = null;
+    state.currentUserId = null;
+    state.data = null;
+    localStorage.removeItem(STORAGE_MODE_KEY);
+    localStorage.removeItem(STORAGE_USER_KEY);
+    renderAccessGate(error.message);
+  }
 }
 
 function endSession() {
@@ -253,9 +276,18 @@ async function submitDemoLogin(loginId, password) {
   }
 }
 
-async function loadState() {
-  state.data = await api(`/api/org/state?user_id=${state.currentUserId}`);
-  renderDashboard();
+async function loadState({ onError = "fatal" } = {}) {
+  try {
+    state.data = await api(`/api/org/state?user_id=${state.currentUserId}`);
+    renderDashboard();
+  } catch (error) {
+    if (onError === "gate") {
+      renderAccessGate(error.message);
+    } else {
+      renderFatal(error.message);
+    }
+    throw error;
+  }
 }
 
 function renderDashboard() {

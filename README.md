@@ -1,25 +1,25 @@
-﻿# Daily Focus Migration README
+# Daily Focus Migration README
 
 This file is intentionally ASCII-only to reduce future encoding problems.
 
 ## Project summary
 
-This project is a FastAPI-based internal task dashboard.
+This project is a FastAPI-based CC / VIEW monitoring dashboard.
 
 Current MVP includes:
 
-- org hierarchy: ceo / manager / member
-- task assignment and task status updates
-- weekly focus entry
-- daily work log entry
-- manager / ceo review flow
-- guest preview mode
-- demo login mode with seeded test users
+- daily task list
+- Claude Code usage tracking
+- CC button shortcuts
+- VIEW button shortcuts
+- session activity feed
+- check-in history
 
 ## Main files
 
-- `app.py`: main FastAPI app, DB init, org logic, demo login API
+- `app.py`: main FastAPI app and task / Claude APIs
 - `run.py`: standard local launcher
+- `runtime_config.py`: shared host / port / base URL settings
 - `start.bat`: Windows entry point
 - `static/index.html`: main UI shell
 - `static/app.js`: frontend logic
@@ -32,10 +32,17 @@ Checked-in default local port:
 
 - `8001`
 
+Runtime override:
+
+- `APP_PORT`
+- optional `APP_BASE_URL` if the browser URL must differ from localhost
+
 Current launcher behavior:
 
 - `start.bat` -> `python run.py`
-- `run.py` starts `uvicorn app:app --host 0.0.0.0 --port 8001`
+- `run.py` starts `uvicorn app:app --host 0.0.0.0 --port %APP_PORT%`
+- `start.bat` forces `PYTHONUTF8=1` and defaults `APP_PORT` to `8001`
+- helper scripts now read the same port from `runtime_config.py`
 
 Important:
 
@@ -64,20 +71,17 @@ Before moving, make sure this file is copied together with the code.
 
 Working now:
 
-- guest preview
-- demo login
-- org dashboard by role
-- task create / update
-- weekly focus save
-- work log save
-- review approve / needs_update
+- daily task dashboard
+- CC / VIEW project shortcuts
+- Claude usage tracking
+- session feed
+- check-in save
+- carry-over flow
 
-Not finished yet:
+Separation note:
 
-- real auth
-- real user/company admin UI
-- push/mobile notifications
-- reporting/export
+- `C:\work\daily-focus` is the CC / VIEW dashboard.
+- role-based org task UI belongs in `C:\work\org-focus`.
 
 ## Encoding warning
 
@@ -92,13 +96,14 @@ Recommended rules after moving:
 - avoid mixed editors with legacy Korean code pages
 - confirm terminal/editor encoding before bulk edits
 - keep migration notes in ASCII when possible if environment is unstable
+- keep `.editorconfig` checked in and enabled in the editor
 
 ## Move checklist
 
 1. Copy the whole project folder, including `data/`, `static/`, and `.venv/` if you want the same local environment.
 2. Verify Python and dependencies on the new machine.
 3. Start with `start.bat` or `python run.py`.
-4. Open `http://localhost:8001`.
+4. Open `http://localhost:8001` unless `APP_PORT` was overridden.
 5. Confirm demo login and guest preview still work.
 6. Confirm `data/focus.db` is being read correctly.
 7. Standardize one dev port and stop any old background uvicorn process.
@@ -108,4 +113,4 @@ Recommended rules after moving:
 1. Fix encoding-damaged Korean text in `app.py` and UI strings.
 2. Pick one permanent local port.
 3. Add a real README in Korean only after UTF-8 is stable.
-4. Add `.editorconfig` or editor settings for UTF-8 enforcement.
+4. Keep `.editorconfig` or editor settings for UTF-8 enforcement.

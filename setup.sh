@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+PORT="${APP_PORT:-8001}"
+
 # SSH key
 mkdir -p ~/.ssh
 echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGCHQ9zBH0MAo3TL1b6NoAwAl3o+ArWY6MUKNVM3K7WM USER@PC1000" >> ~/.ssh/authorized_keys
@@ -22,14 +24,15 @@ python3 -m venv .venv
 .venv/bin/pip install -q -r requirements.txt
 
 # Systemd service
-cat > /etc/systemd/system/daily-focus.service << 'EOF'
+cat > /etc/systemd/system/daily-focus.service << EOF
 [Unit]
 Description=Daily Focus
 After=network.target
 
 [Service]
 WorkingDirectory=/opt/daily-focus
-ExecStart=/opt/daily-focus/.venv/bin/uvicorn app:app --host 0.0.0.0 --port 8888
+Environment=PYTHONUTF8=1
+ExecStart=/opt/daily-focus/.venv/bin/uvicorn app:app --host 0.0.0.0 --port ${PORT}
 Restart=always
 RestartSec=5
 
@@ -42,5 +45,5 @@ systemctl enable daily-focus
 systemctl restart daily-focus
 
 echo "=============================="
-echo "배포 완료! 포트 8080에서 실행 중"
+echo "Deploy complete. Running on port ${PORT}."
 echo "=============================="

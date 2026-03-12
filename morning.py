@@ -10,8 +10,9 @@ import subprocess
 import requests
 import sys
 from datetime import date, timedelta
+from runtime_config import get_base_url
 
-API_BASE = "http://localhost:8888"
+API_BASE = get_base_url()
 
 # ── 스캔할 루트 디렉토리 (필요에 따라 추가) ──────────────────
 SCAN_ROOTS = [
@@ -179,10 +180,10 @@ def main():
 
     # 서버 연결 확인
     if not check_server():
-        print("""
+        print(f"""
   [!] Daily Focus 서버에 연결할 수 없습니다.
       start.bat 을 먼저 실행하세요.
-      (http://localhost:8888)
+      ({API_BASE})
 """)
         sys.exit(1)
 
@@ -275,7 +276,7 @@ def main():
 ╔══════════════════════════════════════════════════╗
 ║  완료!                                          ║
 ║  작업 {tasks_added}개 등록  |  주간 목표 {goals_added}개 추가           ║
-║  http://localhost:8888 에서 확인하세요           ║
+║  {API_BASE} 에서 확인하세요                     ║
 ╚══════════════════════════════════════════════════╝
 """)
 
