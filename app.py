@@ -2950,21 +2950,26 @@ def open_claude(proj: str, prompt: str = ""):
         return {"ok": False, "error": f"경로를 찾을 수 없음: {proj}"}
     target_path = repo["path"]
 
-    CLAUDE_CMD = r"C:\Users\USER\AppData\Roaming\npm\claude.cmd"
+    # Claude CMD: native install 우선, npm fallback
+    CLAUDE_NATIVE = r"C:\Users\USER\.local\bin\claude.exe"
+    CLAUDE_NPM    = r"C:\Users\USER\AppData\Roaming\npm\claude.cmd"
+    CLAUDE_CMD = CLAUDE_NATIVE if os.path.exists(CLAUDE_NATIVE) else CLAUDE_NPM
 
-    # 1) 새 창 열기 + claude 실행
-    # wt.exe 는 App Execution Alias → 백그라운드 프로세스에서 직접 호출 불가
-    # cmd /c 를 통해 shell 컨텍스트에서 wt 를 실행하면 PATH/Alias 정상 동작
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
     prompt_clean = summarize_agent_text(clean_utf8_text(prompt), limit=1200)
     claude_command = subprocess.list2cmdline([CLAUDE_CMD, prompt_clean]) if prompt_clean else subprocess.list2cmdline([CLAUDE_CMD])
 
-    # cmd /c "wt new-window -d <path> -- cmd /k <claude_cmd>"
-    wt_cmd = 'wt new-window -d "%s" -- cmd /k %s' % (target_path.replace('"', ''), claude_command)
+    # PowerShell Start-Process로 wt 실행 — App Execution Alias를 백그라운드에서 해석 가능한 유일한 방법
+    safe_path = target_path.replace("'", "''")
+    safe_cmd  = claude_command.replace("'", "''")
+    ps_launch = (
+        f"Start-Process -FilePath wt "
+        f"-ArgumentList 'new-window -d \"{safe_path}\" -- cmd /k {safe_cmd}'"
+    )
     try:
         subprocess.Popen(
-            ["cmd", "/c", wt_cmd],
+            ["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps_launch],
             shell=False,
             env=env,
             creationflags=subprocess.CREATE_NO_WINDOW,
@@ -3009,7 +3014,8 @@ if ($wt) {
 """
     subprocess.Popen(
         ["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps],
-        shell=False
+        shell=False,
+        creationflags=subprocess.CREATE_NO_WINDOW,
     )
 
     return {"ok": True, "path": target_path, "method": "wt", "prompted": bool(prompt_clean)}
@@ -3875,6 +3881,48 @@ def post_agent_status(report: AgentStatusReport):
                VALUES (?, ?, ?, ?, datetime('now','localtime'))""",
             (project, task, status, normalized_url),
         )
+
+    # ── 오늘 태스크 자동 동기화 ──────────────────────────────────────
+    today = date.today().isoformat()
+    proj_key = normalize_project_key(project)
+
+    # 오늘 날짜 태스크 중 같은 프로젝트 항목 검색 (수동 + 자동 모두)
+    existing_task = conn.execute(
+        """SELECT id, notes, status FROM tasks
+           WHERE date = ? AND lower(title) LIKE ?
+           ORDER BY id DESC LIMIT 1""",
+        (today, f"%[{project.lower()}]%"),
+    ).fetchone()
+
+    if status == "done":
+        # 자동 생성 태스크만 완료 처리 (수동 태스크는 건드리지 않음)
+        if existing_task and existing_task["notes"] == "auto" and existing_task["status"] != "done":
+            conn.execute(
+                """UPDATE tasks SET status='done', completed_at=datetime('now','localtime'),
+                   updated_at=datetime('now','localtime') WHERE id=?""",
+                (existing_task["id"],),
+            )
+    elif status in ("start", "step"):
+        if existing_task:
+            # 자동 생성 태스크면 task 내용 최신화
+            if existing_task["notes"] == "auto":
+                short = task[:60] if task else "작업 중"
+                new_title = f"[{project}] 이어서: {short}"
+                conn.execute(
+                    "UPDATE tasks SET title=?, updated_at=datetime('now','localtime') WHERE id=?",
+                    (new_title, existing_task["id"]),
+                )
+        else:
+            # 오늘 해당 프로젝트 태스크 없음 → 자동 생성
+            short = task[:60] if task else "작업 중"
+            auto_title = f"[{project}] 이어서: {short}"
+            conn.execute(
+                """INSERT INTO tasks (date, title, estimated_minutes, priority, status, notes, updated_at)
+                   VALUES (?, ?, 30, 2, 'todo', 'auto', datetime('now','localtime'))""",
+                (today, auto_title),
+            )
+    # ─────────────────────────────────────────────────────────────────
+
     conn.commit()
     conn.close()
     return {"ok": True}
