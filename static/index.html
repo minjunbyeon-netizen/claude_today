@@ -199,19 +199,40 @@ body {
 .week-item-badge.done-badge { color: var(--success); border-color: #3fb95040; }
 
 /* ── Project List ── */
-.proj-list { display: flex; flex-direction: column; gap: 2px; }
+.proj-list { display: flex; flex-direction: column; gap: 1px; }
+/* 프로젝트 카테고리 헤더 */
+.proj-cat-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 6px 2px;
+  cursor: pointer;
+  user-select: none;
+  margin-top: 4px;
+}
+.proj-cat-hd:first-child { margin-top: 0; }
+.proj-cat-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.proj-cat-arrow { font-size: 9px; color: var(--muted); }
+.proj-cat-body { padding-left: 4px; }
+/* 폴더 아이템 */
 .proj-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 8px;
+  padding: 5px 8px;
   border-radius: 6px;
   cursor: pointer;
   transition: background .12s;
 }
 .proj-item:hover { background: var(--surface2); }
 .proj-item.active { background: var(--surface2); }
-.proj-item.active .proj-item-name { color: var(--text); }
+.proj-item.active .proj-item-name { color: var(--text); font-weight: 700; }
 .proj-item-dot {
   width: 6px;
   height: 6px;
@@ -220,6 +241,7 @@ body {
   flex-shrink: 0;
 }
 .proj-item.all-item .proj-item-dot { background: var(--muted); }
+.proj-item.live-item .proj-item-dot { background: var(--success); }
 .proj-item-name {
   font-size: 12px;
   color: var(--text2);
@@ -1721,7 +1743,10 @@ body {
 
     <!-- 3. 프로젝트별 -->
     <div class="sidebar-section">
-      <div class="sidebar-section-title">프로젝트</div>
+      <div class="sidebar-section-title-row">
+        <span class="sidebar-section-title" style="margin-bottom:0">프로젝트</span>
+        <button class="wf-settings-btn" onclick="openWfSettings()" title="프로젝트 그룹 설정">⚙</button>
+      </div>
       <div class="proj-list" id="projList"></div>
     </div>
 
@@ -2276,35 +2301,82 @@ function normalizeProject(name) {
   return SQUAD_TEAMS.has(name) ? 'squad-team' : name;
 }
 
-// ── Project List (sidebar) ────────────────────────────────────
+// ── Project List (sidebar) — group-based ────────────────────
 function renderProjectList(tasks) {
+  const groups  = getWfGroups();
+  const folders = _lastWfRows.length ? _lastWfRows.map(r => r.project) : [];
+
+  // 태스크 카운트 (폴더명 기준)
   const counts = {};
   for (const t of tasks) {
     const m = t.title.match(/^\[([^\]]+)\]/);
     const proj = normalizeProject(m ? m[1] : '기타');
-    if (!counts[proj]) counts[proj] = 0;
-    counts[proj]++;
+    counts[proj] = (counts[proj] || 0) + 1;
   }
 
-  const total = tasks.length;
-  const projEntries = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+  const folderItem = (name, extraCls = '') => {
+    const isActive = currentProject === name;
+    const isLive   = liveProjects.has(name);
+    const cnt      = counts[name];
+    return `<div class="proj-item ${isActive?'active':''} ${isLive?'live-item':''} ${extraCls}"
+      onclick="selectProject('${esc(name)}')">
+      <div class="proj-item-dot"></div>
+      <span class="proj-item-name">${esc(name)}</span>
+      ${cnt ? `<span class="proj-item-count">${cnt}</span>` : ''}
+    </div>`;
+  };
 
   let html = `<div class="proj-item all-item ${!currentProject?'active':''}" onclick="selectProject(null)">
     <div class="proj-item-dot"></div>
     <span class="proj-item-name">전체</span>
-    <span class="proj-item-count">${total}</span>
+    <span class="proj-item-count">${tasks.length}</span>
   </div>`;
 
-  html += projEntries.map(([name, cnt]) => {
-    const isActive = currentProject === name;
-    return `<div class="proj-item ${isActive?'active':''}" onclick="selectProject('${esc(name)}')">
-      <div class="proj-item-dot"></div>
-      <span class="proj-item-name">${esc(name)}</span>
-      <span class="proj-item-count">${cnt}</span>
-    </div>`;
-  }).join('');
+  if (groups.length) {
+    const assigned = new Set(groups.flatMap(g => g.folders || []));
+
+    groups.forEach(g => {
+      const gFolders = (g.folders || []);
+      const cKey = `pjg_${g.id}`;
+      const collapsed = localStorage.getItem(cKey) === '1';
+      html += `<div class="proj-cat-hd" onclick="toggleProjCat('${esc(g.id)}')">
+        <span class="proj-cat-label">${esc(g.name)}</span>
+        <span class="proj-cat-arrow" id="pjga-${esc(g.id)}">${collapsed?'▶':'▼'}</span>
+      </div>
+      <div class="proj-cat-body" id="pjgb-${esc(g.id)}" style="${collapsed?'display:none':''}">
+        ${gFolders.length ? gFolders.map(f => folderItem(f)).join('') : '<div style="font-size:11px;color:var(--muted);padding:3px 8px">폴더 없음</div>'}
+      </div>`;
+    });
+
+    // 미분류 폴더 (그룹 없는 것)
+    const ungrouped = folders.filter(f => !assigned.has(f));
+    if (ungrouped.length) {
+      const collapsed = localStorage.getItem('pjg___ung') === '1';
+      html += `<div class="proj-cat-hd" onclick="toggleProjCat('__ung')">
+        <span class="proj-cat-label" style="color:var(--muted)">미분류</span>
+        <span class="proj-cat-arrow" id="pjga-__ung">${collapsed?'▶':'▼'}</span>
+      </div>
+      <div class="proj-cat-body" id="pjgb-__ung" style="${collapsed?'display:none':''}">
+        ${ungrouped.map(f => folderItem(f)).join('')}
+      </div>`;
+    }
+  } else {
+    // 그룹 없으면 tasks 기반 폴더 목록 표시
+    const projEntries = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+    html += projEntries.map(([name, cnt]) => folderItem(name)).join('');
+  }
 
   document.getElementById('projList').innerHTML = html;
+}
+
+function toggleProjCat(id) {
+  const body  = document.getElementById(`pjgb-${id}`);
+  const arrow = document.getElementById(`pjga-${id}`);
+  if (!body) return;
+  const collapse = body.style.display !== 'none';
+  body.style.display = collapse ? 'none' : '';
+  if (arrow) arrow.textContent = collapse ? '▶' : '▼';
+  localStorage.setItem(`pjg_${id}`, collapse ? '1' : '0');
 }
 
 // ── Navigation actions ────────────────────────────────────────
@@ -3942,6 +4014,7 @@ function openWfSettings() {
 function closeWfSettings() {
   document.getElementById('wfModalOverlay').style.display = 'none';
   renderWfList(_lastWfRows);
+  renderProjectList(allTasks);
 }
 
 function renderWfSettings() {
@@ -4062,6 +4135,8 @@ async function loadAgentStatus() {
 
     // ── Work Folder sidebar ──
     renderWfList(rows);
+    // 프로젝트 섹션도 폴더 목록 갱신
+    renderProjectList(allTasks);
   } catch(e) {}
 }
 loadAgentStatus();
