@@ -311,9 +311,17 @@ body {
   padding: 14px 18px;
   margin-bottom: 12px;
 }
+.last-log-item { font-size: 11px; color: var(--muted); line-height: 1.6; padding: 1px 0; }
+.last-log-item::before { content: counter(log-item) ". "; counter-increment: log-item; }
+#lastLogItems { counter-reset: log-item; }
+
+.collapsible-header { cursor: pointer; user-select: none; }
+.collapse-arrow { font-size: 10px; color: var(--muted); margin-left: auto; transition: transform .15s; flex-shrink: 0; }
+.collapse-arrow.open { transform: rotate(90deg); }
+
 .sessions-title {
   font-size: 11px; font-weight: 700; color: var(--muted);
-  text-transform: uppercase; letter-spacing: .1em; margin-bottom: 10px;
+  text-transform: uppercase; letter-spacing: .1em; margin-bottom: 0;
   display: flex; align-items: center; justify-content: space-between;
 }
 .sessions-list { display: flex; flex-direction: column; gap: 6px; }
@@ -1658,12 +1666,13 @@ body {
       </div>
 
       <!-- Agent Sessions -->
-      <div class="sessions-card">
-        <div class="sessions-title">
-            <span>CC / VIEW Sessions</span>
+      <div class="sessions-card collapsible-card" id="sessionsCard">
+        <div class="sessions-title collapsible-header" onclick="toggleCard('sessions')">
+          <span>CC / VIEW Sessions</span>
           <span id="sessionsTime" style="font-size:10px;font-weight:400;color:var(--muted);font-family:'Courier New',monospace"></span>
+          <span class="collapse-arrow" id="sessionsArrow">▶</span>
         </div>
-        <div class="sessions-list" id="sessionsList">
+        <div class="sessions-list collapsible-body" id="sessionsList" style="display:none">
           <span class="sessions-empty">연결된 세션 없음</span>
         </div>
       </div>
@@ -1675,8 +1684,8 @@ body {
       <span id="watchSummary" style="display:none"></span>
       <div id="watchAlerts" style="display:none"></div>
 
-      <div class="morning-card">
-        <div class="morning-top">
+      <div class="morning-card collapsible-card" id="morningCard">
+        <div class="morning-top collapsible-header" onclick="toggleCard('morning')">
           <div class="morning-top-left">
             <span class="sec-title">아침 보드</span>
             <span class="morning-headline" id="morningHeadline">프로젝트별 어제 완료 / 오늘 남은 작업</span>
@@ -1684,9 +1693,13 @@ body {
             <span class="morning-pill warn" id="morningConfirmPill">오늘 목표 확정 필요</span>
             <span class="morning-pill ok" id="morningWeekPill">이번 주 0/0</span>
           </div>
-          <button class="icon-btn" onclick="refreshMain();loadMorningProjectBoard()" title="새로고침">↻</button>
+          <div style="display:flex;align-items:center;gap:6px">
+            <button class="icon-btn" onclick="event.stopPropagation();refreshMain();loadMorningProjectBoard()" title="새로고침">↻</button>
+            <span class="collapse-arrow" id="morningArrow">▶</span>
+          </div>
         </div>
 
+        <div class="collapsible-body" id="morningBody" style="display:none">
         <!-- 프로젝트별 어제/오늘 현황 -->
         <div id="morningProjectBoard" style="margin-bottom:10px">
           <div style="font-size:12px;color:var(--muted)">프로젝트 현황을 불러오는 중입니다...</div>
@@ -1712,6 +1725,7 @@ body {
         <input id="weekGoalInput" style="display:none">
         <span id="weekGoalHint" style="display:none"></span>
         <span id="morningPrompt" style="display:none"></span>
+        </div><!-- end collapsible-body -->
       </div>
 
       <div class="ops-card">
@@ -1774,6 +1788,11 @@ body {
       <div class="filter-bar" id="filterBar" style="display:none">
         프로젝트 필터: <span id="filterLabel"></span>
         <button class="filter-clear" onclick="clearProjectFilter()">전체 보기</button>
+      </div>
+
+      <!-- Last Log -->
+      <div id="lastLogPanel" style="display:none;margin-bottom:10px;padding:10px 14px;border-left:2px solid var(--border)">
+        <div id="lastLogItems"></div>
       </div>
 
       <!-- Accordion -->
@@ -2759,6 +2778,46 @@ async function addTask() {
   await refreshMain();
 }
 
+// --- Last Log ---
+async function loadLastLog() {
+  const panel = document.getElementById('lastLogPanel');
+  const itemsEl = document.getElementById('lastLogItems');
+  if (!panel || !itemsEl) return;
+  try {
+    const r = await fetch(appUrl('api/last-log'));
+    if (!r.ok) return;
+    const d = await r.json();
+    if (!d.items || !d.items.length) return;
+    itemsEl.innerHTML = d.items.map(t => `<div class="last-log-item">${esc(t)}</div>`).join('');
+    panel.style.display = 'block';
+  } catch(e) { console.warn('loadLastLog:', e); }
+}
+// --- End Last Log ---
+
+// --- Collapsible Cards ---
+const _cardDefaults = { sessions: false, morning: false };
+function _cardKey(name) { return `df_card_${name}`; }
+function _cardOpen(name) {
+  const v = localStorage.getItem(_cardKey(name));
+  return v === null ? _cardDefaults[name] : v === '1';
+}
+function toggleCard(name) {
+  const isOpen = _cardOpen(name);
+  localStorage.setItem(_cardKey(name), isOpen ? '0' : '1');
+  _applyCard(name, !isOpen);
+}
+function _applyCard(name, open) {
+  const bodies = { sessions: document.getElementById('sessionsList'), morning: document.getElementById('morningBody') };
+  const arrows = { sessions: document.getElementById('sessionsArrow'), morning: document.getElementById('morningArrow') };
+  const body = bodies[name], arrow = arrows[name];
+  if (body) { body.style.display = open ? '' : 'none'; body.style.marginTop = open ? '10px' : '0'; }
+  if (arrow) { arrow.classList.toggle('open', open); }
+}
+function initCollapsibleCards() {
+  Object.keys(_cardDefaults).forEach(name => _applyCard(name, _cardOpen(name)));
+}
+// --- End Collapsible Cards ---
+
 // --- Comment System ---
 let _meLogin = null;
 async function getMe() {
@@ -3457,6 +3516,8 @@ async function loadAgentStatus() {
 loadAgentStatus();
 setInterval(loadAgentStatus, 60000);
 loadMorningProjectBoard();
+initCollapsibleCards();
+loadLastLog();
 </script>
 </body>
 </html>
