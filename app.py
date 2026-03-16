@@ -2382,7 +2382,10 @@ def logout(request: Request):
 # --- Routes ---
 @app.get("/")
 def root():
-    return FileResponse("static/index.html")
+    return FileResponse(
+        "static/index.html",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache"},
+    )
 
 
 @app.get("/api/me")
