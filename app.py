@@ -2281,6 +2281,41 @@ init_org_data()
 def health():
     return {"status": "ok"}
 
+
+def _parse_handoff_completed(handoff_dir: str):
+    import glob as _glob
+    files = sorted(_glob.glob(os.path.join(handoff_dir, "readme-*.md")), reverse=True)
+    if not files:
+        return {"items": [], "file": ""}
+    latest = files[0]
+    items = []
+    in_completed = False
+    with open(latest, encoding="utf-8") as f:
+        for line in f:
+            line = line.rstrip()
+            if line.startswith("## Completed"):
+                in_completed = True; continue
+            if in_completed:
+                if line.startswith("##"): break
+                if line.startswith("- "): items.append(line[2:].strip())
+    return {"items": items[:3], "file": os.path.basename(latest)}
+
+@app.get("/api/last-log")
+def get_last_log():
+    handoff_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "handoff")
+    return _parse_handoff_completed(handoff_dir)
+
+@app.get("/api/project-last-log")
+def get_project_last_log(proj: str):
+    # sanitize: only allow alphanumeric, dash, underscore, dot
+    import re
+    if not re.match(r'^[\w\-\.]+$', proj):
+        return {"items": [], "file": ""}
+    handoff_dir = os.path.join(r"C:\work", proj, "handoff")
+    if not os.path.isdir(handoff_dir):
+        return {"items": [], "file": ""}
+    return _parse_handoff_completed(handoff_dir)
+
 @app.get("/login")
 def login_page(error: Optional[str] = None):
     return FileResponse("static/login.html")

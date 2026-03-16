@@ -314,6 +314,10 @@ body {
 .last-log-item { font-size: 11px; color: var(--muted); line-height: 1.6; padding: 1px 0; }
 .last-log-item::before { content: counter(log-item) ". "; counter-increment: log-item; }
 #lastLogItems { counter-reset: log-item; }
+.proj-last-log { counter-reset: proj-log-item; padding: 6px 0 8px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+.proj-last-log:empty { display: none; }
+.proj-last-log-item { font-size: 11px; color: var(--muted); line-height: 1.6; padding: 1px 0; }
+.proj-last-log-item::before { content: counter(proj-log-item) ". "; counter-increment: proj-log-item; }
 
 .collapsible-header { cursor: pointer; user-select: none; }
 .collapse-arrow { font-size: 10px; color: var(--muted); margin-left: auto; transition: transform .15s; flex-shrink: 0; }
@@ -2521,6 +2525,7 @@ function renderAccordion(tasks) {
       </div>
       <div class="done-list">${parkedItems.map(renderTask).join('')}</div>` : '';
 
+    const projLogId = `proj-log-${proj.replace(/[^a-zA-Z0-9]/g, '_')}`;
     return `
       <div class="acc-group">
         <div class="acc-header" onclick="toggleAcc('${esc(proj)}')">
@@ -2535,7 +2540,10 @@ function renderAccordion(tasks) {
           <button class="btn-cc${canOpenClaude?'':' disabled'}" onclick="event.stopPropagation();${canOpenClaude ? `openClaude('${esc(proj)}')` : ''}" title="${canOpenClaude ? 'Claude Code 열기' : '연결된 로컬 프로젝트 폴더 없음'}">CC</button>
           <button class="btn-view${agentUrls[proj]?'':' disabled'}" onclick="event.stopPropagation();openView('${esc(proj)}')" title="프로젝트 웹 홈">VIEW</button>
         </div>
-        <div class="acc-body ${isOpen?'open':''}">${todoHtml}${parkedHtml}${doneHtml}</div>
+        <div class="acc-body ${isOpen?'open':''}">
+          <div class="proj-last-log" id="${projLogId}"></div>
+          ${todoHtml}${parkedHtml}${doneHtml}
+        </div>
       </div>`;
   }).join('');
 
@@ -2551,6 +2559,8 @@ function renderAccordion(tasks) {
 
   // 댓글 자동 로드
   tasks.forEach(t => loadComments(t.id));
+  // 프로젝트별 최근 작업 로그 로드
+  sortedKeys.forEach(proj => loadProjectLog(proj));
 }
 
 function toggleAcc(proj) {
@@ -2776,6 +2786,20 @@ async function addTask() {
   document.getElementById('inTitle').value = '';
   document.getElementById('inMin').value = '15';
   await refreshMain();
+}
+
+// --- Project Last Log ---
+async function loadProjectLog(proj) {
+  const id = `proj-log-${proj.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  const el = document.getElementById(id);
+  if (!el) return;
+  try {
+    const r = await fetch(appUrl(`api/project-last-log?proj=${encodeURIComponent(proj)}`));
+    if (!r.ok) return;
+    const d = await r.json();
+    if (!d.items || !d.items.length) return;
+    el.innerHTML = d.items.map(t => `<div class="proj-last-log-item">${esc(t)}</div>`).join('');
+  } catch(e) {}
 }
 
 // --- Last Log ---
