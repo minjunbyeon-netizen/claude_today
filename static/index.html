@@ -237,11 +237,16 @@ body {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--border);
   flex-shrink: 0;
 }
-.proj-item.all-item .proj-item-dot { background: var(--muted); }
-.proj-item.live-item .proj-item-dot { background: var(--success); }
+/* 오늘 태스크 있는 그룹 */
+.proj-item.has-tasks .proj-item-dot { background: var(--accent); }
+/* CC 활성 폴더 있는 그룹 */
+.proj-item.live-item .proj-item-dot {
+  background: #34c759;
+  animation: live-pulse-bg 1.8s ease-in-out infinite;
+}
 .proj-item-name {
   font-size: 12px;
   color: var(--text2);
@@ -2671,7 +2676,9 @@ function renderProjectList(tasks) {
   // 전체 태스크 수
   const totalTasks = tasks.length;
 
-  let html = `<div class="proj-item all-item ${currentGroupId===null?'active':''}" onclick="selectGroup(null)">
+  const anyLive = groups.some(g => (g.folders||[]).some(f => liveProjects.has(f)));
+  const allCls  = ['all-item', currentGroupId===null?'active':'', anyLive?'live-item':totalTasks?'has-tasks':''].filter(Boolean).join(' ');
+  let html = `<div class="proj-item ${allCls}" onclick="selectGroup(null)">
     <div class="proj-item-dot"></div>
     <span class="proj-item-name">전체</span>
     ${totalTasks ? `<span class="proj-item-count">${totalTasks}</span>` : ''}
@@ -2682,8 +2689,10 @@ function renderProjectList(tasks) {
       const isActive   = currentGroupId === g.id;
       const liveCnt    = (g.folders || []).filter(f => liveProjects.has(f)).length;
       const folderCnt  = (g.folders || []).length;
-      return `<div class="proj-item ${isActive?'active':''} ${liveCnt?'live-item':''}"
-        onclick="selectGroup('${esc(g.id)}')">
+      const folderSet  = new Set(g.folders || []);
+      const hasTasks   = tasks.some(t => { const m = t.title.match(/^\[([^\]]+)\]/); return m && folderSet.has(normalizeProject(m[1])); });
+      const cls = [isActive?'active':'', liveCnt?'live-item':'', hasTasks?'has-tasks':''].filter(Boolean).join(' ');
+      return `<div class="proj-item ${cls}" onclick="selectGroup('${esc(g.id)}')">
         <div class="proj-item-dot"></div>
         <span class="proj-item-name">${esc(g.name)}</span>
         ${folderCnt ? `<span class="proj-item-count">${folderCnt}</span>` : ''}
