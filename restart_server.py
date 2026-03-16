@@ -12,11 +12,17 @@ DETACHED = getattr(subprocess, "DETACHED_PROCESS", 8)
 
 
 def kill_port(port: int) -> None:
-    result = subprocess.run(["netstat", "-ano"], capture_output=True, text=True)
+    result = subprocess.run(
+        ["netstat", "-ano"], capture_output=True, text=True,
+        creationflags=NO_WINDOW,
+    )
     for line in result.stdout.splitlines():
         if f":{port}" in line and "LISTEN" in line:
             pid = line.strip().split()[-1]
-            subprocess.run(["taskkill", "/F", "/PID", pid], capture_output=True)
+            subprocess.run(
+                ["taskkill", "/F", "/PID", pid], capture_output=True,
+                creationflags=NO_WINDOW,
+            )
 
 
 def start_server() -> None:

@@ -4210,6 +4210,11 @@ def get_agent_status():
     db_normalized = {_re.sub(r'[-_]', '', p).lower() for p in db_projects}
     result = [dict(r) for r in rows]
 
+    # 6시간 이상 업데이트 없는 항목은 status를 idle로 표시 (DB 변경 없이 응답만)
+    for r in result:
+        if r.get('minutes_ago', 0) > 360:
+            r['status'] = 'idle'
+
     # JSONL 파일 기반으로 최근 24h 내 활동한 프로젝트 보완 (hook 미보고 세션 포함)
     # C:/work에 실제 존재하는 폴더만 대상으로 함 (삭제된 폴더 제외)
     try:

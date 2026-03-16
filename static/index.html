@@ -3671,19 +3671,20 @@ async function loadAgentStatus() {
       if (name) grp.classList.toggle('is-live', liveProjects.has(name));
     });
 
-    // ── Sessions panel — idle 완전 제외, active/stale만 표시 ──
-    const activeSessions = rows.filter(r => r.status !== 'idle');
+    // ── Sessions panel — is_live 또는 3시간 이내만 표시 ──
+    const activeSessions = rows.filter(r => r.is_live || (r.minutes_ago != null && r.minutes_ago <= 180));
     if (!activeSessions.length) {
       el.innerHTML = '<span class="sessions-empty">활성 세션 없음</span>';
     } else {
+      // live 먼저, 그 다음 최신순 정렬
+      activeSessions.sort((a, b) => (b.is_live ? 1 : 0) - (a.is_live ? 1 : 0) || a.minutes_ago - b.minutes_ago);
       el.innerHTML = activeSessions.map(r => {
-        const stale = r.minutes_ago > 60;
-        const dotCls = stale ? 'stale' : r.status;
+        const stale = !r.is_live && r.minutes_ago > 60;
+        const dotCls = r.is_live ? 'done' : stale ? 'stale' : r.status;
         const rowCls = stale ? ' is-stale' : '';
         const agoTxt = r.minutes_ago < 1 ? '방금' :
                        r.minutes_ago < 60 ? `${r.minutes_ago}분 전` :
-                       r.minutes_ago < 1440 ? `${Math.floor(r.minutes_ago/60)}시간 전` :
-                       `${Math.floor(r.minutes_ago/1440)}일 전`;
+                       `${Math.floor(r.minutes_ago/60)}시간 전`;
         return `<div class="session-row${rowCls}" title="${esc(r.task)}">
           <div class="session-dot ${dotCls}"></div>
           <span class="session-proj">${esc(r.project)}</span>
