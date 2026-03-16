@@ -74,12 +74,28 @@ body {
 .sidebar-section:last-child { border-bottom: none; }
 
 .sidebar-section-title {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  color: rgba(230,237,243,.9);
+  letter-spacing: -.01em;
   margin-bottom: 10px;
+}
+
+/* 사이드바 서브 아이템 (C-08) */
+.sidebar-item {
+  padding: 6px 16px 6px 24px;
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(230,237,243,.5);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 150ms;
+}
+.sidebar-item:hover { color: rgba(230,237,243,.8); }
+
+/* 사이드바 섹션 그룹 구분 */
+.sidebar-section + .sidebar-section {
+  border-top: 1px solid rgba(255,255,255,.08);
 }
 
 /* ── Mini Calendar ── */
@@ -1963,6 +1979,134 @@ body {
   padding: 0 0 16px;
   letter-spacing: .02em;
 }
+
+/* ── Strategic Advisor Panel ── */
+.strategic-panel {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.strategic-col {
+  flex: 1;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.strategic-divider {
+  width: 1px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+.strategic-col-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: 2px;
+}
+.strategic-col-main {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.strategic-col-sub {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.strategic-start-btn {
+  margin-top: 6px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 980px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 150ms;
+  align-self: flex-start;
+}
+.strategic-start-btn:hover { opacity: .8; }
+.strategic-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  background: #1c2128;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms, transform 200ms;
+  z-index: 200;
+}
+.strategic-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ── Profile Avatar ── */
+.profile-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 13px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 150ms;
+  flex-shrink: 0;
+}
+.profile-avatar:hover { opacity: .8; }
+.profile-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 160px;
+  background: #1c2128;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.3);
+  padding: 4px;
+  display: none;
+  z-index: 100;
+}
+.profile-menu.open { display: block; }
+.profile-menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text);
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background 120ms;
+}
+.profile-menu-item:hover { background: rgba(255,255,255,.07); }
+.profile-menu-item.danger { color: var(--danger); }
+.profile-menu-divider { height: 1px; background: var(--border); margin: 4px 0; }
 </style>
 </head>
 <body>
@@ -2048,10 +2192,44 @@ body {
           <div class="main-hd-title" id="mainTitle"></div>
           <div class="main-hd-sub" id="mainSub"></div>
         </div>
-        <div class="main-hd-right">
+        <div class="main-hd-right" style="display:flex;align-items:center;gap:12px">
           <div class="next-ci" id="nextCi"></div>
+          <div class="profile-wrap" style="position:relative">
+            <button class="profile-avatar" id="profileBtn" onclick="toggleProfileMenu()" aria-haspopup="true" aria-expanded="false">
+              <span class="avatar-initials" id="avatarInitials">-</span>
+            </button>
+            <div class="profile-menu" id="profileMenu" role="menu">
+              <div class="profile-menu-item" role="menuitem" id="profileMenuName" style="color:var(--muted);cursor:default;font-size:12px;padding:8px 12px 4px"></div>
+              <div class="profile-menu-divider"></div>
+              <button class="profile-menu-item danger" role="menuitem" onclick="doLogout()">로그아웃</button>
+            </div>
+          </div>
         </div>
       </div>
+
+      <!-- Strategic Advisor Panel -->
+      <div class="strategic-panel" id="strategicPanel">
+        <div class="strategic-col">
+          <div class="strategic-col-label">어제</div>
+          <div class="strategic-col-main" id="sAdvisorYesterday">불러오는 중...</div>
+          <div class="strategic-col-sub" id="sAdvisorYesterdaySub"></div>
+        </div>
+        <div class="strategic-divider"></div>
+        <div class="strategic-col">
+          <div class="strategic-col-label">오늘 남은 것</div>
+          <div class="strategic-col-main" id="sAdvisorToday">불러오는 중...</div>
+          <div class="strategic-col-sub" id="sAdvisorTodaySub"></div>
+        </div>
+        <div class="strategic-divider"></div>
+        <div class="strategic-col">
+          <div class="strategic-col-label">지금 할 것</div>
+          <div class="strategic-col-main" id="sAdvisorNow">불러오는 중...</div>
+          <div class="strategic-col-sub" id="sAdvisorNowSub"></div>
+          <button class="strategic-start-btn" id="sAdvisorStartBtn" style="display:none" onclick="strategicCopyCommand()">이어서 시작</button>
+        </div>
+      </div>
+      <!-- Strategic toast -->
+      <div class="strategic-toast" id="strategicToast">클립보드에 복사됨</div>
 
       <!-- Claude Usage (compact) -->
       <div class="claude-card">
@@ -4546,6 +4724,125 @@ setInterval(loadAgentStatus, 60000);
 loadMorningProjectBoard();
 initCollapsibleCards();
 loadLastLog();
+
+// ── Strategic Advisor ──────────────────────────────────────────
+let _strategicCommand = '';
+
+async function loadStrategicBrief() {
+  try {
+    const d = await fetch(appUrl('api/strategic-brief')).then(r => r.json());
+
+    // 어제 컬럼
+    const yd = d.yesterday || {};
+    const ydDone = yd.total_done || 0;
+    const ydCc = (yd.cc_sessions || []).filter(s => s.status === 'done').length;
+    document.getElementById('sAdvisorYesterday').textContent =
+      ydDone > 0 ? `완료 ${ydDone}건` : '완료 없음';
+    const ydSub = [];
+    if (ydCc > 0) ydSub.push(`CC ${ydCc}세션`);
+    const carryLen = (yd.carry_over || []).length;
+    if (carryLen > 0) ydSub.push(`이월 ${carryLen}건`);
+    document.getElementById('sAdvisorYesterdaySub').textContent = ydSub.join(' · ') || '기록 없음';
+
+    // 오늘 컬럼
+    const td = d.today || {};
+    const remCount = (td.remaining_tasks || []).length;
+    const remMin = td.total_remaining_minutes || 0;
+    document.getElementById('sAdvisorToday').textContent =
+      remCount > 0 ? `${remCount}개 작업` : '남은 작업 없음';
+    const subParts = [];
+    if (remMin > 0) {
+      const h = Math.floor(remMin / 60);
+      const m = remMin % 60;
+      subParts.push(h > 0 ? `${h}시간 ${m}분 남음` : `${m}분 남음`);
+    }
+    if (td.completion_forecast) subParts.push(td.completion_forecast);
+    document.getElementById('sAdvisorTodaySub').textContent = subParts.join(' · ');
+
+    // 지금 할 것 컬럼
+    const rec = d.recommendation || {};
+    const nowRec = rec.now || {};
+    if (nowRec.title) {
+      document.getElementById('sAdvisorNow').textContent = nowRec.title;
+      document.getElementById('sAdvisorNowSub').textContent = nowRec.reason || '';
+      const btn = document.getElementById('sAdvisorStartBtn');
+      if (nowRec.command) {
+        _strategicCommand = nowRec.command;
+        btn.style.display = '';
+      } else {
+        btn.style.display = 'none';
+      }
+      // 긴급도 색상
+      const nowEl = document.getElementById('sAdvisorNow');
+      if (nowRec.urgency === 'critical') {
+        nowEl.style.color = 'var(--danger)';
+      } else if (nowRec.urgency === 'high') {
+        nowEl.style.color = 'var(--warning)';
+      } else {
+        nowEl.style.color = '';
+      }
+    } else {
+      document.getElementById('sAdvisorNow').textContent = rec.message || '작업 없음';
+      document.getElementById('sAdvisorNowSub').textContent = '';
+      document.getElementById('sAdvisorStartBtn').style.display = 'none';
+    }
+  } catch(e) {
+    ['sAdvisorYesterday','sAdvisorToday','sAdvisorNow'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = '불러오기 실패';
+    });
+  }
+}
+
+function strategicCopyCommand() {
+  if (!_strategicCommand) return;
+  navigator.clipboard.writeText(_strategicCommand).then(() => {
+    const toast = document.getElementById('strategicToast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2000);
+  });
+}
+
+loadStrategicBrief();
+setInterval(loadStrategicBrief, 30000);
+
+// ── Profile Avatar ─────────────────────────────────────────────
+async function loadProfileAvatar() {
+  try {
+    const d = await fetch(appUrl('api/me')).then(r => r.json());
+    const login = d.login || d.name || '';
+    const initial = login ? login[0].toUpperCase() : '-';
+    const el = document.getElementById('avatarInitials');
+    if (el) el.textContent = initial;
+    const nameEl = document.getElementById('profileMenuName');
+    if (nameEl) nameEl.textContent = login || '사용자';
+  } catch(e) {}
+}
+
+function toggleProfileMenu() {
+  const menu = document.getElementById('profileMenu');
+  const btn  = document.getElementById('profileBtn');
+  if (!menu) return;
+  const open = menu.classList.toggle('open');
+  btn.setAttribute('aria-expanded', String(open));
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.profile-wrap')) {
+    const menu = document.getElementById('profileMenu');
+    if (menu && menu.classList.contains('open')) {
+      menu.classList.remove('open');
+      const btn = document.getElementById('profileBtn');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+    }
+  }
+});
+
+function doLogout() {
+  window.location.href = '/logout';
+}
+
+loadProfileAvatar();
 </script>
 </body>
 </html>

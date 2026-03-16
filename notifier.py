@@ -9,6 +9,26 @@ import schedule
 
 from runtime_config import get_base_url
 
+
+def get_morning_summary() -> str:
+    """strategic-brief API를 호출해서 오늘 목표 + 지금 할 것 TOP1을 반환."""
+    try:
+        url = f"{get_base_url()}/api/strategic-brief"
+        with urllib.request.urlopen(url, timeout=3) as response:
+            d = json.loads(response.read())
+        goal = (d.get("today") or {}).get("goal", "")
+        now_task = (d.get("recommendation") or {}).get("now") or {}
+        title = now_task.get("title", "")
+        if goal and title:
+            return f"오늘 목표: {goal}\n지금 할 것: {title}"
+        if goal:
+            return f"오늘 목표: {goal}"
+        if title:
+            return f"지금 할 것: {title}"
+    except Exception:
+        pass
+    return "오늘 집중 시간입니다"
+
 CHECK_TIMES = ["09:00", "11:00", "13:00", "15:00", "17:00", "19:00"]
 MONITOR_INTERVAL_MINUTES = 5
 _LAST_MONITOR_SIGNATURE = ""
@@ -108,7 +128,11 @@ def maybe_notify_morning_brief() -> None:
 
     weekly = payload.get("weekly", {}) or {}
     effective_goal = goal.get("effective_goal") or goal.get("recommended_goal") or "오늘 목표를 확정하세요"
-    if goal.get("confirmed"):
+    # strategic-brief 기반 메시지 우선, 실패 시 기존 방식으로 폴백
+    strategic_msg = get_morning_summary()
+    if strategic_msg and strategic_msg != "오늘 집중 시간입니다":
+        message = strategic_msg
+    elif goal.get("confirmed"):
         message = f"오늘 목표: {effective_goal}"
     else:
         message = f"추천 목표: {effective_goal}\n앱에서 오늘 목표를 확정하세요"

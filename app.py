@@ -4354,6 +4354,191 @@ def get_agent_status():
     return result
 
 
+# ── Strategic Brief API ─────────────────────────────────────────────────────
+
+@app.get("/api/strategic-brief")
+async def get_strategic_brief():
+    """전략적 비서: 어제/오늘/지금 할 것 브리핑"""
+    today = str(date.today())
+    yesterday = str(date.today() - timedelta(days=1))
+    now = datetime.now()
+
+    conn = get_db()
+    try:
+        # ── 어제 데이터 ──
+        yd_rows = conn.execute(
+            "SELECT * FROM tasks WHERE date = ? ORDER BY priority, id", (yesterday,)
+        ).fetchall()
+        yd_tasks = [dict(row) for row in yd_rows]
+        yd_done = [t for t in yd_tasks if t.get("status") == "done"]
+        yd_carry = [t for t in yd_tasks if t.get("status") not in ("done", "carried_over")]
+
+        # 어제 CC 세션 (agent_activity)
+        cc_rows = conn.execute(
+            "SELECT project, task, status, created_at FROM agent_activity "
+            "WHERE date(created_at) = ? ORDER BY created_at DESC LIMIT 20",
+            (yesterday,),
+        ).fetchall()
+        cc_sessions = [dict(row) for row in cc_rows]
+
+        yesterday_block = {
+            "date": yesterday,
+            "completed_tasks": [
+                {
+                    "title": strip_task_project(t.get("title", "")),
+                    "project": (t.get("title", "").split("]")[0].lstrip("[") if "[" in t.get("title", "") else ""),
+                    "minutes": t.get("estimated_minutes", 0),
+                }
+                for t in yd_done
+            ],
+            "total_done": len(yd_done),
+            "cc_sessions": [
+                {
+                    "project": s.get("project", ""),
+                    "task": s.get("task", ""),
+                    "status": s.get("status", ""),
+                }
+                for s in cc_sessions
+            ],
+            "carry_over": [
+                {
+                    "title": strip_task_project(t.get("title", "")),
+                    "project": (t.get("title", "").split("]")[0].lstrip("[") if "[" in t.get("title", "") else ""),
+                }
+                for t in yd_carry
+            ],
+        }
+
+        # ── 오늘 데이터 ──
+        today_rows = conn.execute(
+            "SELECT * FROM tasks WHERE date = ? ORDER BY priority, id", (today,)
+        ).fetchall()
+        repo_snapshots = collect_repo_snapshots()
+        agent_map = get_agent_status_map(conn)
+        learning_model = build_learning_model(conn)
+        today_tasks = [
+            enrich_task_for_dashboard(dict(row), repo_snapshots, agent_map, learning_model)
+            for row in today_rows
+        ]
+        stats = build_task_stats(today_tasks)
+
+        in_progress = [t for t in today_tasks if t.get("is_active_now")]
+        remaining = [t for t in today_tasks if is_task_actionable(t)]
+
+        # 오늘 목표
+        goal_row = conn.execute(
+            "SELECT user_goal, recommended_goal, confirmed FROM daily_goal_plans WHERE date = ?",
+            (today,),
+        ).fetchone()
+        goal_text = ""
+        if goal_row:
+            goal_text = goal_row["user_goal"] or goal_row["recommended_goal"] or ""
+
+        # 완료 예상 시각
+        total_remaining_minutes = stats.get("remaining_minutes", 0)
+        forecast_dt = now + timedelta(minutes=total_remaining_minutes)
+        completion_forecast = f"{forecast_dt.strftime('%H:%M')} 완료 예상" if total_remaining_minutes > 0 else "오늘 할 일 완료"
+
+        today_block = {
+            "date": today,
+            "goal": goal_text,
+            "remaining_tasks": [
+                {
+                    "title": strip_task_project(t.get("title", "")),
+                    "project": (t.get("title", "").split("]")[0].lstrip("[") if "[" in t.get("title", "") else ""),
+                    "priority": t.get("priority", 2),
+                    "est_minutes": resolve_task_remaining_minutes(t),
+                    "pct": t.get("progress_pct", 0),
+                }
+                for t in remaining
+            ],
+            "in_progress": [
+                {
+                    "title": strip_task_project(t.get("title", "")),
+                    "project": (t.get("title", "").split("]")[0].lstrip("[") if "[" in t.get("title", "") else ""),
+                }
+                for t in in_progress
+            ],
+            "total_remaining_minutes": total_remaining_minutes,
+            "completion_forecast": completion_forecast,
+        }
+
+        # ── 추천 ──
+        focus_task = select_focus_task(today_tasks)
+        rec_queue = build_recommended_queue(today_tasks, focus_task)
+
+        def _urgency(tone: str) -> str:
+            if tone in ("critical",):
+                return "critical"
+            if tone in ("stale",):
+                return "high"
+            return "normal"
+
+        now_rec: dict = {}
+        queue_rec: list = []
+
+        if rec_queue:
+            top = rec_queue[0]
+            est = resolve_task_remaining_minutes(next(
+                (t for t in today_tasks if t.get("id") == top.get("task_id")), {}
+            )) if top.get("task_id") else 30
+            urgency = _urgency(top.get("tone", "normal"))
+
+            # attention_minutes 기반 reason 보강
+            raw_task = next((t for t in today_tasks if t.get("id") == top.get("task_id")), {})
+            attn_min = raw_task.get("attention_minutes", 0)
+            if attn_min and urgency in ("critical", "high"):
+                reason = f"{attn_min}분 정체 중. 오늘 안에 끝내려면 지금 시작해야 합니다"
+            elif urgency == "normal" and est <= 30:
+                reason = f"약 {est}분이면 완료 가능. 지금 시작을 권장합니다"
+            else:
+                reason = top.get("detail", "지금 집중하기 좋은 작업입니다")
+
+            now_rec = {
+                "task_id": top.get("task_id"),
+                "title": top.get("title", ""),
+                "project": raw_task.get("title", "").split("]")[0].lstrip("[") if "[" in raw_task.get("title", "") else "",
+                "reason": reason,
+                "urgency": urgency,
+                "command": top.get("launch_prompt", ""),
+                "est_minutes": est,
+            }
+
+            for item in rec_queue[1:3]:
+                raw = next((t for t in today_tasks if t.get("id") == item.get("task_id")), {})
+                queue_rec.append({
+                    "task_id": item.get("task_id"),
+                    "title": item.get("title", ""),
+                    "project": raw.get("title", "").split("]")[0].lstrip("[") if "[" in raw.get("title", "") else "",
+                    "reason": item.get("detail", ""),
+                    "urgency": _urgency(item.get("tone", "normal")),
+                    "command": item.get("launch_prompt", ""),
+                    "est_minutes": resolve_task_remaining_minutes(raw),
+                })
+
+        remaining_count = len(remaining)
+        if remaining_count == 0:
+            rec_message = "오늘 모든 작업이 완료되었습니다."
+        elif total_remaining_minutes <= 0:
+            rec_message = f"오늘 {remaining_count}개 남았습니다."
+        else:
+            rec_message = f"오늘 {remaining_count}개 남았습니다. 지금 집중하면 {forecast_dt.strftime('%H:%M')} 전에 끝납니다."
+
+        recommendation_block = {
+            "now": now_rec,
+            "queue": queue_rec,
+            "message": rec_message,
+        }
+
+        return {
+            "yesterday": yesterday_block,
+            "today": today_block,
+            "recommendation": recommendation_block,
+        }
+    finally:
+        conn.close()
+
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # SessionMiddleware must be added LAST so it executes FIRST (outermost layer),
