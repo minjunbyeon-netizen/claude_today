@@ -255,6 +255,33 @@ body {
   margin: 0 auto;
 }
 
+/* ── Tab Nav ── */
+.main-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+}
+.main-tab-btn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 16px 10px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.main-tab-btn:hover { color: var(--text); }
+.main-tab-btn.active {
+  color: var(--text);
+  border-bottom-color: var(--text);
+  font-weight: 700;
+}
+
 /* ── Main Header ── */
 .main-hd {
   display: flex;
@@ -1554,6 +1581,15 @@ body {
   <main class="main-panel">
     <div class="main-inner">
 
+      <!-- Tab Nav -->
+      <div class="main-tabs">
+        <button class="main-tab-btn active" id="tabBtnReport" onclick="switchTab('report')">보고</button>
+        <button class="main-tab-btn" id="tabBtnWork" onclick="switchTab('work')">작업</button>
+      </div>
+
+      <!-- TAB: 보고 -->
+      <div id="tabReport">
+
       <!-- Main Header -->
       <div class="main-hd">
         <div class="main-hd-left">
@@ -1776,6 +1812,11 @@ body {
         <div class="ops-note" id="opsNote">최근 체크인 메모가 표시됩니다.</div>
       </div>
 
+      </div><!-- /tabReport -->
+
+      <!-- TAB: 작업 -->
+      <div id="tabWork" style="display:none">
+
       <!-- hidden stubs for JS compat -->
       <span id="progRefreshTime" style="display:none"></span>
       <span id="progPct" style="display:none"></span>
@@ -1796,6 +1837,15 @@ body {
       <button id="syncGitBtn" style="display:none"></button>
       <div id="addTaskCard" style="display:none"></div>
 
+      <!-- Work Sub-tabs -->
+      <div class="main-tabs" style="margin-bottom:20px">
+        <button class="main-tab-btn active" id="subBtnWork" onclick="switchSubTab('work')">작업</button>
+        <button class="main-tab-btn" id="subBtnLog" onclick="switchSubTab('log')">LOG</button>
+      </div>
+
+      <!-- Sub-tab: 작업 -->
+      <div id="subTabWork">
+
       <!-- Project filter notice -->
       <div class="filter-bar" id="filterBar" style="display:none">
         프로젝트 필터: <span id="filterLabel"></span>
@@ -1809,6 +1859,11 @@ body {
 
       <!-- Accordion -->
       <div class="acc-list" id="accList"></div>
+
+      </div><!-- /subTabWork -->
+
+      <!-- Sub-tab: LOG -->
+      <div id="subTabLog" style="display:none">
 
       <!-- Check-in -->
       <div class="card">
@@ -1826,6 +1881,10 @@ body {
         <div class="ci-hist" id="ciHist"></div>
       </div>
 
+      </div><!-- /subTabLog -->
+
+      </div><!-- /tabWork -->
+
     </div>
   </main>
 </div>
@@ -1834,6 +1893,29 @@ body {
 const DAYS   = ['일','월','화','수','목','금','토'];
 const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 const CHECK_HOURS = [9,11,13,15,17,19];
+
+function switchTab(tab) {
+  const isWork = tab === 'work';
+  document.getElementById('tabReport').style.display = isWork ? 'none' : '';
+  document.getElementById('tabWork').style.display   = isWork ? '' : 'none';
+  document.getElementById('tabBtnReport').classList.toggle('active', !isWork);
+  document.getElementById('tabBtnWork').classList.toggle('active', isWork);
+  localStorage.setItem('df_active_tab', tab);
+}
+function switchSubTab(sub) {
+  const isLog = sub === 'log';
+  document.getElementById('subTabWork').style.display = isLog ? 'none' : '';
+  document.getElementById('subTabLog').style.display  = isLog ? '' : 'none';
+  document.getElementById('subBtnWork').classList.toggle('active', !isLog);
+  document.getElementById('subBtnLog').classList.toggle('active', isLog);
+  localStorage.setItem('df_active_subtab', sub);
+}
+(function(){
+  const saved = localStorage.getItem('df_active_tab') || 'report';
+  if (saved === 'work') switchTab('work');
+  const savedSub = localStorage.getItem('df_active_subtab') || 'work';
+  if (savedSub === 'log') switchSubTab('log');
+})();
 
 const e   = ev => ev.key === 'Enter';
 const esc = s  => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -2062,6 +2144,7 @@ function selectDate(ds) {
   renderCalendar();
   renderWeekList();
   loadTodayByDate(ds);
+  loadCheckins(ds);
 }
 
 function selectProject(proj) {
@@ -2691,8 +2774,8 @@ async function loadTodayByDate(ds) {
 
     renderProjectList(tasks);
 
+    loadCheckins(ds);
     if (isToday) {
-      loadCheckins();
       checkCarry();
     }
   } catch(err) {
@@ -3028,7 +3111,7 @@ async function saveCheckin() {
   });
   document.getElementById('ciNote').value = '';
   document.getElementById('ciForm').classList.remove('open');
-  await loadCheckins();
+  await loadCheckins(currentViewDate);
   await refreshMain();
 }
 function agentStatusLabel(status) {
@@ -3129,27 +3212,31 @@ async function addProjectToGoal(proj, task) {
   } catch(e) {}
 }
 
-async function loadCheckins() {
-  const r = await fetch(appUrl('api/checkins'));
+async function loadCheckins(d) {
+  const url = appUrl('api/checkins') + (d ? '?d=' + encodeURIComponent(d) : '');
+  const r = await fetch(url);
   const list = await r.json();
   const el = document.getElementById('ciHist');
   if (!list.length) {
     el.innerHTML = '<div class="ci-empty">아직 수동 체크인이나 CC 활동 기록이 없습니다</div>'; return;
   }
-  // 프로젝트별 그룹핑
+  // 날짜별 그룹핑
   const groups = {};
   const order = [];
   for (const c of list) {
-    const key = c.project || c.kind === 'agent' ? (c.project || '프로젝트') : '수동';
+    const ts = c.timestamp || c.checkin_time || '';
+    const key = ts ? ts.slice(0, 10) : '날짜 미상';
     if (!groups[key]) { groups[key] = []; order.push(key); }
     groups[key].push(c);
   }
-  el.innerHTML = order.map(key => `
-    <div class="ci-group">
-      <div class="ci-group-header">${esc(key)}</div>
+  el.innerHTML = order.map(key => {
+    const d = new Date(key);
+    const label = isNaN(d) ? key : `${key} (${DAYS[d.getDay()]})`;
+    return `<div class="ci-group">
+      <div class="ci-group-header">${label}</div>
       ${groups[key].map(renderCheckinItem).join('')}
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
 // ── Sync ──────────────────────────────────────────────────────

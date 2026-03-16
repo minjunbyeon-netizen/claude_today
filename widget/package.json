@@ -1,0 +1,12 @@
+{
+  "name": "daily-focus-widget",
+  "version": "1.0.0",
+  "description": "Daily Focus desktop widget",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^32.0.0"
+  }
+}
