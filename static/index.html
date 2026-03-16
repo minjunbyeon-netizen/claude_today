@@ -1675,6 +1675,24 @@ body {
   gap: 14px;
   align-items: start;
 }
+.grid-section-hd {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 24px 0 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+.grid-section-hd:first-child { padding-top: 4px; }
+.grid-section-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+  align-items: start;
+  margin-bottom: 8px;
+}
 .grid-card {
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -2261,40 +2279,25 @@ function switchView(v) {
 
 function renderGrid(tasks) {
   const container = document.getElementById('gridView');
-  if (!tasks || !tasks.length) {
-    container.innerHTML = '<div class="empty">태스크가 없습니다</div>';
-    return;
-  }
-  const { groups, order } = groupTasks(tasks);
+  const wfGroups  = getWfGroups();
 
-  // live 프로젝트 먼저, done 100% 마지막, 나머지는 df_proj_order
-  const customOrder = getProjOrder();
-  const sortedKeys = [...order].sort((a, b) => {
-    const aLive = liveProjects.has(a) ? 0 : 1;
-    const bLive = liveProjects.has(b) ? 0 : 1;
-    if (aLive !== bLive) return aLive - bLive;
-    const aAll = groups[a].every(t => t.status === 'done') ? 1 : 0;
-    const bAll = groups[b].every(t => t.status === 'done') ? 1 : 0;
-    if (aAll !== bAll) return aAll - bAll;
-    const ai = customOrder.indexOf(a), bi = customOrder.indexOf(b);
-    if (ai === -1 && bi === -1) return 0;
-    return ai === -1 ? 1 : bi === -1 ? -1 : ai - bi;
-  });
+  // ── single folder card builder ─────────────────────────────
+  function buildFolderCard(proj) {
+    const { groups: tGroups } = groupTasks(tasks);
+    const items = tGroups[proj] || [];
+    if (!items.length) return null;
 
-  container.innerHTML = sortedKeys.map(proj => {
-    const items   = groups[proj];
     const summary = summarizeProgress(items);
     const pct     = summary.pct;
     const isLive  = liveProjects.has(proj);
     const url     = agentUrls[proj];
 
-    // 할 일 → 완료 순, 각 섹션 내 우선순위 정렬
-    const todo = items.filter(t => t.is_actionable && t.status !== 'done')
-                      .sort((a,b) => attentionRank(b.attention_level) - attentionRank(a.attention_level) || (a.priority||9) - (b.priority||9));
-    const done = items.filter(t => t.status === 'done');
+    const todo   = items.filter(t => t.is_actionable && t.status !== 'done')
+                        .sort((a,b) => attentionRank(b.attention_level) - attentionRank(a.attention_level) || (a.priority||9) - (b.priority||9));
+    const done   = items.filter(t => t.status === 'done');
     const parked = items.filter(t => !t.is_actionable && t.status !== 'done');
 
-    const taskRow = (t) => {
+    const taskRow = t => {
       const isDone   = t.status === 'done';
       const isParked = !isDone && !t.is_actionable;
       const title    = t.title.replace(/^\[[^\]]+\]\s*/, '');
@@ -2303,7 +2306,7 @@ function renderGrid(tasks) {
       const dotCls   = isDone ? 'done' : isParked ? 'parked' : attn === 'urgent' ? 'urgent' : attn === 'active' ? 'active' : 'normal';
       return `<div class="grid-task-item">
         <div class="grid-task-dot ${dotCls}"></div>
-        <span class="grid-task-title ${isDone ? 'is-done' : ''}">${esc(title)}</span>
+        <span class="grid-task-title ${isDone?'is-done':''}">${esc(title)}</span>
         ${mins && !isDone ? `<span class="grid-task-min">${mins}m</span>` : ''}
       </div>`;
     };
@@ -2313,7 +2316,7 @@ function renderGrid(tasks) {
     const shown    = allRows.slice(0, MAX_SHOW);
     const hidden   = allRows.length - MAX_SHOW;
 
-    return `<div class="grid-card ${isLive ? 'is-live' : ''}">
+    return `<div class="grid-card ${isLive?'is-live':''}">
       <div class="grid-card-prog"><div class="grid-card-prog-fill" style="width:${pct}%"></div></div>
       <div class="grid-card-hd">
         <span class="grid-card-name">${esc(proj)}</span>
@@ -2328,7 +2331,49 @@ function renderGrid(tasks) {
         ${!allRows.length ? `<div class="grid-empty-proj">태스크 없음</div>` : ''}
       </div>
     </div>`;
-  }).join('');
+  }
+
+  // ── 전체: all groups as labeled sections ─────────────────────
+  if (currentGroupId === null) {
+    if (!wfGroups.length) {
+      container.style.display = 'block';
+      container.innerHTML = '<div class="empty">설정에서 그룹을 추가하세요</div>';
+      return;
+    }
+    let html = '';
+    for (const g of wfGroups) {
+      const folders = g.folders || [];
+      // live folders first, then rest
+      const sortedFolders = [...folders].sort((a, b) => {
+        const al = liveProjects.has(a) ? 0 : 1;
+        const bl = liveProjects.has(b) ? 0 : 1;
+        return al - bl;
+      });
+      const cards = sortedFolders.map(buildFolderCard).filter(Boolean);
+      if (!cards.length) continue;
+      html += `<div class="grid-section-hd">${esc(g.name)}</div>`;
+      html += `<div class="grid-section-cards">${cards.join('')}</div>`;
+    }
+    container.style.display = 'block';
+    container.innerHTML = html || '<div class="empty">태스크가 없습니다</div>';
+    return;
+  }
+
+  // ── 특정 그룹만 ───────────────────────────────────────────────
+  const g = wfGroups.find(g => g.id === currentGroupId);
+  if (!g) {
+    container.style.display = 'grid';
+    container.innerHTML = '<div class="empty">그룹을 찾을 수 없습니다</div>';
+    return;
+  }
+  const sortedFolders = [...(g.folders || [])].sort((a, b) => {
+    const al = liveProjects.has(a) ? 0 : 1;
+    const bl = liveProjects.has(b) ? 0 : 1;
+    return al - bl;
+  });
+  const cards = sortedFolders.map(buildFolderCard).filter(Boolean);
+  container.style.display = 'grid';
+  container.innerHTML = cards.length ? cards.join('') : '<div class="empty">태스크가 없습니다</div>';
 }
 
 (function(){
@@ -2354,7 +2399,8 @@ const AUTO_REFRESH_MS = 60000;
 
 // ── State ─────────────────────────────────────────────────────
 let currentViewDate  = todayStr();   // YYYY-MM-DD (선택된 날짜)
-let currentProject   = null;         // null = 전체, string = 프로젝트명
+let currentProject   = null;         // null = 전체, string = 폴더명 (작업폴더 필터용)
+let currentGroupId   = null;         // null = 전체, string = 그룹 id (프로젝트 섹션)
 let allTasks         = [];           // 현재 로드된 전체 태스크
 let weekTaskMap      = {};           // { 'YYYY-MM-DD': { total, done } }
 let calViewYear      = new Date().getFullYear();
@@ -2530,82 +2576,56 @@ function normalizeProject(name) {
   return SQUAD_TEAMS.has(name) ? 'squad-team' : name;
 }
 
-// ── Project List (sidebar) — group-based ────────────────────
+// ── Project List (sidebar) — groups only ─────────────────────
 function renderProjectList(tasks) {
-  const groups  = getWfGroups();
-  const folders = _lastWfRows.length ? _lastWfRows.map(r => r.project) : [];
+  const groups = getWfGroups();
+  const el = document.getElementById('projList');
 
-  // 태스크 카운트 (폴더명 기준)
-  const counts = {};
-  for (const t of tasks) {
-    const m = t.title.match(/^\[([^\]]+)\]/);
-    const proj = normalizeProject(m ? m[1] : '기타');
-    counts[proj] = (counts[proj] || 0) + 1;
-  }
+  // 전체 태스크 수
+  const totalTasks = tasks.length;
 
-  const folderItem = (name, extraCls = '') => {
-    const isActive = currentProject === name;
-    const isLive   = liveProjects.has(name);
-    const cnt      = counts[name];
-    return `<div class="proj-item ${isActive?'active':''} ${isLive?'live-item':''} ${extraCls}"
-      onclick="selectProject('${esc(name)}')">
-      <div class="proj-item-dot"></div>
-      <span class="proj-item-name">${esc(name)}</span>
-      ${cnt ? `<span class="proj-item-count">${cnt}</span>` : ''}
-    </div>`;
-  };
-
-  let html = `<div class="proj-item all-item ${!currentProject?'active':''}" onclick="selectProject(null)">
+  let html = `<div class="proj-item all-item ${currentGroupId===null?'active':''}" onclick="selectGroup(null)">
     <div class="proj-item-dot"></div>
     <span class="proj-item-name">전체</span>
-    <span class="proj-item-count">${tasks.length}</span>
+    ${totalTasks ? `<span class="proj-item-count">${totalTasks}</span>` : ''}
   </div>`;
 
   if (groups.length) {
-    const assigned = new Set(groups.flatMap(g => g.folders || []));
-
-    groups.forEach(g => {
-      const gFolders = (g.folders || []);
-      const cKey = `pjg_${g.id}`;
-      const collapsed = localStorage.getItem(cKey) === '1';
-      html += `<div class="proj-cat-hd" onclick="toggleProjCat('${esc(g.id)}')">
-        <span class="proj-cat-label">${esc(g.name)}</span>
-        <span class="proj-cat-arrow" id="pjga-${esc(g.id)}">${collapsed?'▶':'▼'}</span>
-      </div>
-      <div class="proj-cat-body" id="pjgb-${esc(g.id)}" style="${collapsed?'display:none':''}">
-        ${gFolders.length ? gFolders.map(f => folderItem(f)).join('') : '<div style="font-size:11px;color:var(--muted);padding:3px 8px">폴더 없음</div>'}
+    html += groups.map(g => {
+      const isActive = currentGroupId === g.id;
+      const liveCnt  = (g.folders || []).filter(f => liveProjects.has(f)).length;
+      // 이 그룹 폴더들의 태스크 수
+      const folderSet = new Set(g.folders || []);
+      const gTaskCnt = tasks.filter(t => {
+        const m = t.title.match(/^\[([^\]]+)\]/);
+        return m && folderSet.has(normalizeProject(m[1]));
+      }).length;
+      return `<div class="proj-item ${isActive?'active':''} ${liveCnt?'live-item':''}"
+        onclick="selectGroup('${esc(g.id)}')">
+        <div class="proj-item-dot"></div>
+        <span class="proj-item-name">${esc(g.name)}</span>
+        ${gTaskCnt ? `<span class="proj-item-count">${gTaskCnt}</span>` : ''}
       </div>`;
-    });
-
-    // 미분류 폴더 (그룹 없는 것)
-    const ungrouped = folders.filter(f => !assigned.has(f));
-    if (ungrouped.length) {
-      const collapsed = localStorage.getItem('pjg___ung') === '1';
-      html += `<div class="proj-cat-hd" onclick="toggleProjCat('__ung')">
-        <span class="proj-cat-label" style="color:var(--muted)">미분류</span>
-        <span class="proj-cat-arrow" id="pjga-__ung">${collapsed?'▶':'▼'}</span>
-      </div>
-      <div class="proj-cat-body" id="pjgb-__ung" style="${collapsed?'display:none':''}">
-        ${ungrouped.map(f => folderItem(f)).join('')}
-      </div>`;
-    }
+    }).join('');
   } else {
-    // 그룹 없으면 tasks 기반 폴더 목록 표시
-    const projEntries = Object.entries(counts).sort((a,b) => b[1]-a[1]);
-    html += projEntries.map(([name, cnt]) => folderItem(name)).join('');
+    html += `<div style="font-size:11px;color:var(--muted);padding:6px 8px">
+      ⚙ 설정에서 그룹을 추가하세요
+    </div>`;
   }
 
-  document.getElementById('projList').innerHTML = html;
+  el.innerHTML = html;
 }
 
-function toggleProjCat(id) {
-  const body  = document.getElementById(`pjgb-${id}`);
-  const arrow = document.getElementById(`pjga-${id}`);
-  if (!body) return;
-  const collapse = body.style.display !== 'none';
-  body.style.display = collapse ? 'none' : '';
-  if (arrow) arrow.textContent = collapse ? '▶' : '▼';
-  localStorage.setItem(`pjg_${id}`, collapse ? '1' : '0');
+function selectGroup(groupId) {
+  currentGroupId = groupId;
+  currentProject = null;
+  renderProjectList(allTasks);
+  // 그리드 뷰로 자동 전환
+  if (currentView !== 'grid') {
+    switchView('grid');
+  } else {
+    renderGrid(allTasks);
+  }
 }
 
 // ── Navigation actions ────────────────────────────────────────
