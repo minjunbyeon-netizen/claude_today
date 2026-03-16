@@ -1643,6 +1643,134 @@ body {
 }
 .wf-new-group-btn:hover { border-color: var(--text2); color: var(--text2); }
 
+/* ── View Toggle ── */
+.view-toggle-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+.view-toggle-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 10px;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.view-toggle-btn.active {
+  background: var(--surface2);
+  border-color: var(--text2);
+  color: var(--text);
+}
+.view-toggle-btn:hover:not(.active) { color: var(--text2); border-color: var(--text2); }
+
+/* ── Grid View ── */
+.grid-view {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+.grid-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card);
+  transition: border-color .15s;
+}
+.grid-card.is-live {
+  animation: live-pulse 1.8s ease-in-out infinite;
+}
+.grid-card-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.grid-card-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.grid-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.grid-card-pct {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: 'Courier New', monospace;
+}
+.grid-card-view {
+  font-size: 10px;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  cursor: pointer;
+  transition: color .12s, border-color .12s;
+}
+.grid-card-view:hover { color: var(--accent); border-color: var(--accent); }
+.grid-card-body { padding: 8px 0; }
+.grid-task-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 14px;
+  transition: background .1s;
+}
+.grid-task-item:hover { background: var(--surface2); }
+.grid-task-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+.grid-task-dot.done   { background: var(--success); }
+.grid-task-dot.urgent { background: var(--danger); }
+.grid-task-dot.active { background: var(--accent); }
+.grid-task-dot.normal { background: var(--border); }
+.grid-task-dot.parked { background: transparent; border: 1px solid var(--border); }
+.grid-task-title {
+  font-size: 12px;
+  color: var(--text2);
+  flex: 1;
+  line-height: 1.4;
+}
+.grid-task-title.is-done {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+.grid-task-min {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  font-family: 'Courier New', monospace;
+  flex-shrink: 0;
+}
+.grid-empty-proj {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 10px 14px;
+}
+.grid-card-prog {
+  height: 2px;
+  background: var(--surface2);
+}
+.grid-card-prog-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width .3s;
+}
+
 /* ── Past Day Simple View ── */
 .past-view {
   display: flex;
@@ -2056,8 +2184,17 @@ body {
         <div id="lastLogItems"></div>
       </div>
 
-      <!-- Accordion -->
+      <!-- View Toggle -->
+      <div class="view-toggle-bar">
+        <button class="view-toggle-btn active" id="viewBtnList" onclick="switchView('list')">목록</button>
+        <button class="view-toggle-btn" id="viewBtnGrid" onclick="switchView('grid')">그리드</button>
+      </div>
+
+      <!-- Accordion (list view) -->
       <div class="acc-list" id="accList"></div>
+
+      <!-- Grid View -->
+      <div class="grid-view" id="gridView" style="display:none"></div>
 
       </div><!-- /subTabWork -->
 
@@ -2109,11 +2246,103 @@ function switchSubTab(sub) {
   document.getElementById('subBtnLog').classList.toggle('active', isLog);
   localStorage.setItem('df_active_subtab', sub);
 }
+let currentView = localStorage.getItem('df_view') || 'list';
+
+function switchView(v) {
+  currentView = v;
+  localStorage.setItem('df_view', v);
+  const isList = v === 'list';
+  document.getElementById('accList').style.display  = isList ? '' : 'none';
+  document.getElementById('gridView').style.display = isList ? 'none' : '';
+  document.getElementById('viewBtnList').classList.toggle('active', isList);
+  document.getElementById('viewBtnGrid').classList.toggle('active', !isList);
+  if (!isList) renderGrid(allTasks);
+}
+
+function renderGrid(tasks) {
+  const container = document.getElementById('gridView');
+  if (!tasks || !tasks.length) {
+    container.innerHTML = '<div class="empty">태스크가 없습니다</div>';
+    return;
+  }
+  const { groups, order } = groupTasks(tasks);
+
+  // live 프로젝트 먼저, done 100% 마지막, 나머지는 df_proj_order
+  const customOrder = getProjOrder();
+  const sortedKeys = [...order].sort((a, b) => {
+    const aLive = liveProjects.has(a) ? 0 : 1;
+    const bLive = liveProjects.has(b) ? 0 : 1;
+    if (aLive !== bLive) return aLive - bLive;
+    const aAll = groups[a].every(t => t.status === 'done') ? 1 : 0;
+    const bAll = groups[b].every(t => t.status === 'done') ? 1 : 0;
+    if (aAll !== bAll) return aAll - bAll;
+    const ai = customOrder.indexOf(a), bi = customOrder.indexOf(b);
+    if (ai === -1 && bi === -1) return 0;
+    return ai === -1 ? 1 : bi === -1 ? -1 : ai - bi;
+  });
+
+  container.innerHTML = sortedKeys.map(proj => {
+    const items   = groups[proj];
+    const summary = summarizeProgress(items);
+    const pct     = summary.pct;
+    const isLive  = liveProjects.has(proj);
+    const url     = agentUrls[proj];
+
+    // 할 일 → 완료 순, 각 섹션 내 우선순위 정렬
+    const todo = items.filter(t => t.is_actionable && t.status !== 'done')
+                      .sort((a,b) => attentionRank(b.attention_level) - attentionRank(a.attention_level) || (a.priority||9) - (b.priority||9));
+    const done = items.filter(t => t.status === 'done');
+    const parked = items.filter(t => !t.is_actionable && t.status !== 'done');
+
+    const taskRow = (t) => {
+      const isDone   = t.status === 'done';
+      const isParked = !isDone && !t.is_actionable;
+      const title    = t.title.replace(/^\[[^\]]+\]\s*/, '');
+      const mins     = t.smart_estimated_minutes || t.display_minutes || t.estimated_minutes;
+      const attn     = t.attention_level;
+      const dotCls   = isDone ? 'done' : isParked ? 'parked' : attn === 'urgent' ? 'urgent' : attn === 'active' ? 'active' : 'normal';
+      return `<div class="grid-task-item">
+        <div class="grid-task-dot ${dotCls}"></div>
+        <span class="grid-task-title ${isDone ? 'is-done' : ''}">${esc(title)}</span>
+        ${mins && !isDone ? `<span class="grid-task-min">${mins}m</span>` : ''}
+      </div>`;
+    };
+
+    const allRows = [...todo, ...parked, ...done];
+    const MAX_SHOW = 8;
+    const shown    = allRows.slice(0, MAX_SHOW);
+    const hidden   = allRows.length - MAX_SHOW;
+
+    return `<div class="grid-card ${isLive ? 'is-live' : ''}">
+      <div class="grid-card-prog"><div class="grid-card-prog-fill" style="width:${pct}%"></div></div>
+      <div class="grid-card-hd">
+        <span class="grid-card-name">${esc(proj)}</span>
+        <div class="grid-card-meta">
+          <span class="grid-card-pct">${summary.done}/${summary.total}</span>
+          ${url ? `<button class="grid-card-view" onclick="window.open('${url}','_blank')">VIEW</button>` : ''}
+        </div>
+      </div>
+      <div class="grid-card-body">
+        ${shown.map(taskRow).join('')}
+        ${hidden > 0 ? `<div class="grid-task-item"><span style="font-size:11px;color:var(--muted)">+ ${hidden}개 더</span></div>` : ''}
+        ${!allRows.length ? `<div class="grid-empty-proj">태스크 없음</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
 (function(){
   const saved = localStorage.getItem('df_active_tab') || 'report';
   if (saved === 'work') switchTab('work');
   const savedSub = localStorage.getItem('df_active_subtab') || 'work';
   if (savedSub === 'log') switchSubTab('log');
+  // 저장된 뷰 복원
+  if (currentView === 'grid') {
+    document.getElementById('accList').style.display  = 'none';
+    document.getElementById('gridView').style.display = '';
+    document.getElementById('viewBtnList').classList.remove('active');
+    document.getElementById('viewBtnGrid').classList.add('active');
+  }
 })();
 
 const e   = ev => ev.key === 'Enter';
@@ -3031,6 +3260,7 @@ async function loadTodayByDate(ds) {
       renderPastDayView(tasks);
     } else {
       renderAccordion(tasks);
+      if (currentView === 'grid') renderGrid(tasks);
     }
 
     renderProjectList(tasks);
