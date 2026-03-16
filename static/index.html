@@ -1774,6 +1774,20 @@ body {
 .grp-task-title { flex: 1; font-size: 12px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .grp-task-title.is-done { color: var(--muted); text-decoration: line-through; }
 .grp-task-min { font-size: 10px; color: var(--muted); flex-shrink: 0; }
+.grp-folder-btn {
+  font-size: 10px; color: var(--muted); background: none;
+  border: 1px solid var(--border); border-radius: 980px;
+  padding: 1px 7px; cursor: pointer; transition: color .15s, border-color .15s;
+}
+.grp-folder-btn:hover { color: var(--text); border-color: var(--text2); }
+.grp-folder-btn.is-live { color: #0071E3; border-color: #0071E3; }
+.grp-folder-cmt-panel {
+  display: none;
+  padding: 6px 0 4px 10px;
+  border-top: 1px solid var(--border);
+  margin-top: 6px;
+}
+.grp-folder-cmt-panel.open { display: block; }
 .grp-task-cmt-btn {
   font-size: 10px; color: var(--muted); background: none; border: none;
   cursor: pointer; padding: 0 3px; opacity: 0.5; transition: opacity .15s;
@@ -2399,6 +2413,7 @@ function renderGrid(tasks) {
       </div>`;
     };
 
+    const projId = proj.replace(/[^a-zA-Z0-9_-]/g, '_');
     return `<div class="grp-folder-row ${isLive?'is-live':''}">
       ${items.length ? `<div class="grp-folder-prog"><div class="grp-folder-prog-fill" style="width:${summary.pct}%"></div></div>` : ''}
       <div class="grp-folder-hd">
@@ -2406,11 +2421,20 @@ function renderGrid(tasks) {
         <span class="grp-folder-name">${esc(proj)}</span>
         <div class="grp-folder-meta">
           ${items.length ? `<span class="grp-folder-count">${summary.done}/${summary.total}</span>` : ''}
-          ${url ? `<button class="grp-folder-view" onclick="openView('${escAttr(proj)}')">VIEW</button>` : `<button class="grp-folder-view" onclick="openView('${escAttr(proj)}')">URL</button>`}
+          <button class="grp-folder-btn${isLive?' is-live':''}" onclick="openCC('${escAttr(proj)}')" title="${isLive?'활성 CC — 이어서 열기':'CC 열기'}">CC</button>
+          <button class="grp-folder-btn" onclick="openView('${escAttr(proj)}')" title="브라우저에서 열기">VIEW</button>
+          <button class="grp-folder-btn" onclick="toggleFolderCmt('${escAttr(proj)}','${projId}')">댓글</button>
         </div>
       </div>
       ${shown.map(taskRow).join('')}
-      ${!items.length ? `<div class="grp-task-row"><span style="font-size:11px;color:var(--muted)">태스크 없음</span></div>` : ''}
+      ${!items.length ? `<div class="grp-task-row" style="padding-left:10px"><span style="font-size:11px;color:var(--muted)">태스크 없음</span></div>` : ''}
+      <div class="grp-folder-cmt-panel" id="fcmt-${projId}">
+        <div class="comment-list" id="fcmt-list-${projId}"></div>
+        <div class="comment-input-row">
+          <input class="comment-input" id="fcmt-input-${projId}" placeholder="폴더에 메모..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendFolderComment('${escAttr(proj)}','${projId}');}">
+          <button class="comment-send-btn" onclick="sendFolderComment('${escAttr(proj)}','${projId}')">전송</button>
+        </div>
+      </div>
     </div>`;
   }
 
@@ -3596,6 +3620,59 @@ async function toggleComments(e, taskId) {
   if (isOpen) { panel.classList.remove('open'); return; }
   panel.classList.add('open');
   await loadComments(taskId);
+}
+
+// ── Folder-level CC / VIEW / Comment ──────────────────────────
+async function openCC(proj) {
+  await fetch(appUrl(`api/open-claude?proj=${encodeURIComponent(proj)}`), { method: 'POST' });
+}
+
+function toggleFolderCmt(proj, projId) {
+  const panel = document.getElementById(`fcmt-${projId}`);
+  if (!panel) return;
+  const opening = !panel.classList.contains('open');
+  panel.classList.toggle('open', opening);
+  if (opening) loadFolderComments(proj, projId);
+}
+
+async function loadFolderComments(proj, projId) {
+  const list = document.getElementById(`fcmt-list-${projId}`);
+  if (!list) return;
+  const r = await fetch(appUrl(`api/projects/${encodeURIComponent(proj)}/comments`));
+  const comments = await r.json();
+  if (!comments.length) {
+    list.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:2px 0">댓글 없음</div>';
+    return;
+  }
+  list.innerHTML = comments.map(c => `
+    <div class="comment-item${c.confirmed?' confirmed':''}" id="fcmtitem-${c.id}">
+      <span class="comment-author">${esc(c.author)}</span>
+      <span class="comment-body">${esc(c.body)}</span>
+      ${!c.confirmed ? `<button class="comment-confirm-btn" onclick="confirmFolderComment('${escAttr(proj)}','${projId}',${c.id})">확인</button>` : '<span style="font-size:10px;color:var(--muted)">✓</span>'}
+    </div>`).join('');
+}
+
+async function sendFolderComment(proj, projId) {
+  const input = document.getElementById(`fcmt-input-${projId}`);
+  if (!input) return;
+  const body = input.value.trim();
+  if (!body) return;
+  input.value = '';
+  await fetch(appUrl(`api/projects/${encodeURIComponent(proj)}/comments`), {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({body})
+  });
+  await loadFolderComments(proj, projId);
+}
+
+async function confirmFolderComment(proj, projId, commentId) {
+  await fetch(appUrl(`api/projects/${encodeURIComponent(proj)}/comments/${commentId}/confirm`), {method: 'PATCH'});
+  const el = document.getElementById(`fcmtitem-${commentId}`);
+  if (el) {
+    el.classList.add('confirmed');
+    const btn = el.querySelector('.comment-confirm-btn');
+    if (btn) btn.outerHTML = '<span style="font-size:10px;color:var(--muted)">✓</span>';
+  }
 }
 
 function toggleGrpCmt(taskId) {
