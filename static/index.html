@@ -1295,6 +1295,8 @@ body {
 .btn-view:hover { background: #0d1525; border-color: #4493f8aa; color: #a5c8ff; }
 .btn-view:active { transform: scale(.95); }
 .btn-view.disabled { opacity: .35; cursor: default; pointer-events: none; }
+.btn-order { font-size: 10px; padding: 0 4px; height: 20px; background: none; border: none; color: var(--muted); cursor: pointer; line-height: 1; border-radius: 3px; }
+.btn-order:hover { color: var(--text); background: var(--border); }
 
 /* ── Project filter notice ── */
 .filter-bar {
@@ -2421,10 +2423,16 @@ function renderAccordion(tasks) {
 
   const { groups, order } = groupTasks(tasks);
 
+  const customOrder = getProjOrder();
   const sortedKeys = [...order].sort((a,b) => {
     const aAll = groups[a].every(t => t.status==='done') ? 1 : 0;
     const bAll = groups[b].every(t => t.status==='done') ? 1 : 0;
-    return aAll - bAll;
+    if (aAll !== bAll) return aAll - bAll;
+    const ai = customOrder.indexOf(a), bi = customOrder.indexOf(b);
+    if (ai === -1 && bi === -1) return 0;
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
   });
 
   if (openGroups.size === 0) {
@@ -2537,6 +2545,8 @@ function renderAccordion(tasks) {
           </div>
           <span class="acc-badge ${allDone?'done':''}">${done}/${total}</span>
           <span class="acc-badge">${totalMin}분</span>
+          <button class="btn-order" onclick="event.stopPropagation();moveProjOrder('${esc(proj)}',-1)" title="위로">↑</button>
+          <button class="btn-order" onclick="event.stopPropagation();moveProjOrder('${esc(proj)}',1)" title="아래로">↓</button>
           <button class="btn-cc${canOpenClaude?'':' disabled'}" onclick="event.stopPropagation();${canOpenClaude ? `openClaude('${esc(proj)}')` : ''}" title="${canOpenClaude ? 'Claude Code 열기' : '연결된 로컬 프로젝트 폴더 없음'}">CC</button>
           <button class="btn-view${agentUrls[proj]?'':' disabled'}" onclick="event.stopPropagation();openView('${esc(proj)}')" title="프로젝트 웹 홈">VIEW</button>
         </div>
@@ -2786,6 +2796,25 @@ async function addTask() {
   document.getElementById('inTitle').value = '';
   document.getElementById('inMin').value = '15';
   await refreshMain();
+}
+
+// --- Project Order ---
+function getProjOrder() {
+  try { return JSON.parse(localStorage.getItem('df_proj_order') || '[]'); } catch { return []; }
+}
+function moveProjOrder(proj, dir) {
+  const order = getProjOrder();
+  // 현재 렌더된 순서 기준으로 초기화
+  if (!order.length) {
+    document.querySelectorAll('.acc-name').forEach(el => order.push(el.textContent.trim()));
+  }
+  let idx = order.indexOf(proj);
+  if (idx === -1) { order.push(proj); idx = order.length - 1; }
+  const target = idx + dir;
+  if (target < 0 || target >= order.length) return;
+  [order[idx], order[target]] = [order[target], order[idx]];
+  localStorage.setItem('df_proj_order', JSON.stringify(order));
+  refreshMain();
 }
 
 // --- Project Last Log ---
