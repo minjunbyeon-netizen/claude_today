@@ -2582,6 +2582,11 @@ function renderAccordion(tasks) {
 
   // 댓글 자동 로드
   tasks.forEach(t => loadComments(t.id));
+  // is-live 클래스 적용 (renderAccordion 직후 — DOM 새로 생성됐으므로 여기서 적용)
+  document.querySelectorAll('.acc-group').forEach(grp => {
+    const name = grp.querySelector('.acc-name')?.textContent.trim();
+    if (name) grp.classList.toggle('is-live', liveProjects.has(name));
+  });
   // 프로젝트별 최근 작업 로그 + 댓글 로드
   sortedKeys.forEach(proj => { loadProjectLog(proj); loadProjectComments(proj); });
 }
@@ -3573,7 +3578,7 @@ async function loadAgentStatus() {
       if (r.url) agentUrls[r.project] = r.url;
       if (r.is_live) liveProjects.add(r.project);
     });
-    // acc-group에 is-live 클래스 적용
+    // acc-group은 renderAccordion 안에서 적용 — 여기서는 60초마다 갱신만
     document.querySelectorAll('.acc-group').forEach(grp => {
       const name = grp.querySelector('.acc-name')?.textContent.trim();
       if (name) grp.classList.toggle('is-live', liveProjects.has(name));
