@@ -3219,15 +3219,28 @@ def open_claude(proj: str, prompt: str = ""):
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
     prompt_clean = summarize_agent_text(clean_utf8_text(prompt), limit=1200)
-    claude_command = subprocess.list2cmdline([CLAUDE_CMD, prompt_clean]) if prompt_clean else subprocess.list2cmdline([CLAUDE_CMD])
 
-    # PowerShell Start-Process로 wt 실행 — App Execution Alias를 백그라운드에서 해석 가능한 유일한 방법
-    safe_path = target_path.replace("'", "''")
-    safe_cmd  = claude_command.replace("'", "''")
-    ps_launch = (
-        f"Start-Process -FilePath wt "
-        f"-ArgumentList 'new-window -d \"{safe_path}\" -- cmd /k {safe_cmd}'"
-    )
+    # wt.exe 전체 경로 (App Execution Alias는 PM2 환경 PATH에서 못 찾음)
+    WT_EXE = r"C:\Users\USER\AppData\Local\Microsoft\WindowsApps\wt.exe"
+
+    # claude 인자 목록
+    claude_args = [CLAUDE_CMD]
+    if prompt_clean:
+        claude_args.append(prompt_clean)
+
+    # PowerShell & call-operator + 배열 인자 — ArgumentList 단일문자열 파싱 오류 우회
+    # 경로에 공백이 있을 수 있으므로 각 인자를 따옴표로 감쌈
+    def ps_quote(s):
+        return '"' + s.replace('"', '`"') + '"'
+
+    wt_arg_list = [
+        "new-window",
+        "-d", ps_quote(target_path),
+        "--", "cmd", "/k",
+    ] + [ps_quote(a) for a in claude_args]
+
+    ps_launch = f'& {ps_quote(WT_EXE)} {" ".join(wt_arg_list)}'
+
     try:
         subprocess.Popen(
             ["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps_launch],
