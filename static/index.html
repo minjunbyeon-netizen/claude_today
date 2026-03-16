@@ -1516,6 +1516,8 @@ body {
   transition: background .12s;
 }
 .wf-item:hover { background: rgba(255,255,255,.08); }
+.wf-item.active { background: rgba(255,255,255,.1); }
+.wf-item.active .wf-name { color: rgba(255,255,255,.95); font-weight: 700; }
 .wf-dot {
   width: 6px;
   height: 6px;
@@ -2962,6 +2964,9 @@ function selectGroup(groupId) {
   } else {
     renderGrid(allTasks);
   }
+  // 사이드바 클릭 시 작업 탭으로 자동 이동
+  switchTab('work');
+  switchSubTab('work');
 }
 
 // ── Navigation actions ────────────────────────────────────────
@@ -2976,6 +2981,9 @@ function selectDate(ds) {
   renderWeekList();
   loadTodayByDate(ds);
   loadCheckins(ds);
+  // 사이드바 클릭 시 작업 탭으로 자동 이동
+  switchTab('work');
+  switchSubTab('work');
 }
 
 function selectProject(proj) {
@@ -2992,6 +3000,11 @@ function selectProject(proj) {
     renderProjectList(allTasks);
     applyProjectFilter();
   }
+  // wf-item active 상태 반영
+  renderWfList(_lastWfRows);
+  // 사이드바 클릭 시 작업 탭으로 자동 이동
+  switchTab('work');
+  switchSubTab('work');
 }
 
 function clearProjectFilter() {
@@ -4599,10 +4612,11 @@ function renderWfList(rows) {
   const assigned = new Set(groups.flatMap(g => g.folders || []));
 
   const folderItem = r => {
-    const live  = liveProjects.has(r.project);
-    const stale = !live && r.status !== 'idle' && r.minutes_ago > 30;
-    const dotCls = live ? 'done' : stale ? 'stale' : (r.status || 'idle');
-    return `<div class="wf-item" title="${esc(r.task || r.project)}" onclick="selectProject('${esc(r.project)}')">
+    const live     = liveProjects.has(r.project);
+    const stale    = !live && r.status !== 'idle' && r.minutes_ago > 30;
+    const dotCls   = live ? 'done' : stale ? 'stale' : (r.status || 'idle');
+    const isActive = currentProject === r.project;
+    return `<div class="wf-item${isActive ? ' active' : ''}" title="${esc(r.task || r.project)}" onclick="selectProject('${esc(r.project)}')">
       <div class="wf-dot ${dotCls}"></div>
       <span class="wf-name">${esc(r.project)}</span>
       <button class="wf-cc" onclick="event.stopPropagation();openClaude('${esc(r.project)}')" title="Claude Code 열기">CC</button>
