@@ -1080,9 +1080,8 @@ body {
 .acc-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 
 .acc-group { border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
-.acc-group.is-live { border-color: #3fb95066; }
-.acc-group.is-live .acc-header { background: #0d200f; }
-@keyframes live-pulse { 0%,100% { box-shadow: 0 0 0 0 #3fb95022; } 50% { box-shadow: 0 0 6px 2px #3fb95033; } }
+.acc-group.is-live { border-color: rgba(255,255,255,.25); }
+@keyframes live-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); } 50% { box-shadow: 0 0 8px 2px rgba(255,255,255,.08); } }
 .acc-group.is-live { animation: live-pulse 2.5s ease-in-out infinite; }
 
 .acc-header {
