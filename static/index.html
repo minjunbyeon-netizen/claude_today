@@ -1134,6 +1134,10 @@ body {
   0%, 100% { border-color: var(--border); }
   50%       { border-color: rgba(255,255,255,.7); }
 }
+@keyframes live-pulse-bg {
+  0%, 100% { background: transparent; }
+  50%       { background: rgba(255,255,255,0.05); }
+}
 .acc-group.is-live { animation: live-pulse 1.8s ease-in-out infinite; }
 
 .acc-header {
@@ -1710,6 +1714,9 @@ body {
   transition: width .3s;
 }
 .grp-folder-row.is-live .grp-folder-prog-fill { background: #0071E3; }
+.grp-folder-row.is-live {
+  animation: live-pulse-bg 1.8s ease-in-out infinite;
+}
 .grp-folder-hd {
   display: flex;
   align-items: center;
@@ -2275,17 +2282,11 @@ body {
         <div id="lastLogItems"></div>
       </div>
 
-      <!-- View Toggle -->
-      <div class="view-toggle-bar">
-        <button class="view-toggle-btn active" id="viewBtnList" onclick="switchView('list')">목록</button>
-        <button class="view-toggle-btn" id="viewBtnGrid" onclick="switchView('grid')">그리드</button>
-      </div>
+      <!-- Group-row view (항상 표시) -->
+      <div id="gridView"></div>
 
-      <!-- Accordion (list view) -->
-      <div class="acc-list" id="accList"></div>
-
-      <!-- Grid View -->
-      <div class="grid-view" id="gridView" style="display:none"></div>
+      <!-- Accordion (hidden, kept for data compatibility) -->
+      <div class="acc-list" id="accList" style="display:none"></div>
 
       </div><!-- /subTabWork -->
 
@@ -2336,21 +2337,13 @@ function switchSubTab(sub) {
   document.getElementById('subBtnWork').classList.toggle('active', !isLog);
   document.getElementById('subBtnLog').classList.toggle('active', isLog);
   localStorage.setItem('df_active_subtab', sub);
-  // 작업 서브탭은 항상 그리드(그룹뷰) 강제
-  if (!isLog && currentView !== 'grid') switchView('grid');
-  else if (!isLog) renderGrid(allTasks);
+  if (!isLog) renderGrid(allTasks);
 }
-let currentView = localStorage.getItem('df_view') || 'list';
+let currentView = 'grid';
 
 function switchView(v) {
-  currentView = v;
-  localStorage.setItem('df_view', v);
-  const isList = v === 'list';
-  document.getElementById('accList').style.display  = isList ? '' : 'none';
-  document.getElementById('gridView').style.display = isList ? 'none' : '';
-  document.getElementById('viewBtnList').classList.toggle('active', isList);
-  document.getElementById('viewBtnGrid').classList.toggle('active', !isList);
-  if (!isList) renderGrid(allTasks);
+  currentView = 'grid';
+  renderGrid(allTasks);
 }
 
 function renderGrid(tasks) {
@@ -2440,13 +2433,6 @@ function renderGrid(tasks) {
   if (saved === 'work') switchTab('work');
   const savedSub = localStorage.getItem('df_active_subtab') || 'work';
   if (savedSub === 'log') switchSubTab('log');
-  // 저장된 뷰 복원
-  if (currentView === 'grid') {
-    document.getElementById('accList').style.display  = 'none';
-    document.getElementById('gridView').style.display = '';
-    document.getElementById('viewBtnList').classList.remove('active');
-    document.getElementById('viewBtnGrid').classList.add('active');
-  }
 })();
 
 const e   = ev => ev.key === 'Enter';

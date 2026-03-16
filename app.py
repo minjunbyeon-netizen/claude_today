@@ -611,7 +611,7 @@ def build_checkin_feed(conn, target_date: str):
         activity_rows = conn.execute(
             """SELECT project, task, status, url, created_at
                FROM agent_activity
-               WHERE date(created_at) = ?
+               WHERE date(created_at, 'localtime') = ?
                ORDER BY created_at DESC
                LIMIT 40""",
             (target_date,),
