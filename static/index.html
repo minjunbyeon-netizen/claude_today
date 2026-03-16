@@ -1347,17 +1347,22 @@ body {
 .task-progress-row--compact { display: flex; align-items: center; gap: 8px; margin-top: 6px; opacity: .5; }
 .task-progress-row--compact .task-progress-bar { flex: 1; }
 .task-progress-row--compact .task-progress-text { font-size: 10px; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
-.comment-item { display: flex; gap: 8px; align-items: flex-start; padding: 5px 0; }
-.comment-item.confirmed .comment-body { text-decoration: line-through; color: var(--muted); }
-.comment-author { font-size: 11px; font-weight: 700; color: #1D1D1F; white-space: nowrap; flex-shrink: 0; }
-.comment-body { font-size: 12px; color: #1D1D1F; line-height: 1.5; flex: 1; }
-.comment-confirm-btn { background: none; border: 1px solid var(--border); border-radius: 4px; color: var(--muted); font-size: 10px; padding: 1px 6px; cursor: pointer; flex-shrink: 0; transition: all .15s; }
-.comment-confirm-btn:hover { border-color: #1D1D1F; color: #1D1D1F; }
+.comment-item { display: flex; flex-direction: column; margin: 6px 0; gap: 2px; }
+.comment-item.mine { align-items: flex-end; }
+.comment-item.theirs { align-items: flex-start; }
+.comment-item.confirmed .comment-bubble { text-decoration: line-through; }
+.comment-author { font-size: 11px; font-weight: 700; color: #6E6E73; margin-bottom: 2px; }
+.comment-bubble { max-width: 75%; padding: 8px 12px; border-radius: 12px; font-size: 14px; line-height: 1.5; word-break: break-word; }
+.comment-item.mine .comment-bubble { background: #1D1D1F; color: #fff; border-bottom-right-radius: 3px; }
+.comment-item.theirs .comment-bubble { background: #F5F5F7; color: #1D1D1F; border-bottom-left-radius: 3px; }
+.comment-time { font-size: 10px; color: #6E6E73; margin-top: 2px; }
+.comment-confirm-btn { font-size: 11px; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--border); background: #fff; color: #6E6E73; cursor: pointer; transition: background 120ms; margin-top: 2px; }
+.comment-confirm-btn:hover { background: #F5F5F7; color: #1D1D1F; }
 .comment-input-row { display: flex; gap: 6px; margin-top: 6px; }
 .comment-input { flex: 1; background: #FFFFFF; border: 1px solid var(--border); border-radius: 6px; color: #1D1D1F; font-size: 12px; padding: 5px 8px; outline: none; font-family: inherit; }
 .comment-input:focus { border-color: #1D1D1F; }
-.comment-send-btn { background: #F5F5F7; border: 1px solid var(--border); border-radius: 6px; color: #1D1D1F; font-size: 12px; padding: 5px 10px; cursor: pointer; white-space: nowrap; transition: all .15s; }
-.comment-send-btn:hover { border-color: #1D1D1F; }
+.comment-send-btn { background: #1D1D1F; border: none; border-radius: 980px; color: #fff; font-size: 12px; font-weight: 700; padding: 5px 14px; cursor: pointer; white-space: nowrap; transition: opacity 150ms; }
+.comment-send-btn:hover { opacity: .8; }
 
 .empty { text-align: center; color: var(--muted); padding: 32px; font-size: 13px; background: #F5F5F7; border: none; border-radius: var(--r); }
 
@@ -2179,6 +2184,10 @@ body {
     <div class="dot dot-g"></div>
     <div class="titlebar-title">Daily Focus — 전략적 비서</div>
     <div class="titlebar-right">
+      <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:rgba(255,255,255,.5);">
+        댓글
+        <span id="comment-unread-badge" style="display:none;background:#FF3B30;color:#fff;border-radius:999px;font-size:10px;font-weight:700;padding:1px 5px;min-width:16px;text-align:center;"></span>
+      </div>
       <div class="profile-wrap" style="position:relative">
         <button class="profile-avatar" id="profileBtn" onclick="toggleProfileMenu()" aria-haspopup="true" aria-expanded="false">
           <span class="avatar-initials" id="avatarInitials">-</span>
@@ -3789,27 +3798,42 @@ async function loadProjectComments(proj) {
   const r = await fetch(appUrl(`api/projects/${encodeURIComponent(proj)}/comments`));
   const comments = await r.json();
   if (!comments.length) {
-    list.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:2px 0">아직 댓글이 없습니다.</div>';
+    list.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 0">아직 댓글이 없습니다. 첫 번째로 의견을 남겨보세요.</div>';
     return;
   }
-  list.innerHTML = comments.map(c => `
-    <div class="comment-item${c.confirmed?' confirmed':''}" id="pcmt-item-${c.id}">
-      <span class="comment-author">${esc(c.author)}</span>
-      <span class="comment-body">${esc(c.body)}</span>
-      ${!c.confirmed ? `<button class="comment-confirm-btn" onclick="confirmProjectComment('${esc(proj)}',${c.id})">확인</button>` : '<span style="font-size:10px;color:var(--muted)">✓</span>'}
-    </div>`).join('');
+  const unread = comments.filter(c => !c.confirmed && me && c.author !== me).length;
+  if (unread > 0) _addUnread(unread);
+  list.innerHTML = comments.map(c => {
+    const isMine = me && c.author && (c.author === me);
+    const timeStr = formatCommentTime(c.created_at);
+    return `
+    <div class="comment-item${c.confirmed?' confirmed':''}${isMine?' mine':' theirs'}" id="pcmt-item-${c.id}">
+      ${!isMine ? `<span class="comment-author">${esc(c.author)}</span>` : ''}
+      <div class="comment-bubble">${esc(c.body)}</div>
+      ${timeStr ? `<span class="comment-time">${timeStr}</span>` : ''}
+      ${!c.confirmed && !isMine ? `<button class="comment-confirm-btn" onclick="confirmProjectComment('${esc(proj)}',${c.id})">확인</button>` : ''}
+    </div>`;
+  }).join('');
 }
 
 async function sendProjectComment(proj) {
   const id = _pcmtId(proj);
   const input = document.getElementById(`pcmt-input-${id}`);
   if (!input || !input.value.trim()) return;
-  await fetch(appUrl(`api/projects/${encodeURIComponent(proj)}/comments`), {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({body: input.value.trim()})
-  });
+  const body = input.value.trim();
   input.value = '';
-  await loadProjectComments(proj);
+  try {
+    const r = await fetch(appUrl(`api/projects/${encodeURIComponent(proj)}/comments`), {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({body})
+    });
+    if (!r.ok) throw new Error('fail');
+    showToast('댓글이 전송되었습니다');
+    await loadProjectComments(proj);
+  } catch {
+    showToast('전송 실패. 다시 시도해주세요.', 'error');
+    input.value = body;
+  }
 }
 
 async function confirmProjectComment(proj, commentId) {
@@ -3875,9 +3899,73 @@ function initCollapsibleCards() {
 let _meLogin = null;
 async function getMe() {
   if (_meLogin !== null) return _meLogin;
-  try { const r = await fetch(appUrl('api/me')); const d = await r.json(); _meLogin = d.login || ''; } catch { _meLogin = ''; }
+  try { const r = await fetch(appUrl('api/me')); const d = await r.json(); _meLogin = d.login || d.username || ''; } catch { _meLogin = ''; }
   return _meLogin;
 }
+
+function formatCommentTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const now = new Date();
+  const diffMin = Math.floor((now - d) / 60000);
+  if (diffMin < 1) return '방금';
+  if (diffMin < 60) return `${diffMin}분 전`;
+  if (diffMin < 1440) return `${Math.floor(diffMin/60)}시간 전`;
+  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+function showToast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.style.cssText = `position:fixed;bottom:24px;right:24px;z-index:9999;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;color:#fff;opacity:0;transition:opacity 200ms;background:${type==='error'?'#FF3B30':'#1D1D1F'};pointer-events:none;`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => { el.style.opacity = '1'; });
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 200); }, 3000);
+}
+
+function renderCommentItem(c, me, onConfirmClick) {
+  const isMine = me && c.author && (c.author === me);
+  const timeStr = formatCommentTime(c.created_at);
+  return `
+    <div class="comment-item${c.confirmed ? ' confirmed' : ''}${isMine ? ' mine' : ' theirs'}" id="comment-${c.id}">
+      ${!isMine ? `<span class="comment-author">${esc(c.author)}</span>` : ''}
+      <div class="comment-bubble">${esc(c.body)}</div>
+      ${timeStr ? `<span class="comment-time">${timeStr}</span>` : ''}
+      ${!c.confirmed && !isMine ? `<button class="comment-confirm-btn" onclick="${onConfirmClick}">확인</button>` : (c.confirmed ? '' : '')}
+    </div>`;
+}
+
+function renderCommentItemProj(c, me, proj, idPrefix) {
+  const isMine = me && c.author && (c.author === me);
+  const timeStr = formatCommentTime(c.created_at);
+  return `
+    <div class="comment-item${c.confirmed ? ' confirmed' : ''}${isMine ? ' mine' : ' theirs'}" id="${idPrefix}-${c.id}">
+      ${!isMine ? `<span class="comment-author">${esc(c.author)}</span>` : ''}
+      <div class="comment-bubble">${esc(c.body)}</div>
+      ${timeStr ? `<span class="comment-time">${timeStr}</span>` : ''}
+      ${!c.confirmed && !isMine ? `<button class="comment-confirm-btn" onclick="${proj}">확인</button>` : ''}
+    </div>`;
+}
+
+// 전역 미읽음 배지
+let _unreadCount = 0;
+function _addUnread(n) { _unreadCount += n; _renderUnreadBadge(); }
+function _resetUnread() { _unreadCount = 0; _renderUnreadBadge(); }
+function _renderUnreadBadge() {
+  const badge = document.getElementById('comment-unread-badge');
+  if (!badge) return;
+  if (_unreadCount > 0) { badge.textContent = _unreadCount; badge.style.display = 'inline-block'; }
+  else { badge.style.display = 'none'; }
+}
+
+// 30초 폴링 — 열린 댓글 패널 자동 갱신
+setInterval(() => {
+  document.querySelectorAll('.task-comment-panel.open, .grp-task-cmt-panel.open').forEach(panel => {
+    const id = panel.id;
+    const taskId = id.replace('cmt-','').replace('grp-cmt-','');
+    if (taskId && !isNaN(taskId)) loadComments(Number(taskId));
+  });
+}, 30000);
 
 async function toggleComments(e, taskId) {
   e.stopPropagation();
@@ -3905,18 +3993,24 @@ function toggleFolderCmt(proj, projId) {
 async function loadFolderComments(proj, projId) {
   const list = document.getElementById(`fcmt-list-${projId}`);
   if (!list) return;
+  const me = await getMe();
   const r = await fetch(appUrl(`api/projects/${encodeURIComponent(proj)}/comments`));
   const comments = await r.json();
   if (!comments.length) {
-    list.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:2px 0">댓글 없음</div>';
+    list.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 0">아직 댓글이 없습니다. 첫 번째로 의견을 남겨보세요.</div>';
     return;
   }
-  list.innerHTML = comments.map(c => `
-    <div class="comment-item${c.confirmed?' confirmed':''}" id="fcmtitem-${c.id}">
-      <span class="comment-author">${esc(c.author)}</span>
-      <span class="comment-body">${esc(c.body)}</span>
-      ${!c.confirmed ? `<button class="comment-confirm-btn" onclick="confirmFolderComment('${escAttr(proj)}','${projId}',${c.id})">확인</button>` : '<span style="font-size:10px;color:var(--muted)">✓</span>'}
-    </div>`).join('');
+  list.innerHTML = comments.map(c => {
+    const isMine = me && c.author && (c.author === me);
+    const timeStr = formatCommentTime(c.created_at);
+    return `
+    <div class="comment-item${c.confirmed?' confirmed':''}${isMine?' mine':' theirs'}" id="fcmtitem-${c.id}">
+      ${!isMine ? `<span class="comment-author">${esc(c.author)}</span>` : ''}
+      <div class="comment-bubble">${esc(c.body)}</div>
+      ${timeStr ? `<span class="comment-time">${timeStr}</span>` : ''}
+      ${!c.confirmed && !isMine ? `<button class="comment-confirm-btn" onclick="confirmFolderComment('${escAttr(proj)}','${projId}',${c.id})">확인</button>` : ''}
+    </div>`;
+  }).join('');
 }
 
 async function sendFolderComment(proj, projId) {
@@ -3925,21 +4019,23 @@ async function sendFolderComment(proj, projId) {
   const body = input.value.trim();
   if (!body) return;
   input.value = '';
-  await fetch(appUrl(`api/projects/${encodeURIComponent(proj)}/comments`), {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({body})
-  });
-  await loadFolderComments(proj, projId);
+  try {
+    const r = await fetch(appUrl(`api/projects/${encodeURIComponent(proj)}/comments`), {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({body})
+    });
+    if (!r.ok) throw new Error('fail');
+    showToast('댓글이 전송되었습니다');
+    await loadFolderComments(proj, projId);
+  } catch {
+    showToast('전송 실패. 다시 시도해주세요.', 'error');
+    input.value = body;
+  }
 }
 
 async function confirmFolderComment(proj, projId, commentId) {
   await fetch(appUrl(`api/projects/${encodeURIComponent(proj)}/comments/${commentId}/confirm`), {method: 'PATCH'});
-  const el = document.getElementById(`fcmtitem-${commentId}`);
-  if (el) {
-    el.classList.add('confirmed');
-    const btn = el.querySelector('.comment-confirm-btn');
-    if (btn) btn.outerHTML = '<span style="font-size:10px;color:var(--muted)">✓</span>';
-  }
+  await loadFolderComments(proj, projId);
 }
 
 function toggleGrpCmt(taskId) {
@@ -3956,13 +4052,10 @@ async function loadComments(taskId) {
   const me = await getMe();
   const r = await fetch(appUrl(`api/tasks/${taskId}/comments`));
   const comments = await r.json();
-  if (!comments.length) { list.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:2px 0">아직 댓글이 없습니다.</div>'; return; }
-  list.innerHTML = comments.map(c => `
-    <div class="comment-item${c.confirmed ? ' confirmed' : ''}" id="comment-${c.id}">
-      <span class="comment-author">${esc(c.author)}</span>
-      <span class="comment-body">${esc(c.body)}</span>
-      ${!c.confirmed ? `<button class="comment-confirm-btn" onclick="confirmComment(${taskId},${c.id})">확인</button>` : '<span style="font-size:10px;color:var(--muted)">✓</span>'}
-    </div>`).join('');
+  if (!comments.length) { list.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 0">아직 댓글이 없습니다. 첫 번째로 의견을 남겨보세요.</div>'; return; }
+  list.innerHTML = comments.map(c => renderCommentItem(c, me, `confirmComment(${taskId},${c.id})`)).join('');
+  const unread = comments.filter(c => !c.confirmed && me && c.author !== me).length;
+  if (unread > 0) _addUnread(unread);
 }
 
 async function sendComment(taskId) {
@@ -3971,21 +4064,23 @@ async function sendComment(taskId) {
   const body = input.value.trim();
   if (!body) return;
   input.value = '';
-  await fetch(appUrl(`api/tasks/${taskId}/comments`), {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({body})
-  });
-  await loadComments(taskId);
+  try {
+    const r = await fetch(appUrl(`api/tasks/${taskId}/comments`), {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({body})
+    });
+    if (!r.ok) throw new Error('fail');
+    showToast('댓글이 전송되었습니다');
+    await loadComments(taskId);
+  } catch {
+    showToast('전송 실패. 다시 시도해주세요.', 'error');
+    input.value = body;
+  }
 }
 
 async function confirmComment(taskId, commentId) {
   await fetch(appUrl(`api/tasks/${taskId}/comments/${commentId}/confirm`), {method:'PATCH'});
-  const el = document.getElementById(`comment-${commentId}`);
-  if (el) {
-    el.classList.add('confirmed');
-    const btn = el.querySelector('.comment-confirm-btn');
-    if (btn) btn.outerHTML = '<span style="font-size:10px;color:var(--muted)">✓</span>';
-  }
+  await loadComments(taskId);
 }
 // --- End Comment System ---
 
