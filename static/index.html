@@ -1461,6 +1461,165 @@ body {
   transition: color .12s;
 }
 .wf-toggle:hover { color: var(--text2); }
+.wf-settings-btn {
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color .12s;
+}
+.wf-settings-btn:hover { color: var(--text2); }
+.wf-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px 2px;
+  margin-top: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+.wf-group-name {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.wf-group-arrow { font-size: 9px; color: var(--muted); }
+.wf-group-body { padding-left: 4px; }
+/* ── WF Settings Modal ── */
+.wf-modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.6);
+  z-index: 2000;
+  overflow-y: auto;
+}
+.wf-modal {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  width: 520px;
+  max-width: 92vw;
+  margin: 48px auto 48px;
+  padding: 24px;
+}
+.wf-modal-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.wf-modal-title { font-size: 15px; font-weight: 700; }
+.wf-modal-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0;
+  line-height: 1;
+}
+.wf-modal-close:hover { color: var(--text); }
+.wf-group-block {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.wf-group-block-hd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface);
+}
+.wf-group-input {
+  flex: 1;
+  background: none;
+  border: none;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  outline: none;
+}
+.wf-group-input:focus { border-bottom: 1px solid var(--accent); }
+.wf-del-group {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0 2px;
+}
+.wf-del-group:hover { color: var(--danger); }
+.wf-folder-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 12px;
+}
+.wf-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface2);
+  border-radius: 99px;
+  padding: 3px 10px 3px 10px;
+  font-size: 11px;
+  color: var(--text2);
+}
+.wf-chip-rm {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 0;
+  line-height: 1;
+}
+.wf-chip-rm:hover { color: var(--danger); }
+.wf-add-folder-row {
+  padding: 6px 12px 10px;
+  display: flex;
+  gap: 6px;
+}
+.wf-folder-select {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text2);
+  font-size: 12px;
+  padding: 4px 8px;
+  outline: none;
+}
+.wf-add-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text2);
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.wf-add-btn:hover { border-color: var(--accent); color: var(--accent); }
+.wf-new-group-btn {
+  width: 100%;
+  padding: 9px;
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  margin-top: 4px;
+}
+.wf-new-group-btn:hover { border-color: var(--text2); color: var(--text2); }
 
 /* ── Past Day Simple View ── */
 .past-view {
@@ -1570,12 +1729,27 @@ body {
     <div class="sidebar-section">
       <div class="sidebar-section-title-row">
         <span class="sidebar-section-title" style="margin-bottom:0">작업 폴더</span>
-        <span class="wf-toggle" id="wfToggle" onclick="toggleWorkFolders()">접기</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button class="wf-settings-btn" onclick="openWfSettings()" title="그룹 설정">⚙</button>
+          <span class="wf-toggle" id="wfToggle" onclick="toggleWorkFolders()">접기</span>
+        </div>
       </div>
       <div class="wf-list" id="wfList"></div>
     </div>
 
   </aside>
+
+  <!-- WF Group Settings Modal -->
+  <div class="wf-modal-overlay" id="wfModalOverlay" onclick="if(event.target===this)closeWfSettings()">
+    <div class="wf-modal">
+      <div class="wf-modal-hd">
+        <span class="wf-modal-title">작업 폴더 그룹 설정</span>
+        <button class="wf-modal-close" onclick="closeWfSettings()">✕</button>
+      </div>
+      <div id="wfSettingsBody"></div>
+      <button class="wf-new-group-btn" onclick="addWfGroup()">+ 그룹 추가</button>
+    </div>
+  </div>
 
   <!-- ════════ MAIN PANEL ════════ -->
   <main class="main-panel">
@@ -3674,12 +3848,168 @@ const liveProjects = new Set();
 
 // work folder sidebar collapse state
 let wfCollapsed = localStorage.getItem('wf_collapsed') === '1';
+let _lastWfRows = [];  // cache for re-render after settings change
 
 function toggleWorkFolders() {
   wfCollapsed = !wfCollapsed;
   localStorage.setItem('wf_collapsed', wfCollapsed ? '1' : '0');
   document.getElementById('wfList').style.display = wfCollapsed ? 'none' : '';
   document.getElementById('wfToggle').textContent = wfCollapsed ? '펼치기' : '접기';
+}
+
+// ── WF Groups ─────────────────────────────────────────────────
+function getWfGroups() {
+  try { return JSON.parse(localStorage.getItem('df_wf_groups')) || []; } catch { return []; }
+}
+function saveWfGroups(groups) {
+  localStorage.setItem('df_wf_groups', JSON.stringify(groups));
+}
+
+function renderWfList(rows) {
+  _lastWfRows = rows;
+  const wfEl = document.getElementById('wfList');
+  if (wfCollapsed) { wfEl.style.display = 'none'; return; }
+  wfEl.style.display = '';
+  if (!rows || !rows.length) {
+    wfEl.innerHTML = '<span style="font-size:12px;color:var(--muted)">폴더 없음</span>';
+    return;
+  }
+  const groups   = getWfGroups();
+  const rowMap   = {};
+  rows.forEach(r => rowMap[r.project] = r);
+  const assigned = new Set(groups.flatMap(g => g.folders || []));
+
+  const folderItem = r => {
+    const live  = liveProjects.has(r.project);
+    const stale = !live && r.status !== 'idle' && r.minutes_ago > 30;
+    const dotCls = live ? 'done' : stale ? 'stale' : (r.status || 'idle');
+    return `<div class="wf-item" title="${esc(r.task || r.project)}" onclick="selectProject('${esc(r.project)}')">
+      <div class="wf-dot ${dotCls}"></div>
+      <span class="wf-name">${esc(r.project)}</span>
+      <button class="wf-cc" onclick="event.stopPropagation();openClaude('${esc(r.project)}')" title="Claude Code 열기">CC</button>
+    </div>`;
+  };
+
+  let html = '';
+  groups.forEach(g => {
+    const gFolders = (g.folders || []).filter(f => rowMap[f]);
+    const cKey = `wfg_${g.id}`;
+    const collapsed = localStorage.getItem(cKey) === '1';
+    html += `<div class="wf-group-header" onclick="toggleWfGroup('${esc(g.id)}')">
+      <span class="wf-group-name">${esc(g.name)}</span>
+      <span class="wf-group-arrow" id="wfga-${esc(g.id)}">${collapsed ? '▶' : '▼'}</span>
+    </div>
+    <div class="wf-group-body" id="wfgb-${esc(g.id)}" style="${collapsed ? 'display:none' : ''}">
+      ${gFolders.length ? gFolders.map(f => folderItem(rowMap[f])).join('') : '<div style="font-size:11px;color:var(--muted);padding:4px 6px">폴더 없음</div>'}
+    </div>`;
+  });
+
+  // 미분류
+  const ungrouped = rows.filter(r => !assigned.has(r.project))
+                        .sort((a,b) => a.project.localeCompare(b.project));
+  if (ungrouped.length) {
+    if (groups.length) {
+      const collapsed = localStorage.getItem('wfg___ung') === '1';
+      html += `<div class="wf-group-header" onclick="toggleWfGroup('__ung')">
+        <span class="wf-group-name" style="color:var(--muted)">미분류</span>
+        <span class="wf-group-arrow" id="wfga-__ung">${collapsed ? '▶' : '▼'}</span>
+      </div>
+      <div class="wf-group-body" id="wfgb-__ung" style="${collapsed ? 'display:none' : ''}">
+        ${ungrouped.map(folderItem).join('')}
+      </div>`;
+    } else {
+      html += ungrouped.map(folderItem).join('');
+    }
+  }
+  wfEl.innerHTML = html;
+}
+
+function toggleWfGroup(id) {
+  const body  = document.getElementById(`wfgb-${id}`);
+  const arrow = document.getElementById(`wfga-${id}`);
+  if (!body) return;
+  const collapse = body.style.display !== 'none';
+  body.style.display  = collapse ? 'none' : '';
+  if (arrow) arrow.textContent = collapse ? '▶' : '▼';
+  localStorage.setItem(`wfg_${id}`, collapse ? '1' : '0');
+}
+
+// ── WF Settings Modal ──────────────────────────────────────────
+function openWfSettings() {
+  renderWfSettings();
+  document.getElementById('wfModalOverlay').style.display = 'block';
+}
+function closeWfSettings() {
+  document.getElementById('wfModalOverlay').style.display = 'none';
+  renderWfList(_lastWfRows);
+}
+
+function renderWfSettings() {
+  const groups = getWfGroups();
+  const allFolders = _lastWfRows.map(r => r.project);
+  const assigned = new Set(groups.flatMap(g => g.folders || []));
+  const unassigned = allFolders.filter(f => !assigned.has(f));
+
+  document.getElementById('wfSettingsBody').innerHTML = groups.map((g, gi) => {
+    const unassignedForGroup = allFolders.filter(f => !assigned.has(f) || (g.folders||[]).includes(f));
+    const available = allFolders.filter(f => !(g.folders||[]).includes(f) && (!assigned.has(f)));
+    return `<div class="wf-group-block">
+      <div class="wf-group-block-hd">
+        <input class="wf-group-input" value="${escAttr(g.name)}" placeholder="그룹 이름"
+          onchange="renameWfGroup('${g.id}', this.value)">
+        <button class="wf-del-group" onclick="deleteWfGroup('${g.id}')" title="그룹 삭제">✕</button>
+      </div>
+      <div class="wf-folder-chips" id="chips-${g.id}">
+        ${(g.folders||[]).map(f => `<div class="wf-chip">
+          ${esc(f)}
+          <button class="wf-chip-rm" onclick="removeFolderFromGroup('${g.id}','${esc(f)}')">✕</button>
+        </div>`).join('')}
+      </div>
+      ${available.length ? `<div class="wf-add-folder-row">
+        <select class="wf-folder-select" id="sel-${g.id}">
+          <option value="">폴더 선택...</option>
+          ${available.map(f => `<option value="${escAttr(f)}">${esc(f)}</option>`).join('')}
+        </select>
+        <button class="wf-add-btn" onclick="addFolderToGroup('${g.id}')">추가</button>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function addWfGroup() {
+  const groups = getWfGroups();
+  groups.push({ id: 'g' + Date.now(), name: '새 그룹', folders: [] });
+  saveWfGroups(groups);
+  renderWfSettings();
+}
+function deleteWfGroup(id) {
+  saveWfGroups(getWfGroups().filter(g => g.id !== id));
+  renderWfSettings();
+}
+function renameWfGroup(id, name) {
+  const groups = getWfGroups();
+  const g = groups.find(g => g.id === id);
+  if (g) { g.name = name.trim() || '그룹'; saveWfGroups(groups); }
+}
+function addFolderToGroup(gid) {
+  const sel = document.getElementById(`sel-${gid}`);
+  if (!sel || !sel.value) return;
+  const groups = getWfGroups();
+  const g = groups.find(g => g.id === gid);
+  if (g && !g.folders.includes(sel.value)) {
+    g.folders.push(sel.value);
+    saveWfGroups(groups);
+    renderWfSettings();
+  }
+}
+function removeFolderFromGroup(gid, folder) {
+  const groups = getWfGroups();
+  const g = groups.find(g => g.id === gid);
+  if (g) {
+    g.folders = g.folders.filter(f => f !== folder);
+    saveWfGroups(groups);
+    renderWfSettings();
+  }
 }
 
 // 4) 세션 현황 로드
@@ -3730,31 +4060,8 @@ async function loadAgentStatus() {
       }).join('');
     }
 
-    // ── Work Folder sidebar (ALL C:/work folders, status dot + CC button) ──
-    const wfEl = document.getElementById('wfList');
-    if (wfCollapsed) {
-      wfEl.style.display = 'none';
-      document.getElementById('wfToggle').textContent = '펼치기';
-    }
-    if (!rows.length) {
-      wfEl.innerHTML = '<span style="font-size:12px;color:var(--muted)">폴더 없음</span>';
-    } else {
-      const statusOrder = { start: 0, step: 1, done: 2, stale: 3, idle: 4 };
-      const sorted = [...rows].sort((a, b) => {
-        const aOrd = statusOrder[a.status] ?? 5;
-        const bOrd = statusOrder[b.status] ?? 5;
-        return aOrd !== bOrd ? aOrd - bOrd : a.project.localeCompare(b.project);
-      });
-      wfEl.innerHTML = sorted.map(r => {
-        const stale = r.status !== 'idle' && r.minutes_ago > 30;
-        const dotCls = stale ? 'stale' : r.status;
-        return `<div class="wf-item" title="${esc(r.task || r.project)}">
-          <div class="wf-dot ${dotCls}"></div>
-          <span class="wf-name">${esc(r.project)}</span>
-          <button class="wf-cc" onclick="event.stopPropagation();openClaude('${esc(r.project)}')" title="Claude Code 열기">CC</button>
-        </div>`;
-      }).join('');
-    }
+    // ── Work Folder sidebar ──
+    renderWfList(rows);
   } catch(e) {}
 }
 loadAgentStatus();
