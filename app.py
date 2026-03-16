@@ -1,6 +1,7 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse, JSONResponse, HTMLResponse
+from starlette.middleware.sessions import SessionMiddleware
 from pydantic import BaseModel
 from typing import Optional
 from pathlib import Path
@@ -9,9 +10,47 @@ import sqlite3
 import os
 import re
 import subprocess
+import secrets
+import httpx
 from datetime import date, datetime, timedelta
 
 app = FastAPI()
+
+# --- Load .env if present ---
+_env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+if os.path.exists(_env_path):
+    with open(_env_path) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith("#") and "=" in _line:
+                _k, _v = _line.split("=", 1)
+                os.environ.setdefault(_k.strip(), _v.strip())
+
+# --- Auth Config ---
+SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_hex(32))
+GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "")
+GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "")
+ALLOWED_GITHUB_USERS = set(
+    u.strip() for u in os.getenv("ALLOWED_GITHUB_USERS", "").split(",") if u.strip()
+)
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8001")
+from urllib.parse import urlparse as _urlparse
+_BASE_PATH = _urlparse(BASE_URL).path.rstrip("/")  # "" locally, "/daily-focus" on droplet
+
+_AUTH_PUBLIC_PATHS = {"/login", "/auth/github", "/auth/callback", "/logout", "/health"}
+
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    path = request.url.path
+    if path in _AUTH_PUBLIC_PATHS or path.startswith("/static/"):
+        return await call_next(request)
+    user = request.session.get("user")
+    if not user:
+        if path.startswith("/api/"):
+            return JSONResponse({"error": "Unauthorized"}, status_code=401)
+        return RedirectResponse(f"{_BASE_PATH}/login")
+    return await call_next(request)
 DB_PATH = "data/focus.db"
 AI_SPEED_FACTOR = 0.42
 REPO_SCAN_ROOTS = [r"C:\work", r"C:\Users\USER\Desktop"]
@@ -156,6 +195,16 @@ def init_db():
             discovered_at TEXT DEFAULT CURRENT_TIMESTAMP,
             last_seen_at TEXT DEFAULT CURRENT_TIMESTAMP,
             auto_task_created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS task_comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id INTEGER NOT NULL,
+            author TEXT NOT NULL,
+            body TEXT NOT NULL,
+            confirmed INTEGER DEFAULT 0,
+            confirmed_by TEXT,
+            confirmed_at TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
     """)
     conn.commit()
@@ -2227,10 +2276,131 @@ def get_week_start(d=None):
 init_org_data()
 
 
+# --- Auth Routes ---
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+@app.get("/login")
+def login_page(error: Optional[str] = None):
+    return FileResponse("static/login.html")
+
+
+@app.get("/auth/github")
+def auth_github():
+    if not GITHUB_CLIENT_ID:
+        return HTMLResponse("GITHUB_CLIENT_ID not configured", status_code=500)
+    redirect_uri = f"{BASE_URL}/auth/callback"
+    url = (
+        "https://github.com/login/oauth/authorize"
+        f"?client_id={GITHUB_CLIENT_ID}"
+        f"&redirect_uri={redirect_uri}"
+        "&scope=read:user"
+    )
+    return RedirectResponse(url)
+
+
+@app.get("/auth/callback")
+async def auth_callback(request: Request, code: Optional[str] = None, error: Optional[str] = None):
+    if error or not code:
+        return RedirectResponse(f"{_BASE_PATH}/login?error=cancelled")
+    redirect_uri = f"{BASE_URL}/auth/callback"
+    async with httpx.AsyncClient() as client:
+        token_resp = await client.post(
+            "https://github.com/login/oauth/access_token",
+            data={
+                "code": code,
+                "client_id": GITHUB_CLIENT_ID,
+                "client_secret": GITHUB_CLIENT_SECRET,
+                "redirect_uri": redirect_uri,
+            },
+            headers={"Accept": "application/json"},
+        )
+        token = token_resp.json()
+        access_token = token.get("access_token")
+        if not access_token:
+            return RedirectResponse(f"{_BASE_PATH}/login?error=token_failed")
+        user_resp = await client.get(
+            "https://api.github.com/user",
+            headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
+        )
+        info = user_resp.json()
+
+    login = info.get("login", "")
+    if ALLOWED_GITHUB_USERS and login not in ALLOWED_GITHUB_USERS:
+        return RedirectResponse(f"{_BASE_PATH}/login?error=forbidden")
+
+    request.session["user"] = {
+        "login": login,
+        "name": info.get("name") or login,
+        "picture": info.get("avatar_url", ""),
+    }
+    return RedirectResponse(f"{_BASE_PATH}/")
+
+
+@app.get("/logout")
+def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse(f"{_BASE_PATH}/login")
+
+
 # --- Routes ---
 @app.get("/")
 def root():
     return FileResponse("static/index.html")
+
+
+@app.get("/api/me")
+def get_me(request: Request):
+    user = request.session.get("user", {})
+    return {"login": user.get("login", ""), "name": user.get("name", ""), "picture": user.get("picture", "")}
+
+
+@app.get("/api/tasks/{task_id}/comments")
+def get_comments(task_id: int):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT id, task_id, author, body, confirmed, confirmed_by, confirmed_at, created_at FROM task_comments WHERE task_id=? ORDER BY created_at ASC",
+        (task_id,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+class CommentIn(BaseModel):
+    body: str
+
+
+@app.post("/api/tasks/{task_id}/comments")
+def post_comment(task_id: int, payload: CommentIn, request: Request):
+    user = request.session.get("user", {})
+    author = user.get("login") or user.get("name") or "unknown"
+    body = payload.body.strip()
+    if not body:
+        raise HTTPException(status_code=400, detail="body required")
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO task_comments (task_id, author, body) VALUES (?,?,?)",
+        (task_id, author, body)
+    )
+    conn.commit()
+    row = conn.execute("SELECT id, task_id, author, body, confirmed, confirmed_by, confirmed_at, created_at FROM task_comments WHERE rowid=last_insert_rowid()").fetchone()
+    conn.close()
+    return dict(row)
+
+
+@app.patch("/api/tasks/{task_id}/comments/{comment_id}/confirm")
+def confirm_comment(task_id: int, comment_id: int, request: Request):
+    user = request.session.get("user", {})
+    confirmed_by = user.get("login") or user.get("name") or "unknown"
+    conn = get_db()
+    conn.execute(
+        "UPDATE task_comments SET confirmed=1, confirmed_by=?, confirmed_at=datetime('now') WHERE id=? AND task_id=?",
+        (confirmed_by, comment_id, task_id)
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
 
 
 @app.get("/api/today")
@@ -4042,3 +4212,7 @@ def get_agent_status():
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# SessionMiddleware must be added LAST so it executes FIRST (outermost layer),
+# making request.session available to auth_middleware above.
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, session_cookie="df_session", max_age=86400 * 30)

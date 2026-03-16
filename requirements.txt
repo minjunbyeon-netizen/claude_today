@@ -2,3 +2,5 @@ fastapi
 uvicorn[standard]
 schedule
 plyer
+httpx
+itsdangerous

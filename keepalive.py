@@ -28,7 +28,7 @@ def acquire_singleton() -> object | None:
 
 def app_is_healthy() -> bool:
     try:
-        with urllib.request.urlopen(f"{get_base_url()}/api/today", timeout=4) as response:
+        with urllib.request.urlopen(f"{get_base_url()}/health", timeout=4) as response:
             return response.status == 200
     except urllib.error.URLError:
         return False
