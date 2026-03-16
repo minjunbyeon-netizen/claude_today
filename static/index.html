@@ -2652,7 +2652,7 @@ function renderAccordion(tasks) {
           <button class="btn-order" onclick="event.stopPropagation();moveProjOrder('${esc(proj)}',-1)" title="위로">↑</button>
           <button class="btn-order" onclick="event.stopPropagation();moveProjOrder('${esc(proj)}',1)" title="아래로">↓</button>
           <button class="btn-cc${canOpenClaude?'':' disabled'}" onclick="event.stopPropagation();${canOpenClaude ? `openClaude('${esc(proj)}')` : ''}" title="${canOpenClaude ? 'Claude Code 열기' : '연결된 로컬 프로젝트 폴더 없음'}">CC</button>
-          <button class="btn-view${agentUrls[proj]?'':' disabled'}" onclick="event.stopPropagation();openView('${esc(proj)}')" title="프로젝트 웹 홈">VIEW</button>
+          <button class="btn-view" onclick="event.stopPropagation();openView('${esc(proj)}')" title="프로젝트 웹 홈${agentUrls[proj]?' — '+agentUrls[proj]:' — URL 없음 (클릭하여 등록)'}">VIEW${agentUrls[proj]?'':'<span style="font-size:9px;opacity:.5;margin-left:2px">+</span>'}</button>
         </div>
         <div class="acc-body ${isOpen?'open':''}">
           <div class="proj-last-log" id="${projLogId}"></div>
@@ -3551,7 +3551,22 @@ async function deleteWeeklyGoal(goalId) {
 // ── Open Project Web View ──────────────────────────────────────
 function openView(proj) {
   const url = agentUrls[proj];
-  if (url) window.open(url, '_blank');
+  if (url) { window.open(url, '_blank'); return; }
+  // URL 없으면 입력 받아서 저장
+  const input = prompt(`${proj} VIEW URL 입력\n예: http://localhost:3000`, '');
+  if (input === null) return;
+  const trimmed = input.trim();
+  fetch(appUrl('api/agent-status/url'), {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ project: proj, url: trimmed })
+  }).then(() => {
+    if (trimmed) {
+      agentUrls[proj] = trimmed;
+      window.open(trimmed, '_blank');
+    }
+    loadAgentStatus();
+  });
 }
 
 // ── Open Claude Code ──────────────────────────────────────────

@@ -4189,6 +4189,27 @@ def post_agent_status(report: AgentStatusReport):
     return {"ok": True}
 
 
+@app.patch("/api/agent-status/url")
+def patch_agent_url(body: dict):
+    project = (body.get("project") or "").strip()
+    url     = (body.get("url") or "").strip()
+    if not project:
+        raise HTTPException(status_code=400, detail="project required")
+    conn = get_db()
+    ensure_table_column(conn, "agent_status", "url", "TEXT DEFAULT ''")
+    existing = conn.execute("SELECT project FROM agent_status WHERE project = ?", (project,)).fetchone()
+    if existing:
+        conn.execute("UPDATE agent_status SET url = ? WHERE project = ?", (url, project))
+    else:
+        conn.execute(
+            "INSERT INTO agent_status (project, task, status, url, updated_at) VALUES (?, '', 'step', ?, datetime('now','localtime'))",
+            (project, url)
+        )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
 @app.get("/api/agent-status")
 def get_agent_status():
     import re as _re
