@@ -2361,7 +2361,6 @@ function renderGrid(tasks) {
   function buildFolderRow(proj) {
     const { groups: tGroups } = groupTasks(tasks);
     const items = tGroups[proj] || [];
-    if (!items.length) return null;
 
     const summary = summarizeProgress(items);
     const isLive  = liveProjects.has(proj);
@@ -2372,9 +2371,8 @@ function renderGrid(tasks) {
     const done   = items.filter(t => t.status === 'done');
     const parked = items.filter(t => !t.is_actionable && t.status !== 'done');
     const allRows = [...todo, ...parked, ...done];
-    const MAX_SHOW = 8;
-    const shown    = allRows.slice(0, MAX_SHOW);
-    const hidden   = allRows.length - MAX_SHOW;
+    const shown    = allRows;
+    const hidden   = 0;
 
     const taskRow = t => {
       const isDone   = t.status === 'done';
@@ -2391,26 +2389,26 @@ function renderGrid(tasks) {
     };
 
     return `<div class="grp-folder-row ${isLive?'is-live':''}">
-      <div class="grp-folder-prog"><div class="grp-folder-prog-fill" style="width:${summary.pct}%"></div></div>
+      ${items.length ? `<div class="grp-folder-prog"><div class="grp-folder-prog-fill" style="width:${summary.pct}%"></div></div>` : ''}
       <div class="grp-folder-hd">
         ${isLive ? '<div class="grp-folder-live-dot"></div>' : ''}
         <span class="grp-folder-name">${esc(proj)}</span>
         <div class="grp-folder-meta">
-          <span class="grp-folder-count">${summary.done}/${summary.total}</span>
+          ${items.length ? `<span class="grp-folder-count">${summary.done}/${summary.total}</span>` : ''}
           ${url ? `<button class="grp-folder-view" onclick="openView('${escAttr(proj)}')">VIEW</button>` : `<button class="grp-folder-view" onclick="openView('${escAttr(proj)}')">URL</button>`}
         </div>
       </div>
       ${shown.map(taskRow).join('')}
-      ${hidden > 0 ? `<div class="grp-task-row"><span style="font-size:11px;color:var(--muted)">+ ${hidden}개 더</span></div>` : ''}
+      ${!items.length ? `<div class="grp-task-row"><span style="font-size:11px;color:var(--muted)">태스크 없음</span></div>` : ''}
     </div>`;
   }
 
   // ── render a single group as a wrapper with folder rows ────
   function buildGroupWrapper(g) {
     const folders = g.folders || [];
+    if (!folders.length) return null;
     const sortedFolders = [...folders].sort((a, b) => (liveProjects.has(a)?0:1) - (liveProjects.has(b)?0:1));
-    const rows = sortedFolders.map(buildFolderRow).filter(Boolean);
-    if (!rows.length) return null;
+    const rows = sortedFolders.map(buildFolderRow);
     return `<div class="grp-wrapper">
       <div class="grp-wrapper-hd">${esc(g.name)}</div>
       ${rows.join('')}
