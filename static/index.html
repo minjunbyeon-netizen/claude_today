@@ -1675,27 +1675,100 @@ body {
   gap: 14px;
   align-items: start;
 }
-.grid-section-wrapper {
+/* ── Group-row layout (그룹 wrapper + 폴더 row) ─────────────── */
+.grp-wrapper {
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 16px;
+  overflow: hidden;
+  margin-bottom: 14px;
   background: var(--card);
 }
-.grid-section-hd {
+.grp-wrapper-hd {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
-  margin-bottom: 16px;
+  padding: 14px 20px 12px;
 }
-.grid-section-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 12px;
-  align-items: start;
+.grp-folder-row {
+  border-top: 1px solid var(--border);
+  padding: 14px 20px 12px;
+  position: relative;
 }
+.grp-folder-prog {
+  height: 2px;
+  background: var(--border);
+  border-radius: 1px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.grp-folder-prog-fill {
+  height: 100%;
+  background: #1d1d1f;
+  border-radius: 1px;
+  transition: width .3s;
+}
+.grp-folder-row.is-live .grp-folder-prog-fill { background: #0071E3; }
+.grp-folder-hd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.grp-folder-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #0071E3;
+  flex-shrink: 0;
+  animation: live-pulse 1.8s ease-in-out infinite;
+}
+.grp-folder-name {
+  font-size: 14px;
+  font-weight: 700;
+  flex: 1;
+}
+.grp-folder-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.grp-folder-count { font-size: 11px; color: var(--muted); }
+.grp-folder-view {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 980px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: color .15s, border-color .15s;
+}
+.grp-folder-view:hover { color: var(--accent); border-color: var(--accent); }
+.grp-task-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+.grp-task-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--border);
+}
+.grp-task-dot.done   { background: #d1d1d6; }
+.grp-task-dot.urgent { background: #FF3B30; }
+.grp-task-dot.active { background: #0071E3; }
+.grp-task-dot.normal { background: #1d1d1f; }
+.grp-task-dot.parked { background: var(--border); }
+.grp-task-title { flex: 1; font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.grp-task-title.is-done { color: var(--muted); text-decoration: line-through; }
+.grp-task-min { font-size: 11px; color: var(--muted); flex-shrink: 0; }
 .grid-card {
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -1884,11 +1957,8 @@ body {
       <div class="cal-grid" id="calGrid"></div>
     </div>
 
-    <!-- 2. 주별 일정 -->
-    <div class="sidebar-section">
-      <div class="sidebar-section-title">이번 주</div>
-      <div class="week-list" id="weekList"></div>
-    </div>
+    <!-- 2. hidden weekList (data kept for calendar dots) -->
+    <div id="weekList" style="display:none"></div>
 
     <!-- 3. 프로젝트별 -->
     <div class="sidebar-section">
@@ -2266,6 +2336,9 @@ function switchSubTab(sub) {
   document.getElementById('subBtnWork').classList.toggle('active', !isLog);
   document.getElementById('subBtnLog').classList.toggle('active', isLog);
   localStorage.setItem('df_active_subtab', sub);
+  // 작업 서브탭은 항상 그리드(그룹뷰) 강제
+  if (!isLog && currentView !== 'grid') switchView('grid');
+  else if (!isLog) renderGrid(allTasks);
 }
 let currentView = localStorage.getItem('df_view') || 'list';
 
@@ -2284,14 +2357,13 @@ function renderGrid(tasks) {
   const container = document.getElementById('gridView');
   const wfGroups  = getWfGroups();
 
-  // ── single folder card builder ─────────────────────────────
-  function buildFolderCard(proj) {
+  // ── single folder row builder ──────────────────────────────
+  function buildFolderRow(proj) {
     const { groups: tGroups } = groupTasks(tasks);
     const items = tGroups[proj] || [];
     if (!items.length) return null;
 
     const summary = summarizeProgress(items);
-    const pct     = summary.pct;
     const isLive  = liveProjects.has(proj);
     const url     = agentUrls[proj];
 
@@ -2299,6 +2371,10 @@ function renderGrid(tasks) {
                         .sort((a,b) => attentionRank(b.attention_level) - attentionRank(a.attention_level) || (a.priority||9) - (b.priority||9));
     const done   = items.filter(t => t.status === 'done');
     const parked = items.filter(t => !t.is_actionable && t.status !== 'done');
+    const allRows = [...todo, ...parked, ...done];
+    const MAX_SHOW = 8;
+    const shown    = allRows.slice(0, MAX_SHOW);
+    const hidden   = allRows.length - MAX_SHOW;
 
     const taskRow = t => {
       const isDone   = t.status === 'done';
@@ -2307,78 +2383,58 @@ function renderGrid(tasks) {
       const mins     = t.smart_estimated_minutes || t.display_minutes || t.estimated_minutes;
       const attn     = t.attention_level;
       const dotCls   = isDone ? 'done' : isParked ? 'parked' : attn === 'urgent' ? 'urgent' : attn === 'active' ? 'active' : 'normal';
-      return `<div class="grid-task-item">
-        <div class="grid-task-dot ${dotCls}"></div>
-        <span class="grid-task-title ${isDone?'is-done':''}">${esc(title)}</span>
-        ${mins && !isDone ? `<span class="grid-task-min">${mins}m</span>` : ''}
+      return `<div class="grp-task-row">
+        <div class="grp-task-dot ${dotCls}"></div>
+        <span class="grp-task-title ${isDone?'is-done':''}">${esc(title)}</span>
+        ${mins && !isDone ? `<span class="grp-task-min">${mins}m</span>` : ''}
       </div>`;
     };
 
-    const allRows = [...todo, ...parked, ...done];
-    const MAX_SHOW = 8;
-    const shown    = allRows.slice(0, MAX_SHOW);
-    const hidden   = allRows.length - MAX_SHOW;
-
-    return `<div class="grid-card ${isLive?'is-live':''}">
-      <div class="grid-card-prog"><div class="grid-card-prog-fill" style="width:${pct}%"></div></div>
-      <div class="grid-card-hd">
-        <span class="grid-card-name">${esc(proj)}</span>
-        <div class="grid-card-meta">
-          <span class="grid-card-pct">${summary.done}/${summary.total}</span>
-          ${url ? `<button class="grid-card-view" onclick="window.open('${url}','_blank')">VIEW</button>` : ''}
+    return `<div class="grp-folder-row ${isLive?'is-live':''}">
+      <div class="grp-folder-prog"><div class="grp-folder-prog-fill" style="width:${summary.pct}%"></div></div>
+      <div class="grp-folder-hd">
+        ${isLive ? '<div class="grp-folder-live-dot"></div>' : ''}
+        <span class="grp-folder-name">${esc(proj)}</span>
+        <div class="grp-folder-meta">
+          <span class="grp-folder-count">${summary.done}/${summary.total}</span>
+          ${url ? `<button class="grp-folder-view" onclick="openView('${escAttr(proj)}')">VIEW</button>` : `<button class="grp-folder-view" onclick="openView('${escAttr(proj)}')">URL</button>`}
         </div>
       </div>
-      <div class="grid-card-body">
-        ${shown.map(taskRow).join('')}
-        ${hidden > 0 ? `<div class="grid-task-item"><span style="font-size:11px;color:var(--muted)">+ ${hidden}개 더</span></div>` : ''}
-        ${!allRows.length ? `<div class="grid-empty-proj">태스크 없음</div>` : ''}
-      </div>
+      ${shown.map(taskRow).join('')}
+      ${hidden > 0 ? `<div class="grp-task-row"><span style="font-size:11px;color:var(--muted)">+ ${hidden}개 더</span></div>` : ''}
     </div>`;
   }
 
-  // ── 전체: all groups as labeled sections ─────────────────────
+  // ── render a single group as a wrapper with folder rows ────
+  function buildGroupWrapper(g) {
+    const folders = g.folders || [];
+    const sortedFolders = [...folders].sort((a, b) => (liveProjects.has(a)?0:1) - (liveProjects.has(b)?0:1));
+    const rows = sortedFolders.map(buildFolderRow).filter(Boolean);
+    if (!rows.length) return null;
+    return `<div class="grp-wrapper">
+      <div class="grp-wrapper-hd">${esc(g.name)}</div>
+      ${rows.join('')}
+    </div>`;
+  }
+
+  container.style.display = 'block';
+
+  // ── 전체: all groups ──────────────────────────────────────────
   if (currentGroupId === null) {
     if (!wfGroups.length) {
-      container.style.display = 'block';
       container.innerHTML = '<div class="empty">설정에서 그룹을 추가하세요</div>';
       return;
     }
-    let html = '';
-    for (const g of wfGroups) {
-      const folders = g.folders || [];
-      // live folders first, then rest
-      const sortedFolders = [...folders].sort((a, b) => {
-        const al = liveProjects.has(a) ? 0 : 1;
-        const bl = liveProjects.has(b) ? 0 : 1;
-        return al - bl;
-      });
-      const cards = sortedFolders.map(buildFolderCard).filter(Boolean);
-      if (!cards.length) continue;
-      html += `<div class="grid-section-wrapper">
-        <div class="grid-section-hd">${esc(g.name)}</div>
-        <div class="grid-section-cards">${cards.join('')}</div>
-      </div>`;
-    }
-    container.style.display = 'block';
+    const html = wfGroups.map(buildGroupWrapper).filter(Boolean).join('');
     container.innerHTML = html || '<div class="empty">태스크가 없습니다</div>';
     return;
   }
 
   // ── 특정 그룹만 ───────────────────────────────────────────────
   const g = wfGroups.find(g => g.id === currentGroupId);
-  if (!g) {
-    container.style.display = 'grid';
-    container.innerHTML = '<div class="empty">그룹을 찾을 수 없습니다</div>';
-    return;
-  }
-  const sortedFolders = [...(g.folders || [])].sort((a, b) => {
-    const al = liveProjects.has(a) ? 0 : 1;
-    const bl = liveProjects.has(b) ? 0 : 1;
-    return al - bl;
-  });
-  const cards = sortedFolders.map(buildFolderCard).filter(Boolean);
-  container.style.display = 'grid';
-  container.innerHTML = cards.length ? cards.join('') : '<div class="empty">태스크가 없습니다</div>';
+  if (!g) { container.innerHTML = '<div class="empty">그룹을 찾을 수 없습니다</div>'; return; }
+  const html = buildGroupWrapper(g);
+  container.innerHTML = html || '<div class="empty">태스크가 없습니다</div>';
 }
 
 (function(){
