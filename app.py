@@ -4161,6 +4161,7 @@ def get_agent_status():
         work_folders = set(os.listdir("C:/work"))
         work_folders_norm = {_re.sub(r'[-_]', '', f).lower(): f for f in work_folders}
         cutoff = _dt.now() - _td(hours=24)
+        live_cutoff = _dt.now() - _td(minutes=10)  # 10분 이내 = is_live
 
         def _clean_proj(d: str) -> str:
             cleaned = _re.sub(r'^[A-Z]-+', '', d)
@@ -4178,11 +4179,9 @@ def get_agent_status():
             pname = _clean_proj(proj_dir)
             if not pname:
                 continue
-            # C:/work에 실제 존재하지 않는 프로젝트는 건너뜀
             pname_norm = _re.sub(r'[-_]', '', pname).lower()
             if pname not in work_folders and pname_norm not in work_folders_norm:
                 continue
-            # 실제 폴더명으로 정규화
             if pname not in work_folders and pname_norm in work_folders_norm:
                 pname = work_folders_norm[pname_norm]
             # Find most recently modified JSONL
@@ -4200,23 +4199,19 @@ def get_agent_status():
             if not latest_mtime:
                 continue
             minutes_ago = int((_dt.now() - latest_mtime).total_seconds() / 60)
-            # DB에 이미 있는 경우: JSONL이 더 최신이면 DB 항목을 교체
+            is_live = latest_mtime >= live_cutoff
             if pname in db_projects or pname_norm in db_normalized:
-                # 해당 DB 항목의 minutes_ago 찾기
                 for i, r in enumerate(result):
                     r_norm = _re.sub(r'[-_]', '', r['project']).lower()
                     if r['project'] == pname or r_norm == pname_norm:
+                        # is_live 항상 갱신, minutes_ago는 더 최신인 경우만 교체
+                        result[i]['is_live'] = is_live
                         if r.get('minutes_ago', 9999) > minutes_ago + 5:
-                            # JSONL이 5분 이상 더 최신이면 교체
-                            result[i] = {
-                                "project": pname,
-                                "task": r['task'],  # 기존 task 텍스트 유지
-                                "status": r['status'],
-                                "url": r.get('url', ''),
+                            result[i].update({
                                 "updated_at": latest_mtime.strftime("%Y-%m-%d %H:%M"),
                                 "minutes_ago": minutes_ago,
                                 "from_jsonl": True,
-                            }
+                            })
                         break
                 continue
             result.append({
@@ -4226,6 +4221,7 @@ def get_agent_status():
                 "url": "",
                 "updated_at": latest_mtime.strftime("%Y-%m-%d %H:%M"),
                 "minutes_ago": minutes_ago,
+                "is_live": is_live,
                 "from_jsonl": True,
             })
     except Exception:

@@ -1080,6 +1080,10 @@ body {
 .acc-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 
 .acc-group { border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+.acc-group.is-live { border-color: #3fb95066; }
+.acc-group.is-live .acc-header { background: #0d200f; }
+@keyframes live-pulse { 0%,100% { box-shadow: 0 0 0 0 #3fb95022; } 50% { box-shadow: 0 0 6px 2px #3fb95033; } }
+.acc-group.is-live { animation: live-pulse 2.5s ease-in-out infinite; }
 
 .acc-header {
   display: flex; align-items: center; gap: 10px;
@@ -3496,6 +3500,7 @@ setInterval(loadClaudeUsage, 60000);
 
 // agentUrls: project -> url (populated by loadAgentStatus)
 const agentUrls = {};
+const liveProjects = new Set();
 
 // work folder sidebar collapse state
 let wfCollapsed = localStorage.getItem('wf_collapsed') === '1';
@@ -3515,7 +3520,16 @@ async function loadAgentStatus() {
     document.getElementById('sessionsTime').textContent =
       new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
     // update url map
-    rows.forEach(r => { if (r.url) agentUrls[r.project] = r.url; });
+    liveProjects.clear();
+    rows.forEach(r => {
+      if (r.url) agentUrls[r.project] = r.url;
+      if (r.is_live) liveProjects.add(r.project);
+    });
+    // acc-group에 is-live 클래스 적용
+    document.querySelectorAll('.acc-group').forEach(grp => {
+      const name = grp.querySelector('.acc-name')?.textContent.trim();
+      if (name) grp.classList.toggle('is-live', liveProjects.has(name));
+    });
 
     // ── Sessions panel — idle 완전 제외, active/stale만 표시 ──
     const activeSessions = rows.filter(r => r.status !== 'idle');
