@@ -1688,69 +1688,67 @@ body {
   background: var(--card);
 }
 .grp-wrapper-hd {
-  font-size: 11px;
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-  padding: 14px 20px 12px;
+  color: var(--text);
+  padding: 14px 16px 10px;
 }
 .grp-folder-row {
   border-top: 1px solid var(--border);
-  padding: 14px 20px 12px;
+  padding: 8px 16px 8px;
   position: relative;
+}
+.grp-folder-row.is-live {
+  animation: live-pulse-bg 1.8s ease-in-out infinite;
 }
 .grp-folder-prog {
   height: 2px;
   background: var(--border);
   border-radius: 1px;
-  margin-bottom: 10px;
+  margin-bottom: 7px;
   overflow: hidden;
 }
 .grp-folder-prog-fill {
   height: 100%;
-  background: #1d1d1f;
+  background: var(--muted);
   border-radius: 1px;
   transition: width .3s;
 }
 .grp-folder-row.is-live .grp-folder-prog-fill { background: #0071E3; }
-.grp-folder-row.is-live {
-  animation: live-pulse-bg 1.8s ease-in-out infinite;
-}
 .grp-folder-hd {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 6px;
+  margin-bottom: 6px;
 }
 .grp-folder-live-dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: #0071E3;
   flex-shrink: 0;
-  animation: live-pulse 1.8s ease-in-out infinite;
+  animation: live-pulse-bg 1.8s ease-in-out infinite;
 }
 .grp-folder-name {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text2);
   flex: 1;
 }
 .grp-folder-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin-left: auto;
 }
-.grp-folder-count { font-size: 11px; color: var(--muted); }
+.grp-folder-count { font-size: 10px; color: var(--muted); }
 .grp-folder-view {
   font-size: 10px;
-  font-weight: 700;
   color: var(--muted);
   background: none;
   border: 1px solid var(--border);
   border-radius: 980px;
-  padding: 2px 8px;
+  padding: 1px 7px;
   cursor: pointer;
   transition: color .15s, border-color .15s;
 }
@@ -1758,12 +1756,12 @@ body {
 .grp-task-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 3px 0;
+  gap: 7px;
+  padding: 2px 0 2px 10px;
 }
 .grp-task-dot {
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
   flex-shrink: 0;
   background: var(--border);
@@ -1771,11 +1769,21 @@ body {
 .grp-task-dot.done   { background: #d1d1d6; }
 .grp-task-dot.urgent { background: #FF3B30; }
 .grp-task-dot.active { background: #0071E3; }
-.grp-task-dot.normal { background: #1d1d1f; }
+.grp-task-dot.normal { background: #8e8e93; }
 .grp-task-dot.parked { background: var(--border); }
-.grp-task-title { flex: 1; font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.grp-task-title { flex: 1; font-size: 12px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .grp-task-title.is-done { color: var(--muted); text-decoration: line-through; }
-.grp-task-min { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+.grp-task-min { font-size: 10px; color: var(--muted); flex-shrink: 0; }
+.grp-task-cmt-btn {
+  font-size: 10px; color: var(--muted); background: none; border: none;
+  cursor: pointer; padding: 0 3px; opacity: 0.5; transition: opacity .15s;
+}
+.grp-task-cmt-btn:hover { opacity: 1; }
+.grp-task-cmt-panel {
+  display: none;
+  padding: 4px 0 4px 18px;
+}
+.grp-task-cmt-panel.open { display: block; }
 .grid-card {
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -2374,10 +2382,20 @@ function renderGrid(tasks) {
       const mins     = t.smart_estimated_minutes || t.display_minutes || t.estimated_minutes;
       const attn     = t.attention_level;
       const dotCls   = isDone ? 'done' : isParked ? 'parked' : attn === 'urgent' ? 'urgent' : attn === 'active' ? 'active' : 'normal';
-      return `<div class="grp-task-row">
-        <div class="grp-task-dot ${dotCls}"></div>
-        <span class="grp-task-title ${isDone?'is-done':''}">${esc(title)}</span>
-        ${mins && !isDone ? `<span class="grp-task-min">${mins}m</span>` : ''}
+      return `<div>
+        <div class="grp-task-row">
+          <div class="grp-task-dot ${dotCls}"></div>
+          <span class="grp-task-title ${isDone?'is-done':''}">${esc(title)}</span>
+          ${mins && !isDone ? `<span class="grp-task-min">${mins}m</span>` : ''}
+          <button class="grp-task-cmt-btn" onclick="toggleGrpCmt(${t.id})">댓글</button>
+        </div>
+        <div class="grp-task-cmt-panel" id="grp-cmt-${t.id}">
+          <div class="comment-list" id="cmt-list-${t.id}"></div>
+          <div class="comment-input-row">
+            <input class="comment-input" id="cmt-input-${t.id}" placeholder="의견..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendComment(${t.id});}">
+            <button class="comment-send-btn" onclick="sendComment(${t.id})">전송</button>
+          </div>
+        </div>
       </div>`;
     };
 
@@ -2637,19 +2655,14 @@ function renderProjectList(tasks) {
 
   if (groups.length) {
     html += groups.map(g => {
-      const isActive = currentGroupId === g.id;
-      const liveCnt  = (g.folders || []).filter(f => liveProjects.has(f)).length;
-      // 이 그룹 폴더들의 태스크 수
-      const folderSet = new Set(g.folders || []);
-      const gTaskCnt = tasks.filter(t => {
-        const m = t.title.match(/^\[([^\]]+)\]/);
-        return m && folderSet.has(normalizeProject(m[1]));
-      }).length;
+      const isActive   = currentGroupId === g.id;
+      const liveCnt    = (g.folders || []).filter(f => liveProjects.has(f)).length;
+      const folderCnt  = (g.folders || []).length;
       return `<div class="proj-item ${isActive?'active':''} ${liveCnt?'live-item':''}"
         onclick="selectGroup('${esc(g.id)}')">
         <div class="proj-item-dot"></div>
         <span class="proj-item-name">${esc(g.name)}</span>
-        ${gTaskCnt ? `<span class="proj-item-count">${gTaskCnt}</span>` : ''}
+        ${folderCnt ? `<span class="proj-item-count">${folderCnt}</span>` : ''}
       </div>`;
     }).join('');
   } else {
@@ -3583,6 +3596,14 @@ async function toggleComments(e, taskId) {
   if (isOpen) { panel.classList.remove('open'); return; }
   panel.classList.add('open');
   await loadComments(taskId);
+}
+
+function toggleGrpCmt(taskId) {
+  const panel = document.getElementById(`grp-cmt-${taskId}`);
+  if (!panel) return;
+  const opening = !panel.classList.contains('open');
+  panel.classList.toggle('open', opening);
+  if (opening) loadComments(taskId);
 }
 
 async function loadComments(taskId) {
