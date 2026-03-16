@@ -1675,23 +1675,26 @@ body {
   gap: 14px;
   align-items: start;
 }
+.grid-section-wrapper {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+  background: var(--card);
+}
 .grid-section-hd {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
-  padding: 24px 0 10px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
-.grid-section-hd:first-child { padding-top: 4px; }
 .grid-section-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
   align-items: start;
-  margin-bottom: 8px;
 }
 .grid-card {
   border: 1px solid var(--border);
@@ -2351,8 +2354,10 @@ function renderGrid(tasks) {
       });
       const cards = sortedFolders.map(buildFolderCard).filter(Boolean);
       if (!cards.length) continue;
-      html += `<div class="grid-section-hd">${esc(g.name)}</div>`;
-      html += `<div class="grid-section-cards">${cards.join('')}</div>`;
+      html += `<div class="grid-section-wrapper">
+        <div class="grid-section-hd">${esc(g.name)}</div>
+        <div class="grid-section-cards">${cards.join('')}</div>
+      </div>`;
     }
     container.style.display = 'block';
     container.innerHTML = html || '<div class="empty">태스크가 없습니다</div>';
