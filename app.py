@@ -206,6 +206,16 @@ def init_db():
             confirmed_at TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS project_comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project TEXT NOT NULL,
+            author TEXT NOT NULL,
+            body TEXT NOT NULL,
+            confirmed INTEGER DEFAULT 0,
+            confirmed_by TEXT,
+            confirmed_at TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
     """)
     conn.commit()
     conn.close()
@@ -2435,6 +2445,49 @@ def confirm_comment(task_id: int, comment_id: int, request: Request):
     conn.execute(
         "UPDATE task_comments SET confirmed=1, confirmed_by=?, confirmed_at=datetime('now') WHERE id=? AND task_id=?",
         (confirmed_by, comment_id, task_id)
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+@app.get("/api/projects/{proj}/comments")
+def get_project_comments(proj: str):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT id, project, author, body, confirmed, confirmed_by, confirmed_at, created_at FROM project_comments WHERE project=? ORDER BY created_at ASC",
+        (proj,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+@app.post("/api/projects/{proj}/comments")
+def post_project_comment(proj: str, payload: CommentIn, request: Request):
+    user = request.session.get("user", {})
+    author = user.get("login") or user.get("name") or "unknown"
+    body = payload.body.strip()
+    if not body:
+        raise HTTPException(status_code=400, detail="body required")
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO project_comments (project, author, body) VALUES (?,?,?)",
+        (proj, author, body)
+    )
+    conn.commit()
+    row = conn.execute("SELECT id, project, author, body, confirmed, confirmed_by, confirmed_at, created_at FROM project_comments WHERE rowid=last_insert_rowid()").fetchone()
+    conn.close()
+    return dict(row)
+
+
+@app.patch("/api/projects/{proj}/comments/{comment_id}/confirm")
+def confirm_project_comment(proj: str, comment_id: int, request: Request):
+    user = request.session.get("user", {})
+    confirmed_by = user.get("login") or user.get("name") or "unknown"
+    conn = get_db()
+    conn.execute(
+        "UPDATE project_comments SET confirmed=1, confirmed_by=?, confirmed_at=datetime('now') WHERE id=? AND project=?",
+        (confirmed_by, comment_id, proj)
     )
     conn.commit()
     conn.close()
