@@ -143,7 +143,64 @@ def maybe_notify_morning_brief() -> None:
         message += f"\n{weekly.get('recommended_week_goal')}"
 
     notify_message("Daily Focus - Morning Brief", message.strip())
+    # Telegram 전송 시도 (실패해도 무시)
+    try:
+        _try_telegram_send(message.strip())
+    except Exception:
+        pass
     _LAST_MORNING_BRIEF_DATE = target_date
+
+
+def _try_telegram_send(text: str) -> None:
+    """Telegram 설정이 있으면 메시지 전송."""
+    try:
+        url = f"{get_base_url()}/api/settings/telegram"
+        with urllib.request.urlopen(url, timeout=3) as resp:
+            cfg = json.loads(resp.read())
+    except Exception:
+        return
+    if not (cfg.get("enabled") and cfg.get("bot_token") and cfg.get("chat_id")):
+        return
+    token = cfg["bot_token"]
+    chat_id = cfg["chat_id"]
+    data = json.dumps({"chat_id": chat_id, "text": text}).encode("utf-8")
+    req = urllib.request.Request(
+        f"https://api.telegram.org/bot{token}/sendMessage",
+        data=data,
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=8):
+            pass
+    except Exception:
+        pass
+
+
+_LAST_EOD_DATE = ""
+
+
+def maybe_send_eod_report() -> None:
+    """18:00 이후 하루 1회 EOD 리포트를 Telegram으로 전송."""
+    global _LAST_EOD_DATE
+    today = datetime.now().date().isoformat()
+    if _LAST_EOD_DATE == today:
+        return
+    now_label = datetime.now().strftime("%H:%M")
+    if now_label < "18:00":
+        return
+    try:
+        url = f"{get_base_url()}/api/eod-report/send"
+        req = urllib.request.Request(
+            url,
+            data=b"{}",
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=10):
+            pass
+        _LAST_EOD_DATE = today
+    except Exception:
+        pass
 
 
 def run() -> None:
@@ -151,6 +208,7 @@ def run() -> None:
         schedule.every().day.at(check_time).do(notify)
     schedule.every(MONITOR_INTERVAL_MINUTES).minutes.do(monitor_attention)
     schedule.every(1).minutes.do(maybe_notify_morning_brief)
+    schedule.every(5).minutes.do(maybe_send_eod_report)
     print(f"[Notifier running] Check-in times: {', '.join(CHECK_TIMES)}")
     while True:
         schedule.run_pending()

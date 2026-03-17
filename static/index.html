@@ -2353,6 +2353,132 @@ body {
 .profile-menu-item:hover { background: #F5F5F7; }
 .profile-menu-item.danger { color: var(--danger); }
 .profile-menu-divider { height: 1px; background: var(--border); margin: 4px 0; }
+
+/* ── 구과장님 요청 패널 ── */
+.req-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.55); z-index: 1000; overflow-y: auto;
+}
+.req-panel {
+  background: #fff; border-radius: 12px;
+  width: 600px; max-width: 94vw;
+  margin: 40px auto 48px; padding: 0;
+  box-shadow: 0 8px 32px rgba(0,0,0,.14);
+  overflow: hidden;
+}
+.req-panel-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 22px 16px; border-bottom: 1px solid var(--border);
+  background: #FAFAFA;
+}
+.req-panel-title { font-size: 15px; font-weight: 700; color: #1D1D1F; }
+.req-panel-close { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 18px; padding: 0; line-height: 1; }
+.req-panel-close:hover { color: #1D1D1F; }
+.req-form { padding: 18px 22px 0; border-bottom: 1px solid var(--border); }
+.req-form input[type=text], .req-form textarea {
+  width: 100%; border: 1px solid var(--border); border-radius: 7px;
+  padding: 9px 12px; font-size: 13px; font-family: inherit;
+  resize: vertical; background: #fff; color: #1D1D1F;
+  transition: border 150ms;
+}
+.req-form input[type=text]:focus, .req-form textarea:focus {
+  border-color: #000; box-shadow: 0 0 0 2px rgba(0,0,0,.06); outline: none;
+}
+.req-form textarea { min-height: 72px; }
+.req-form-row { margin-bottom: 12px; }
+.req-form-label { font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 5px; }
+.req-form-actions { display: flex; align-items: center; gap: 8px; padding: 12px 0 16px; }
+.req-btn-primary { background: #1D1D1F; color: #fff; border: none; border-radius: 980px; padding: 7px 18px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
+.req-btn-primary:hover { background: #3A3A3C; }
+.req-btn-ghost { background: none; color: var(--muted); border: 1px solid var(--border); border-radius: 980px; padding: 7px 14px; font-size: 12px; cursor: pointer; font-family: inherit; }
+.req-btn-ghost:hover { border-color: #1D1D1F; color: #1D1D1F; }
+.req-list { padding: 0 22px 16px; }
+.req-item {
+  border-bottom: 1px solid var(--border); padding: 14px 0; cursor: pointer;
+}
+.req-item:last-child { border-bottom: none; }
+.req-item-hd { display: flex; align-items: flex-start; gap: 10px; }
+.req-item-title { font-size: 13px; font-weight: 700; flex: 1; }
+.req-status {
+  display: inline-block; padding: 2px 8px; border-radius: 980px; font-size: 10px; font-weight: 700; flex-shrink: 0;
+}
+.req-status.open { background: #E3F2FD; color: #1565C0; }
+.req-status.in_progress { background: #FFF3E0; color: #E65100; }
+.req-status.done { background: #E8F5E9; color: #2E7D32; }
+.req-item-body { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.5; white-space: pre-wrap; display: none; }
+.req-item.expanded .req-item-body { display: block; }
+.req-item-meta { font-size: 11px; color: var(--muted); margin-top: 6px; display: flex; align-items: center; gap: 12px; }
+.req-attach-zone {
+  border: 1.5px dashed var(--border); border-radius: 8px; padding: 16px;
+  text-align: center; font-size: 12px; color: var(--muted); cursor: pointer; margin-top: 10px;
+  transition: border-color 150ms;
+}
+.req-attach-zone:hover, .req-attach-zone.drag-over { border-color: #1D1D1F; color: #1D1D1F; }
+.req-attach-list { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+.req-attach-chip {
+  display: flex; align-items: center; gap: 5px;
+  background: #F5F5F7; border-radius: 6px; padding: 4px 8px;
+  font-size: 11px; color: #1D1D1F;
+}
+.req-attach-chip a { color: inherit; text-decoration: none; }
+.req-attach-chip a:hover { text-decoration: underline; }
+.req-attach-del { background: none; border: none; cursor: pointer; color: var(--muted); padding: 0; font-size: 12px; line-height: 1; }
+.req-attach-del:hover { color: var(--danger); }
+.req-empty { padding: 32px 22px; text-align: center; font-size: 13px; color: var(--muted); }
+.req-item-actions { display: flex; gap: 6px; margin-top: 8px; }
+.req-item-action-btn { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 3px 10px; font-size: 11px; cursor: pointer; font-family: inherit; color: var(--muted); }
+.req-item-action-btn:hover { border-color: #1D1D1F; color: #1D1D1F; }
+
+/* 구과장님 그룹 고정 표시 */
+.wf-group-pinned .wf-group-name::before {
+  content: '';
+  display: inline-block; width: 5px; height: 5px;
+  background: var(--accent); border-radius: 50%;
+  margin-right: 5px; vertical-align: middle;
+}
+
+/* ── 알림 패널 ── */
+.notif-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.45); z-index: 1000;
+}
+.notif-panel {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  background: #fff; border-radius: 12px; width: 480px; max-width: 94vw;
+  max-height: 80vh; display: flex; flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0,0,0,.16); overflow: hidden;
+}
+.notif-panel-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 20px 14px; border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.notif-panel-title { font-size: 15px; font-weight: 700; }
+.notif-panel-actions { display: flex; align-items: center; gap: 8px; }
+.notif-read-all { background: none; border: none; cursor: pointer; font-size: 12px; color: var(--accent); font-family: inherit; padding: 0; }
+.notif-close { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 18px; padding: 0; line-height: 1; }
+.notif-close:hover { color: #1D1D1F; }
+.notif-list { overflow-y: auto; flex: 1; }
+.notif-item {
+  display: flex; gap: 12px; padding: 14px 20px;
+  border-bottom: 1px solid var(--border); cursor: pointer;
+  transition: background 120ms;
+}
+.notif-item:hover { background: #FAFAFA; }
+.notif-item.unread { background: #F0F7FF; }
+.notif-item.unread:hover { background: #E3F0FF; }
+.notif-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; margin-top: 5px; }
+.notif-dot.read { background: transparent; border: 1px solid var(--border); }
+.notif-item-title { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+.notif-item-body { font-size: 12px; color: var(--muted); }
+.notif-item-time { font-size: 10px; color: var(--muted); margin-top: 4px; }
+.notif-empty { padding: 48px 20px; text-align: center; font-size: 13px; color: var(--muted); }
+#notifBadge {
+  display: none; position: absolute; top: -3px; right: -3px;
+  background: #FF3B30; color: #fff; border-radius: 999px;
+  font-size: 9px; font-weight: 700; padding: 1px 4px; min-width: 14px; text-align: center;
+}
+.profile-wrap { position: relative; }
 </style>
 </head>
 <body>
@@ -2366,16 +2492,26 @@ body {
     <div class="dot dot-g"></div>
     <div class="titlebar-title">Daily Focus — 전략적 비서</div>
     <div class="titlebar-right">
+      <button id="widgetBtn" onclick="launchWidget()" title="위젯 열기 / 앞으로" style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.08);border:none;border-radius:6px;padding:4px 10px;cursor:pointer;color:rgba(255,255,255,.7);font-size:11px;font-weight:700;letter-spacing:.02em;transition:background 150ms;font-family:inherit;" onmouseenter="this.style.background='rgba(255,255,255,.16)'" onmouseleave="this.style.background='rgba(255,255,255,.08)'">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
+        WIDGET
+      </button>
       <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:rgba(255,255,255,.5);">
         댓글
         <span id="comment-unread-badge" style="display:none;background:#FF3B30;color:#fff;border-radius:999px;font-size:10px;font-weight:700;padding:1px 5px;min-width:16px;text-align:center;"></span>
       </div>
       <div class="profile-wrap" style="position:relative">
-        <button class="profile-avatar" id="profileBtn" onclick="toggleProfileMenu()" aria-haspopup="true" aria-expanded="false">
+        <button class="profile-avatar" id="profileBtn" onclick="toggleProfileMenu()" aria-haspopup="true" aria-expanded="false" style="position:relative">
           <span class="avatar-initials" id="avatarInitials">-</span>
+          <span id="notifBadge"></span>
         </button>
         <div class="profile-menu" id="profileMenu" role="menu">
           <div class="profile-menu-item" role="menuitem" id="profileMenuName" style="color:var(--muted);cursor:default;font-size:12px;padding:8px 12px 4px"></div>
+          <div class="profile-menu-divider"></div>
+          <button class="profile-menu-item" role="menuitem" onclick="openNotifPanel();toggleProfileMenu()">
+            알림 확인
+            <span id="notifMenuBadge" style="display:none;background:#FF3B30;color:#fff;border-radius:999px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:6px"></span>
+          </button>
           <div class="profile-menu-divider"></div>
           <button class="profile-menu-item danger" role="menuitem" onclick="doLogout()">로그아웃</button>
         </div>
@@ -2429,6 +2565,52 @@ body {
     </div>
 
   </aside>
+
+  <!-- 구과장님 요청 패널 -->
+  <div class="req-overlay" id="reqOverlay" onclick="if(event.target===this)closeReqPanel()">
+    <div class="req-panel">
+      <div class="req-panel-hd">
+        <span class="req-panel-title">구과장님 요청</span>
+        <button class="req-panel-close" onclick="closeReqPanel()">✕</button>
+      </div>
+      <!-- 새 요청 폼 -->
+      <div class="req-form" id="reqForm">
+        <div class="req-form-row">
+          <div class="req-form-label">제목</div>
+          <input type="text" id="reqTitle" placeholder="요청 제목을 입력하세요" maxlength="200">
+        </div>
+        <div class="req-form-row">
+          <div class="req-form-label">내용</div>
+          <textarea id="reqBody" placeholder="상세 내용, 메모 등을 작성하세요"></textarea>
+        </div>
+        <div class="req-form-actions">
+          <button class="req-btn-primary" onclick="submitRequest()">요청 등록</button>
+          <label class="req-btn-ghost" style="cursor:pointer">
+            파일 첨부
+            <input type="file" id="reqFileInput" multiple style="display:none" onchange="handleReqFileSelect(event)">
+          </label>
+          <span id="reqFileCount" style="font-size:11px;color:var(--muted)"></span>
+        </div>
+        <div id="reqPendingFiles" class="req-attach-list" style="margin-bottom:14px"></div>
+      </div>
+      <!-- 요청 목록 -->
+      <div class="req-list" id="reqList"><div class="req-empty">로딩 중...</div></div>
+    </div>
+  </div>
+
+  <!-- 알림 패널 -->
+  <div class="notif-overlay" id="notifOverlay" onclick="if(event.target===this)closeNotifPanel()">
+    <div class="notif-panel">
+      <div class="notif-panel-hd">
+        <span class="notif-panel-title">알림</span>
+        <div class="notif-panel-actions">
+          <button class="notif-read-all" onclick="markAllRead()">모두 읽음</button>
+          <button class="notif-close" onclick="closeNotifPanel()">✕</button>
+        </div>
+      </div>
+      <div class="notif-list" id="notifList"><div class="notif-empty">로딩 중...</div></div>
+    </div>
+  </div>
 
   <!-- WF Group Settings Modal -->
   <div class="wf-modal-overlay" id="wfModalOverlay" onclick="if(event.target===this)closeWfSettings()">
@@ -2709,6 +2891,61 @@ body {
         <div id="opsRisks" style="display:none"></div>
       </div>
 
+      <!-- Project Health -->
+      <div class="sessions-card collapsible-card" id="healthCard">
+        <div class="sessions-title collapsible-header" onclick="toggleCard('health')">
+          <span>프로젝트 건강</span>
+          <span class="collapse-arrow" id="healthArrow">▶</span>
+        </div>
+        <div class="collapsible-body" id="healthBody" style="display:none;padding:12px 0 4px">
+          <div id="healthList" style="font-size:12px;color:var(--muted)">불러오는 중...</div>
+        </div>
+      </div>
+
+      <!-- EOD Report -->
+      <div class="sessions-card collapsible-card" id="eodCard">
+        <div class="sessions-title collapsible-header" onclick="toggleCard('eod')">
+          <span>오늘 마감 리포트</span>
+          <span class="collapse-arrow" id="eodArrow">▶</span>
+        </div>
+        <div class="collapsible-body" id="eodBody" style="display:none;padding:12px 0 4px">
+          <div id="eodContent" style="font-size:12px;color:var(--muted)">불러오는 중...</div>
+          <button type="button" onclick="sendEodTelegram()" style="margin-top:10px;padding:6px 14px;font-size:12px;background:#000;color:#fff;border:none;border-radius:980px;cursor:pointer">Telegram 전송</button>
+          <div id="eodSendStatus" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
+        </div>
+      </div>
+
+      <!-- Telegram Settings -->
+      <div class="sessions-card collapsible-card" id="telegramCard">
+        <div class="sessions-title collapsible-header" onclick="toggleCard('telegram')">
+          <span>알림 설정 (Telegram)</span>
+          <span class="collapse-arrow" id="telegramArrow">▶</span>
+        </div>
+        <div class="collapsible-body" id="telegramBody" style="display:none;padding:12px 0 4px">
+          <div style="display:flex;flex-direction:column;gap:10px;max-width:480px">
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px">Bot Token</div>
+              <input id="tgTokenInput" type="text" placeholder="1234567890:AAF..." style="width:100%;padding:7px 10px;font-size:12px;border:1px solid #e0e0e0;border-radius:6px;box-sizing:border-box">
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px">Chat ID</div>
+              <input id="tgChatInput" type="text" placeholder="-1001234567890" style="width:100%;padding:7px 10px;font-size:12px;border:1px solid #e0e0e0;border-radius:6px;box-sizing:border-box">
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+                <input type="checkbox" id="tgEnabledInput" style="width:14px;height:14px">
+                <span>활성화</span>
+              </label>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button type="button" onclick="saveTelegramSettings()" style="padding:6px 14px;font-size:12px;background:#000;color:#fff;border:none;border-radius:980px;cursor:pointer">저장</button>
+              <button type="button" onclick="testTelegram()" style="padding:6px 14px;font-size:12px;background:none;border:1px solid #000;border-radius:980px;cursor:pointer">테스트 전송</button>
+            </div>
+            <div id="tgStatus" style="font-size:11px;color:var(--muted)"></div>
+          </div>
+        </div>
+      </div>
+
       </div><!-- /tabReport -->
 
       <!-- TAB: 작업 -->
@@ -2795,21 +3032,42 @@ const DAYS   = ['일','월','화','수','목','금','토'];
 const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 const CHECK_HOURS = [9,11,13,15,17,19];
 
-function switchTab(tab) {
+// ── 위젯 실행 ────────────────────────────────────────────────────
+async function launchWidget() {
+  const btn = document.getElementById('widgetBtn');
+  const orig = btn.innerHTML;
+  btn.style.opacity = '0.5';
+  btn.disabled = true;
+  try {
+    const r = await fetch(appUrl('api/launch-widget'), { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 8 8 12 12 4"/></svg> ' + (d.method === 'activated' ? 'FOCUSED' : 'LAUNCHED');
+      btn.style.background = 'rgba(255,255,255,.22)';
+    } else {
+      btn.innerHTML = 'ERROR';
+    }
+    setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; btn.style.opacity = ''; btn.disabled = false; }, 2000);
+  } catch(e) {
+    btn.innerHTML = orig; btn.style.opacity = ''; btn.disabled = false;
+  }
+}
+
+function switchTab(tab, noSave) {
   const isWork = tab === 'work';
   document.getElementById('tabReport').style.display = isWork ? 'none' : '';
   document.getElementById('tabWork').style.display   = isWork ? '' : 'none';
   document.getElementById('tabBtnReport').classList.toggle('active', !isWork);
   document.getElementById('tabBtnWork').classList.toggle('active', isWork);
-  localStorage.setItem('df_active_tab', tab);
+  if (!noSave) setUiPref('active_tab', tab);
 }
-function switchSubTab(sub) {
+function switchSubTab(sub, noSave) {
   const isLog = sub === 'log';
   document.getElementById('subTabWork').style.display = isLog ? 'none' : '';
   document.getElementById('subTabLog').style.display  = isLog ? '' : 'none';
   document.getElementById('subBtnWork').classList.toggle('active', !isLog);
   document.getElementById('subBtnLog').classList.toggle('active', isLog);
-  localStorage.setItem('df_active_subtab', sub);
+  if (!noSave) setUiPref('active_subtab', sub);
   if (!isLog) renderGrid(allTasks);
 }
 let currentView = 'grid';
@@ -2921,12 +3179,7 @@ function renderGrid(tasks) {
   container.innerHTML = html || '<div class="empty">태스크가 없습니다</div>';
 }
 
-(function(){
-  const saved = localStorage.getItem('df_active_tab') || 'report';
-  if (saved === 'work') switchTab('work');
-  const savedSub = localStorage.getItem('df_active_subtab') || 'work';
-  if (savedSub === 'log') switchSubTab('log');
-})();
+// 탭 복원은 loadUiPrefs() 이후 applyUiPrefs()에서 처리
 
 const e   = ev => ev.key === 'Enter';
 const esc = s  => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -2941,16 +3194,18 @@ let currentProject   = null;         // null = 전체, string = 폴더명 (작�
 let currentGroupId   = null;         // null = 전체, string = 그룹 id (프로젝트 섹션)
 let allTasks         = [];           // 현재 로드된 전체 태스크
 let weekTaskMap      = {};           // { 'YYYY-MM-DD': { total, done } }
+let serverToday      = todayStr();   // 서버 KST 기준 오늘 날짜 (api/week에서 갱신)
+let calActivityMap   = {};           // { 'YYYY-MM-DD': { done, cc } } — 월별 전체 활동
 let calViewYear      = new Date().getFullYear();
 let calViewMonth     = new Date().getMonth();  // 0-based
 let autoRefreshBusy  = false;
 let lastAutoRefreshAt = null;
 let _syncGitTick = 0;  // autoRefreshTick 카운터 (5틱마다 silent sync-git)
-let claudePanelOpen = localStorage.getItem('claude_open') === '1';
+let claudePanelOpen = false; // applyUiPrefs()에서 복원
 
 // Accordion state
-let openGroups = new Set(JSON.parse(localStorage.getItem('acc_open') || '[]'));
-function saveOpen() { localStorage.setItem('acc_open', JSON.stringify([...openGroups])); }
+let openGroups = new Set();
+function saveOpen() { setUiPref('acc_open', [...openGroups]); }
 function syncClaudePanel() {
   const detail = document.getElementById('claudeDetail');
   const arrow = document.getElementById('claudeToggleArrow');
@@ -2962,7 +3217,7 @@ function syncClaudePanel() {
 }
 function toggleClaudePanel() {
   claudePanelOpen = !claudePanelOpen;
-  localStorage.setItem('claude_open', claudePanelOpen ? '1' : '0');
+  setUiPref('claude_open', claudePanelOpen);
   syncClaudePanel();
 }
 
@@ -3022,16 +3277,26 @@ function updateCountdown() {
 function calPrev() {
   calViewMonth--;
   if (calViewMonth < 0) { calViewMonth = 11; calViewYear--; }
-  renderCalendar();
+  loadCalendarActivity();
 }
 function calNext() {
   calViewMonth++;
   if (calViewMonth > 11) { calViewMonth = 0; calViewYear++; }
+  loadCalendarActivity();
+}
+
+async function loadCalendarActivity() {
+  try {
+    const r = await fetch(appUrl(`api/calendar?year=${calViewYear}&month=${calViewMonth + 1}`));
+    if (!r.ok) { renderCalendar(); return; }
+    const d = await r.json();
+    calActivityMap = d.daily || {};
+    if (d.server_today) serverToday = d.server_today;
+  } catch(e) {}
   renderCalendar();
 }
 
 function renderCalendar() {
-  const today = todayStr();
   const label = `${calViewYear}년 ${MONTHS[calViewMonth]}`;
   document.getElementById('calMonthLabel').textContent = label;
 
@@ -3050,16 +3315,17 @@ function renderCalendar() {
       continue;
     }
     const ds = `${calViewYear}-${p2(calViewMonth+1)}-${p2(dayNum)}`;
-    const isToday    = ds === today;
+    const isToday    = ds === serverToday;   // 서버 KST 기준
     const isSelected = ds === currentViewDate && !currentProject;
-    const hasTasks   = weekTaskMap[ds] && weekTaskMap[ds].total > 0;
+    const act = calActivityMap[ds] || {};
+    const hasActivity = (act.done > 0) || (act.cc > 0);  // 완료작업 OR CC 활동 있는 날
     const cls = [
       'cal-cell',
       isToday    ? 'cal-today'    : '',
       isSelected ? 'cal-selected' : '',
     ].filter(Boolean).join(' ');
 
-    const dot = hasTasks ? '<span class="cal-dot"></span>' : '';
+    const dot = hasActivity ? '<span class="cal-dot"></span>' : '';
     html += `<div class="${cls}" onclick="selectDate('${ds}')">${dayNum}${dot}</div>`;
   }
 
@@ -3068,7 +3334,7 @@ function renderCalendar() {
 
 // ── Week List (sidebar) ───────────────────────────────────────
 async function renderWeekList() {
-  const today = todayStr();
+  const today = serverToday;   // 서버 KST 기준
   const d = new Date();
   // 이번 주 월요일 계산
   const dow = d.getDay(); // 0=Sun
@@ -4018,6 +4284,7 @@ async function loadWeekTaskMap() {
     const r = await fetch(appUrl('api/week'));
     const data = await r.json();
     weekTaskMap = data.daily || {};
+    if (data.server_today) serverToday = data.server_today;
     renderCalendar();
     renderWeekList();
   } catch(err) {
@@ -4043,11 +4310,10 @@ async function addTask() {
 
 // --- Project Order ---
 function getProjOrder() {
-  try { return JSON.parse(localStorage.getItem('df_proj_order') || '[]'); } catch { return []; }
+  return getUiPref('proj_order', []);
 }
 function moveProjOrder(proj, dir) {
-  const order = getProjOrder();
-  // 현재 렌더된 순서 기준으로 초기화
+  const order = getProjOrder().slice();
   if (!order.length) {
     document.querySelectorAll('.acc-name').forEach(el => order.push(el.textContent.trim()));
   }
@@ -4056,7 +4322,7 @@ function moveProjOrder(proj, dir) {
   const target = idx + dir;
   if (target < 0 || target >= order.length) return;
   [order[idx], order[target]] = [order[target], order[idx]];
-  localStorage.setItem('df_proj_order', JSON.stringify(order));
+  setUiPref('proj_order', order);
   refreshMain();
 }
 
@@ -4145,28 +4411,140 @@ async function loadLastLog() {
 // --- End Last Log ---
 
 // --- Collapsible Cards ---
-const _cardDefaults = { sessions: false, morning: false };
-function _cardKey(name) { return `df_card_${name}`; }
+const _cardDefaults = { sessions: false, morning: false, health: false, eod: false, telegram: false };
 function _cardOpen(name) {
-  const v = localStorage.getItem(_cardKey(name));
-  return v === null ? _cardDefaults[name] : v === '1';
+  const states = getUiPref('card_states', {});
+  return name in states ? states[name] : (_cardDefaults[name] || false);
 }
 function toggleCard(name) {
   const isOpen = _cardOpen(name);
-  localStorage.setItem(_cardKey(name), isOpen ? '0' : '1');
+  const states = getUiPref('card_states', {});
+  setUiPref('card_states', { ...states, [name]: !isOpen });
   _applyCard(name, !isOpen);
 }
 function _applyCard(name, open) {
-  const bodies = { sessions: document.getElementById('sessionsList'), morning: document.getElementById('morningBody') };
-  const arrows = { sessions: document.getElementById('sessionsArrow'), morning: document.getElementById('morningArrow') };
-  const body = bodies[name], arrow = arrows[name];
+  const bodyIds = { sessions: 'sessionsList', morning: 'morningBody', health: 'healthBody', eod: 'eodBody', telegram: 'telegramBody' };
+  const arrowIds = { sessions: 'sessionsArrow', morning: 'morningArrow', health: 'healthArrow', eod: 'eodArrow', telegram: 'telegramArrow' };
+  const body = document.getElementById(bodyIds[name]);
+  const arrow = document.getElementById(arrowIds[name]);
   if (body) { body.style.display = open ? '' : 'none'; body.style.marginTop = open ? '10px' : '0'; }
   if (arrow) { arrow.classList.toggle('open', open); }
+  if (open) {
+    if (name === 'health') loadProjectHealth();
+    if (name === 'eod') loadEodReport();
+    if (name === 'telegram') loadTelegramSettings();
+  }
 }
 function initCollapsibleCards() {
   Object.keys(_cardDefaults).forEach(name => _applyCard(name, _cardOpen(name)));
 }
 // --- End Collapsible Cards ---
+
+// --- Project Health ---
+async function loadProjectHealth() {
+  const el = document.getElementById('healthList');
+  if (!el) return;
+  try {
+    const r = await fetch(appUrl('api/project-health'));
+    const d = await r.json();
+    const projects = d.projects || [];
+    if (!projects.length) { el.textContent = '프로젝트 없음'; return; }
+    el.innerHTML = projects.map(p => {
+      const color = p.status === 'good' ? '#34C759' : p.status === 'warn' ? '#FF9500' : '#FF3B30';
+      const bar = `<div style="display:inline-block;width:${p.score}px;max-width:100px;height:3px;background:${color};border-radius:2px;vertical-align:middle;margin:0 6px"></div>`;
+      const meta = `완료 ${p.done_7d}/7일 · CC ${p.cc_7d} · 유휴 ${p.days_idle}d`;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(0,0,0,.04)">
+        <span style="font-size:11px;font-weight:700;color:${color};min-width:28px">${p.score}</span>
+        ${bar}
+        <span style="font-size:12px;color:var(--text);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.project}</span>
+        <span style="font-size:10px;color:var(--muted);white-space:nowrap">${meta}</span>
+      </div>`;
+    }).join('');
+  } catch(e) { el.textContent = '오류'; }
+}
+
+// --- EOD Report ---
+async function loadEodReport() {
+  const el = document.getElementById('eodContent');
+  if (!el) return;
+  try {
+    const r = await fetch(appUrl('api/eod-report'));
+    const d = await r.json();
+    let html = `<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px">
+      <span>완료 <b style="color:var(--text)">${d.done_count}개</b></span>
+      <span>미완료 <b style="color:var(--text)">${d.todo_count}개</b></span>
+      <span>CC세션 <b style="color:var(--text)">${d.cc_sessions_count}회</b></span>
+      <span>작업시간 <b style="color:var(--text)">${Math.round((d.done_minutes||0)/60*10)/10}h</b></span>
+    </div>`;
+    if (d.goal) html += `<div style="margin-bottom:8px;font-size:12px;color:var(--muted)">목표: ${d.goal}</div>`;
+    if ((d.done_tasks||[]).length) {
+      html += `<div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px">완료</div>`;
+      html += d.done_tasks.slice(0,5).map(t => `<div style="font-size:11px;color:var(--muted);padding:1px 0">+ ${t.title}</div>`).join('');
+    }
+    if ((d.remaining_tasks||[]).length) {
+      html += `<div style="font-size:11px;font-weight:700;color:var(--text);margin:8px 0 4px">미완료</div>`;
+      html += d.remaining_tasks.slice(0,5).map(t => `<div style="font-size:11px;color:var(--muted);padding:1px 0">- ${t.title}</div>`).join('');
+    }
+    el.innerHTML = html;
+  } catch(e) { el.textContent = '오류'; }
+}
+
+async function sendEodTelegram() {
+  const statusEl = document.getElementById('eodSendStatus');
+  statusEl.textContent = '전송 중...';
+  try {
+    const r = await fetch(appUrl('api/eod-report/send'), { method: 'POST' });
+    if (r.ok) { statusEl.textContent = '전송 완료'; }
+    else {
+      const d = await r.json().catch(() => ({}));
+      statusEl.textContent = `오류: ${d.detail || r.status}`;
+    }
+  } catch(e) { statusEl.textContent = '전송 실패'; }
+}
+
+// --- Telegram Settings ---
+async function loadTelegramSettings() {
+  try {
+    const r = await fetch(appUrl('api/settings/telegram'));
+    const d = await r.json();
+    const tokenEl = document.getElementById('tgTokenInput');
+    const chatEl = document.getElementById('tgChatInput');
+    const enabledEl = document.getElementById('tgEnabledInput');
+    if (tokenEl) tokenEl.value = d.bot_token || '';
+    if (chatEl) chatEl.value = d.chat_id || '';
+    if (enabledEl) enabledEl.checked = !!d.enabled;
+  } catch(e) {}
+}
+
+async function saveTelegramSettings() {
+  const token = (document.getElementById('tgTokenInput') || {}).value || '';
+  const chatId = (document.getElementById('tgChatInput') || {}).value || '';
+  const enabled = (document.getElementById('tgEnabledInput') || {}).checked;
+  const statusEl = document.getElementById('tgStatus');
+  statusEl.textContent = '저장 중...';
+  try {
+    const r = await fetch(appUrl('api/settings/telegram'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bot_token: token, chat_id: chatId, enabled }),
+    });
+    if (r.ok) { statusEl.textContent = '저장됨'; }
+    else { statusEl.textContent = '오류'; }
+  } catch(e) { statusEl.textContent = '저장 실패'; }
+}
+
+async function testTelegram() {
+  const statusEl = document.getElementById('tgStatus');
+  statusEl.textContent = '전송 중...';
+  try {
+    const r = await fetch(appUrl('api/telegram-test'), { method: 'POST' });
+    if (r.ok) { statusEl.textContent = '테스트 전송 성공'; }
+    else {
+      const d = await r.json().catch(() => ({}));
+      statusEl.textContent = `실패: ${d.detail || r.status}`;
+    }
+  } catch(e) { statusEl.textContent = '전송 실패'; }
+}
 
 // --- Comment System ---
 let _meLogin = null;
@@ -4999,22 +5377,93 @@ const agentUrls = {};
 const liveProjects = new Set();
 
 // work folder sidebar collapse state
-let wfCollapsed = localStorage.getItem('wf_collapsed') === '1';
+let wfCollapsed = false; // applyUiPrefs()에서 복원
 let _lastWfRows = [];  // cache for re-render after settings change
 
 function toggleWorkFolders() {
   wfCollapsed = !wfCollapsed;
-  localStorage.setItem('wf_collapsed', wfCollapsed ? '1' : '0');
+  setUiPref('wf_collapsed', wfCollapsed);
   document.getElementById('wfList').style.display = wfCollapsed ? 'none' : '';
   document.getElementById('wfToggle').textContent = wfCollapsed ? '펼치기' : '접기';
 }
 
-// ── WF Groups ─────────────────────────────────────────────────
-function getWfGroups() {
-  try { return JSON.parse(localStorage.getItem('df_wf_groups')) || []; } catch { return []; }
+// ── UI Prefs (서버 DB 저장, localStorage 완전 대체) ────────────
+let _uiPrefs = {
+  active_tab: 'report', active_subtab: 'work',
+  claude_open: false, acc_open: [], proj_order: [],
+  card_states: {}, wf_collapsed: false, wfg_states: {},
+};
+let _uiPrefsSaveTimer = null;
+
+function getUiPref(key, def) {
+  return (key in _uiPrefs) ? _uiPrefs[key] : def;
 }
+function setUiPref(key, val) {
+  _uiPrefs[key] = val;
+  clearTimeout(_uiPrefsSaveTimer);
+  _uiPrefsSaveTimer = setTimeout(() => {
+    fetch(appUrl('api/ui-prefs'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prefs: _uiPrefs }),
+    }).catch(() => {});
+  }, 600);
+}
+async function loadUiPrefs() {
+  try {
+    const r = await fetch(appUrl('api/ui-prefs'));
+    if (!r.ok) return;
+    const d = await r.json();
+    _uiPrefs = { ..._uiPrefs, ...d };
+  } catch(e) {}
+}
+function applyUiPrefs() {
+  // 탭
+  const tab = _uiPrefs.active_tab || 'report';
+  if (tab === 'work') switchTab('work', true);
+  const sub = _uiPrefs.active_subtab || 'work';
+  if (sub === 'log') switchSubTab('log', true);
+  // Claude 패널
+  claudePanelOpen = !!_uiPrefs.claude_open;
+  syncClaudePanel();
+  // 아코디언
+  openGroups = new Set(_uiPrefs.acc_open || []);
+  // WF 접힘
+  wfCollapsed = !!_uiPrefs.wf_collapsed;
+  const wfListEl = document.getElementById('wfList');
+  const wfToggleEl = document.getElementById('wfToggle');
+  if (wfListEl) wfListEl.style.display = wfCollapsed ? 'none' : '';
+  if (wfToggleEl) wfToggleEl.textContent = wfCollapsed ? '펼치기' : '접기';
+  // 카드 접힘
+  initCollapsibleCards();
+}
+
+// ── WF Groups ─────────────────────────────────────────────────
+// WF groups — 서버 DB 전용 저장 (인메모리 캐시로 동기 접근 유지)
+let _wfGroupsCache = [];
+
+function getWfGroups() {
+  return _wfGroupsCache;
+}
+
 function saveWfGroups(groups) {
-  localStorage.setItem('df_wf_groups', JSON.stringify(groups));
+  _wfGroupsCache = groups;
+  fetch(appUrl('api/wf-groups'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ groups }),
+  }).catch(() => {});
+}
+
+async function loadWfGroupsFromServer() {
+  try {
+    const r = await fetch(appUrl('api/wf-groups'));
+    if (!r.ok) return;
+    const d = await r.json();
+    _wfGroupsCache = d.groups || [];
+  } catch(e) {
+    _wfGroupsCache = [];
+  }
 }
 
 function renderWfList(rows) {
@@ -5043,11 +5492,27 @@ function renderWfList(rows) {
     </div>`;
   };
 
+  // 구과장님 요청 그룹 최상위 고정
+  const isPinned = g => g.name && g.name.includes('구과장');
+  const sortedGroups = [...groups].sort((a, b) => {
+    if (isPinned(a) && !isPinned(b)) return -1;
+    if (!isPinned(a) && isPinned(b)) return 1;
+    return 0;
+  });
+
   let html = '';
-  groups.forEach(g => {
+  sortedGroups.forEach(g => {
+    const pinned = isPinned(g);
     const gFolders = (g.folders || []).filter(f => rowMap[f]);
-    const cKey = `wfg_${g.id}`;
-    const collapsed = localStorage.getItem(cKey) === '1';
+    const collapsed = (getUiPref('wfg_states', {}))[g.id] === true;
+    if (pinned) {
+      // 구과장님 그룹: 클릭 시 요청 패널 오픈
+      html += `<div class="wf-group-header wf-group-pinned" onclick="openReqPanel()" style="cursor:pointer">
+        <span class="wf-group-name">${esc(g.name)}</span>
+        <span class="wf-group-arrow" style="font-size:10px;color:var(--accent)">→</span>
+      </div>`;
+      return;
+    }
     html += `<div class="wf-group-header" onclick="toggleWfGroup('${esc(g.id)}')">
       <span class="wf-group-name">${esc(g.name)}</span>
       <span class="wf-group-arrow" id="wfga-${esc(g.id)}">${collapsed ? '▶' : '▼'}</span>
@@ -5062,7 +5527,7 @@ function renderWfList(rows) {
                         .sort((a,b) => a.project.localeCompare(b.project));
   if (ungrouped.length) {
     if (groups.length) {
-      const collapsed = localStorage.getItem('wfg___ung') === '1';
+      const collapsed = (getUiPref('wfg_states', {})).__ung === true;
       html += `<div class="wf-group-header" onclick="toggleWfGroup('__ung')">
         <span class="wf-group-name" style="color:var(--muted)">미분류</span>
         <span class="wf-group-arrow" id="wfga-__ung">${collapsed ? '▶' : '▼'}</span>
@@ -5084,7 +5549,8 @@ function toggleWfGroup(id) {
   const collapse = body.style.display !== 'none';
   body.style.display  = collapse ? 'none' : '';
   if (arrow) arrow.textContent = collapse ? '▶' : '▼';
-  localStorage.setItem(`wfg_${id}`, collapse ? '1' : '0');
+  const wfgStates = { ...getUiPref('wfg_states', {}), [id]: collapse };
+  setUiPref('wfg_states', wfgStates);
 }
 
 // ── WF Settings Modal ──────────────────────────────────────────
@@ -5221,11 +5687,17 @@ async function loadAgentStatus() {
     renderProjectList(allTasks);
   } catch(e) {}
 }
-loadAgentStatus();
-setInterval(loadAgentStatus, 60000);
-loadMorningProjectBoard();
-initCollapsibleCards();
-loadLastLog();
+// 초기화: UI prefs + WF groups 서버에서 로드 → 적용 → 나머지 실행
+(async function initApp() {
+  await Promise.all([loadUiPrefs(), loadWfGroupsFromServer()]);
+  applyUiPrefs();
+  if (_lastWfRows && _lastWfRows.length) renderWfList(_lastWfRows);
+  loadAgentStatus();
+  setInterval(loadAgentStatus, 60000);
+  loadMorningProjectBoard();
+  loadLastLog();
+  loadCalendarActivity();
+})();
 
 // ── Strategic Advisor ──────────────────────────────────────────
 let _strategicCommand = '';
@@ -5344,7 +5816,211 @@ function doLogout() {
   window.location.href = '/logout';
 }
 
+// ── 구과장님 요청 패널 ──────────────────────────────────────────
+let _reqPendingFiles = [];
+
+function openReqPanel() {
+  document.getElementById('reqOverlay').style.display = 'block';
+  loadRequests();
+}
+function closeReqPanel() {
+  document.getElementById('reqOverlay').style.display = 'none';
+}
+
+async function loadRequests() {
+  const listEl = document.getElementById('reqList');
+  try {
+    const d = await fetch(appUrl('api/requests')).then(r => r.json());
+    const reqs = d.requests || [];
+    if (!reqs.length) {
+      listEl.innerHTML = '<div class="req-empty">아직 등록된 요청이 없습니다.</div>';
+      return;
+    }
+    listEl.innerHTML = reqs.map(r => `
+      <div class="req-item" id="reqItem-${r.id}" onclick="toggleReqItem(${r.id})">
+        <div class="req-item-hd">
+          <span class="req-item-title">${esc(r.title)}</span>
+          <span class="req-status ${r.status}">${{open:'대기',in_progress:'진행중',done:'완료'}[r.status]||r.status}</span>
+        </div>
+        <div class="req-item-body">${esc(r.body||'')}</div>
+        <div class="req-item-meta">
+          <span>${r.created_by||''}</span>
+          <span>${(r.created_at||'').slice(0,16)}</span>
+          ${r.attach_count>0?`<span>${r.attach_count}개 첨부</span>`:''}
+        </div>
+        <div class="req-item-actions" style="display:none" id="reqActions-${r.id}">
+          <button class="req-item-action-btn" onclick="event.stopPropagation();changeReqStatus(${r.id},'in_progress')">진행중</button>
+          <button class="req-item-action-btn" onclick="event.stopPropagation();changeReqStatus(${r.id},'done')">완료</button>
+          <button class="req-item-action-btn" onclick="event.stopPropagation();openReqAttachments(${r.id})">첨부파일</button>
+          <button class="req-item-action-btn" style="color:var(--danger)" onclick="event.stopPropagation();deleteRequest(${r.id})">삭제</button>
+        </div>
+        <div id="reqAttachArea-${r.id}" style="display:none;margin-top:8px"></div>
+      </div>`).join('');
+  } catch(e) {
+    listEl.innerHTML = '<div class="req-empty">로드 실패</div>';
+  }
+}
+
+function toggleReqItem(id) {
+  const item = document.getElementById(`reqItem-${id}`);
+  const actions = document.getElementById(`reqActions-${id}`);
+  if (!item) return;
+  const expanding = !item.classList.contains('expanded');
+  item.classList.toggle('expanded', expanding);
+  if (actions) actions.style.display = expanding ? 'flex' : 'none';
+}
+
+async function changeReqStatus(id, status) {
+  await fetch(appUrl(`api/requests/${id}`), {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({status})
+  });
+  loadRequests();
+}
+
+async function deleteRequest(id) {
+  if (!confirm('삭제하시겠습니까?')) return;
+  await fetch(appUrl(`api/requests/${id}`), {method:'DELETE'});
+  loadRequests();
+}
+
+async function openReqAttachments(reqId) {
+  const area = document.getElementById(`reqAttachArea-${reqId}`);
+  if (!area) return;
+  if (area.style.display !== 'none') { area.style.display = 'none'; return; }
+  const d = await fetch(appUrl(`api/requests/${reqId}/attachments`)).then(r=>r.json());
+  const atts = d.attachments || [];
+  area.innerHTML = `
+    <div class="req-attach-list">${atts.map(a=>`
+      <div class="req-attach-chip">
+        <a href="${appUrl(`api/requests/${reqId}/attachments/${a.id}/download`)}" target="_blank">${esc(a.original_name)}</a>
+        <button class="req-attach-del" onclick="deleteAttachment(${reqId},${a.id})" title="삭제">✕</button>
+      </div>`).join('')}
+      ${!atts.length?'<span style="font-size:11px;color:var(--muted)">첨부파일 없음</span>':''}
+    </div>
+    <div class="req-attach-zone" onclick="document.getElementById('reqItemFile-${reqId}').click()"
+         ondragover="event.preventDefault();this.classList.add('drag-over')"
+         ondragleave="this.classList.remove('drag-over')"
+         ondrop="event.preventDefault();this.classList.remove('drag-over');uploadAttachments(${reqId},event.dataTransfer.files)">
+      클릭 또는 드래그로 파일 추가
+      <input type="file" id="reqItemFile-${reqId}" multiple style="display:none" onchange="uploadAttachments(${reqId},this.files)">
+    </div>`;
+  area.style.display = 'block';
+}
+
+async function uploadAttachments(reqId, files) {
+  for (const f of Array.from(files)) {
+    const fd = new FormData();
+    fd.append('file', f);
+    await fetch(appUrl(`api/requests/${reqId}/attachments`), {method:'POST', body:fd});
+  }
+  openReqAttachments(reqId);
+  openReqAttachments(reqId); // refresh
+}
+
+async function deleteAttachment(reqId, attId) {
+  await fetch(appUrl(`api/requests/${reqId}/attachments/${attId}`), {method:'DELETE'});
+  openReqAttachments(reqId);
+  openReqAttachments(reqId);
+}
+
+function handleReqFileSelect(e) {
+  _reqPendingFiles = Array.from(e.target.files);
+  renderPendingFiles();
+}
+function renderPendingFiles() {
+  const el = document.getElementById('reqPendingFiles');
+  const cnt = document.getElementById('reqFileCount');
+  if (!el) return;
+  el.innerHTML = _reqPendingFiles.map((f,i)=>`
+    <div class="req-attach-chip">
+      ${esc(f.name)}
+      <button class="req-attach-del" onclick="_reqPendingFiles.splice(${i},1);renderPendingFiles()">✕</button>
+    </div>`).join('');
+  if (cnt) cnt.textContent = _reqPendingFiles.length ? `${_reqPendingFiles.length}개 선택됨` : '';
+}
+
+async function submitRequest() {
+  const title = document.getElementById('reqTitle').value.trim();
+  if (!title) { document.getElementById('reqTitle').focus(); return; }
+  const body = document.getElementById('reqBody').value;
+  const res = await fetch(appUrl('api/requests'), {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({title, body, priority:2})
+  });
+  const req = await res.json();
+  // 파일 첨부
+  for (const f of _reqPendingFiles) {
+    const fd = new FormData(); fd.append('file', f);
+    await fetch(appUrl(`api/requests/${req.id}/attachments`), {method:'POST', body:fd});
+  }
+  document.getElementById('reqTitle').value = '';
+  document.getElementById('reqBody').value = '';
+  _reqPendingFiles = [];
+  renderPendingFiles();
+  loadRequests();
+  loadNotifBadge(); // 새 알림 배지 갱신
+}
+
+// ── 알림 시스템 ─────────────────────────────────────────────────
+async function loadNotifBadge() {
+  try {
+    const d = await fetch(appUrl('api/notifications?limit=1')).then(r=>r.json());
+    const cnt = d.unread || 0;
+    const badge = document.getElementById('notifBadge');
+    const menuBadge = document.getElementById('notifMenuBadge');
+    if (badge) { badge.textContent = cnt > 9 ? '9+' : cnt; badge.style.display = cnt > 0 ? '' : 'none'; }
+    if (menuBadge) { menuBadge.textContent = cnt; menuBadge.style.display = cnt > 0 ? '' : 'none'; }
+  } catch(e) {}
+}
+
+function openNotifPanel() {
+  document.getElementById('notifOverlay').style.display = 'block';
+  loadNotifList();
+}
+function closeNotifPanel() {
+  document.getElementById('notifOverlay').style.display = 'none';
+}
+
+async function loadNotifList() {
+  const listEl = document.getElementById('notifList');
+  try {
+    const d = await fetch(appUrl('api/notifications')).then(r=>r.json());
+    const notifs = d.notifications || [];
+    if (!notifs.length) {
+      listEl.innerHTML = '<div class="notif-empty">새 알림이 없습니다.</div>';
+      return;
+    }
+    listEl.innerHTML = notifs.map(n => `
+      <div class="notif-item${n.is_read?'':' unread'}" onclick="readNotif(${n.id},this,${n.ref_type==='request'?n.ref_id:0})">
+        <div class="notif-dot${n.is_read?' read':''}"></div>
+        <div>
+          <div class="notif-item-title">${esc(n.title)}</div>
+          <div class="notif-item-body">${esc(n.body||'')}</div>
+          <div class="notif-item-time">${(n.created_at||'').slice(0,16)}</div>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    listEl.innerHTML = '<div class="notif-empty">로드 실패</div>';
+  }
+}
+
+async function readNotif(id, el, reqId) {
+  await fetch(appUrl(`api/notifications/${id}/read`), {method:'POST'});
+  if (el) { el.classList.remove('unread'); el.querySelector('.notif-dot').classList.add('read'); }
+  loadNotifBadge();
+  if (reqId) { closeNotifPanel(); openReqPanel(); }
+}
+
+async function markAllRead() {
+  await fetch(appUrl('api/notifications/read-all'), {method:'POST'});
+  loadNotifList();
+  loadNotifBadge();
+}
+
 loadProfileAvatar();
+loadNotifBadge();
+setInterval(loadNotifBadge, 30000);
 </script>
 </body>
 </html>

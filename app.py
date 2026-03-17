@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse, JSONResponse, HTMLResponse
 from starlette.middleware.sessions import SessionMiddleware
@@ -217,9 +217,45 @@ def init_db():
             confirmed_at TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS user_activity (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            action TEXT NOT NULL,
+            detail TEXT DEFAULT '{}',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            body TEXT DEFAULT '',
+            status TEXT DEFAULT 'open',
+            priority INTEGER DEFAULT 2,
+            created_by TEXT DEFAULT '',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS request_attachments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            request_id INTEGER NOT NULL,
+            filename TEXT NOT NULL,
+            original_name TEXT NOT NULL,
+            file_size INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            type TEXT DEFAULT 'info',
+            title TEXT NOT NULL,
+            body TEXT DEFAULT '',
+            ref_type TEXT DEFAULT '',
+            ref_id INTEGER DEFAULT 0,
+            is_read INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
     """)
     conn.commit()
     conn.close()
+    # 업로드 폴더 생성
+    os.makedirs("data/uploads", exist_ok=True)
 
 
 def ensure_table_column(conn, table_name: str, column_name: str, column_def: str):
@@ -2369,6 +2405,12 @@ class MorningBriefTimeRequest(BaseModel):
     time: str
 
 
+class TelegramSettingsRequest(BaseModel):
+    bot_token: str
+    chat_id: str
+    enabled: Optional[bool] = True
+
+
 class TodayGoalUpdate(BaseModel):
     date: Optional[str] = None
     user_goal: str = ""
@@ -2760,6 +2802,7 @@ def create_task(task: TaskCreate):
         "INSERT INTO tasks (date, title, estimated_minutes, priority, updated_at) VALUES (?, ?, ?, ?, ?)",
         (task.date, task.title, task.estimated_minutes, task.priority, datetime.now().isoformat()),
     )
+    log_activity(conn, "task_create", {"id": cur.lastrowid, "title": task.title, "date": task.date})
     conn.commit()
     new = conn.execute("SELECT * FROM tasks WHERE id = ?", (cur.lastrowid,)).fetchone()
     conn.close()
@@ -2781,6 +2824,7 @@ def update_task(task_id: int, update: TaskUpdate):
         updates["updated_at"] = datetime.now().isoformat()
         sets = ", ".join(f"{k} = ?" for k in updates)
         conn.execute(f"UPDATE tasks SET {sets} WHERE id = ?", (*updates.values(), task_id))
+        log_activity(conn, "task_update", {"id": task_id, "changes": {k: v for k, v in updates.items() if k != "updated_at"}})
         conn.commit()
     updated = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
     if updated and updated["status"] == "done":
@@ -2933,10 +2977,54 @@ def decide_task(task_id: int, decision: TaskDecisionRequest):
 @app.delete("/api/tasks/{task_id}")
 def delete_task(task_id: int):
     conn = get_db()
+    task = conn.execute("SELECT title, date FROM tasks WHERE id = ?", (task_id,)).fetchone()
     conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+    log_activity(conn, "task_delete", {"id": task_id, "title": task["title"] if task else "", "date": task["date"] if task else ""})
     conn.commit()
     conn.close()
     return {"ok": True}
+
+
+@app.get("/api/calendar")
+def get_calendar_activity(year: int = 0, month: int = 0):
+    """달력용 월별 활동 데이터 — done 작업 + CC 활동을 날짜별로 반환."""
+    today = date.today()
+    if not year:
+        year = today.year
+    if not month:
+        month = today.month
+    from calendar import monthrange
+    _, last_day = monthrange(year, month)
+    month_start = f"{year}-{month:02d}-01"
+    month_end   = f"{year}-{month:02d}-{last_day:02d}"
+
+    conn = get_db()
+    try:
+        # done 작업 집계
+        done_rows = conn.execute(
+            "SELECT date, COUNT(*) as cnt FROM tasks "
+            "WHERE date >= ? AND date <= ? AND status = 'done' GROUP BY date",
+            (month_start, month_end),
+        ).fetchall()
+        done_map = {r["date"]: r["cnt"] for r in done_rows}
+
+        # CC 활동 집계
+        cc_rows = conn.execute(
+            "SELECT date(created_at) as day, COUNT(*) as cnt FROM agent_activity "
+            "WHERE date(created_at) >= ? AND date(created_at) <= ? GROUP BY day",
+            (month_start, month_end),
+        ).fetchall()
+        cc_map = {r["day"]: r["cnt"] for r in cc_rows}
+
+        # 합산
+        all_days = set(done_map) | set(cc_map)
+        daily = {
+            d: {"done": done_map.get(d, 0), "cc": cc_map.get(d, 0)}
+            for d in all_days
+        }
+        return {"year": year, "month": month, "daily": daily, "server_today": str(today)}
+    finally:
+        conn.close()
 
 
 @app.get("/api/week")
@@ -2962,7 +3050,7 @@ def get_week(week_start: Optional[str] = None):
         daily[d]["total"] += 1
         if t["status"] == "done":
             daily[d]["done"] += 1
-    return {"week_start": week_start, "goals": [dict(g) for g in goals], "daily": daily}
+    return {"week_start": week_start, "goals": [dict(g) for g in goals], "daily": daily, "server_today": str(date.today())}
 
 
 @app.post("/api/week/goals")
@@ -3051,11 +3139,12 @@ def carry_over():
     ).fetchall()
     count = 0
     for task in undone:
-        conn.execute(
+        cur = conn.execute(
             "INSERT INTO tasks (date, title, estimated_minutes, priority, carry_from) VALUES (?, ?, ?, ?, ?)",
             (today, task["title"], task["estimated_minutes"], task["priority"], task["id"]),
         )
         conn.execute("UPDATE tasks SET status = 'carried_over' WHERE id = ?", (task["id"],))
+        log_activity(conn, "task_carry_over", {"new_id": cur.lastrowid, "from_id": task["id"], "title": task["title"], "date": today})
         count += 1
     conn.commit()
     conn.close()
@@ -3365,109 +3454,327 @@ def sync_git():
     return {"updated": updated, "count": len(updated), "scanned": scanned}
 
 
+WIDGET_VBS = str(Path(__file__).parent / "widget" / "widget-start-silent.vbs")
+
+# ═══════════════════════════════════════════════════════════════════
+# 구과장님 요청 — Requests API
+# ═══════════════════════════════════════════════════════════════════
+
+class RequestCreate(BaseModel):
+    title: str
+    body: str = ""
+    priority: int = 2
+
+class RequestUpdate(BaseModel):
+    title: Optional[str] = None
+    body: Optional[str] = None
+    status: Optional[str] = None
+    priority: Optional[int] = None
+
+
+@app.get("/api/requests")
+def list_requests():
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT r.*, COUNT(a.id) as attach_count FROM requests r "
+            "LEFT JOIN request_attachments a ON a.request_id = r.id "
+            "GROUP BY r.id ORDER BY r.created_at DESC"
+        ).fetchall()
+        return {"requests": [dict(r) for r in rows]}
+    finally:
+        conn.close()
+
+
+@app.post("/api/requests")
+async def create_request(payload: RequestCreate, http_req: Request):
+    user = http_req.session.get("user", {})
+    author = user.get("login", "unknown") if isinstance(user, dict) else str(user)
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "INSERT INTO requests (title, body, priority, created_by) VALUES (?, ?, ?, ?)",
+            (payload.title.strip(), payload.body, payload.priority, author),
+        )
+        req_id = cur.lastrowid
+        # 알림 자동 생성
+        conn.execute(
+            "INSERT INTO notifications (type, title, body, ref_type, ref_id) VALUES (?,?,?,?,?)",
+            ("request", f"새 요청: {payload.title}", f"작성자: {author}", "request", req_id),
+        )
+        conn.commit()
+        row = conn.execute("SELECT * FROM requests WHERE id=?", (req_id,)).fetchone()
+        return dict(row)
+    finally:
+        conn.close()
+
+
+@app.patch("/api/requests/{req_id}")
+def update_request(req_id: int, payload: RequestUpdate):
+    conn = get_db()
+    try:
+        updates = {k: v for k, v in payload.dict().items() if v is not None}
+        if not updates:
+            raise HTTPException(400, "변경사항 없음")
+        updates["updated_at"] = datetime.now().isoformat()
+        sets = ", ".join(f"{k}=?" for k in updates)
+        conn.execute(f"UPDATE requests SET {sets} WHERE id=?", (*updates.values(), req_id))
+        conn.commit()
+        row = conn.execute("SELECT * FROM requests WHERE id=?", (req_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "Not found")
+        return dict(row)
+    finally:
+        conn.close()
+
+
+@app.delete("/api/requests/{req_id}")
+def delete_request(req_id: int):
+    conn = get_db()
+    try:
+        # 첨부파일 물리 삭제
+        atts = conn.execute("SELECT filename FROM request_attachments WHERE request_id=?", (req_id,)).fetchall()
+        for a in atts:
+            fp = Path(f"data/uploads/{req_id}/{a['filename']}")
+            if fp.exists():
+                fp.unlink()
+        conn.execute("DELETE FROM request_attachments WHERE request_id=?", (req_id,))
+        conn.execute("DELETE FROM requests WHERE id=?", (req_id,))
+        conn.commit()
+        return {"ok": True}
+    finally:
+        conn.close()
+
+
+@app.post("/api/requests/{req_id}/attachments")
+async def upload_attachment(req_id: int, file: UploadFile = File(...)):
+    upload_dir = Path(f"data/uploads/{req_id}")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    # 안전한 파일명 생성 (타임스탬프 prefix)
+    safe_name = f"{int(datetime.now().timestamp())}_{file.filename.replace('/', '_').replace('..', '_')}"
+    dest = upload_dir / safe_name
+    content = await file.read()
+    dest.write_bytes(content)
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "INSERT INTO request_attachments (request_id, filename, original_name, file_size) VALUES (?,?,?,?)",
+            (req_id, safe_name, file.filename, len(content)),
+        )
+        conn.commit()
+        row = conn.execute("SELECT * FROM request_attachments WHERE id=?", (cur.lastrowid,)).fetchone()
+        return dict(row)
+    finally:
+        conn.close()
+
+
+@app.get("/api/requests/{req_id}/attachments")
+def list_attachments(req_id: int):
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM request_attachments WHERE request_id=? ORDER BY created_at DESC", (req_id,)
+        ).fetchall()
+        return {"attachments": [dict(r) for r in rows]}
+    finally:
+        conn.close()
+
+
+@app.delete("/api/requests/{req_id}/attachments/{att_id}")
+def delete_attachment(req_id: int, att_id: int):
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT * FROM request_attachments WHERE id=? AND request_id=?", (att_id, req_id)).fetchone()
+        if not row:
+            raise HTTPException(404, "Not found")
+        fp = Path(f"data/uploads/{req_id}/{row['filename']}")
+        if fp.exists():
+            fp.unlink()
+        conn.execute("DELETE FROM request_attachments WHERE id=?", (att_id,))
+        conn.commit()
+        return {"ok": True}
+    finally:
+        conn.close()
+
+
+@app.get("/api/requests/{req_id}/attachments/{att_id}/download")
+def download_attachment(req_id: int, att_id: int):
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT * FROM request_attachments WHERE id=? AND request_id=?", (att_id, req_id)).fetchone()
+        if not row:
+            raise HTTPException(404, "Not found")
+        fp = Path(f"data/uploads/{req_id}/{row['filename']}")
+        if not fp.exists():
+            raise HTTPException(404, "파일 없음")
+        return FileResponse(str(fp), filename=row["original_name"])
+    finally:
+        conn.close()
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 알림 API
+# ═══════════════════════════════════════════════════════════════════
+
+@app.get("/api/notifications")
+def get_notifications(limit: int = 50):
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM notifications ORDER BY created_at DESC LIMIT ?", (limit,)
+        ).fetchall()
+        unread = conn.execute("SELECT COUNT(*) FROM notifications WHERE is_read=0").fetchone()[0]
+        return {"notifications": [dict(r) for r in rows], "unread": unread}
+    finally:
+        conn.close()
+
+
+@app.post("/api/notifications/{notif_id}/read")
+def mark_notification_read(notif_id: int):
+    conn = get_db()
+    try:
+        conn.execute("UPDATE notifications SET is_read=1 WHERE id=?", (notif_id,))
+        conn.commit()
+        return {"ok": True}
+    finally:
+        conn.close()
+
+
+@app.post("/api/notifications/read-all")
+def mark_all_notifications_read():
+    conn = get_db()
+    try:
+        conn.execute("UPDATE notifications SET is_read=1")
+        conn.commit()
+        return {"ok": True}
+    finally:
+        conn.close()
+
+
+@app.post("/api/launch-widget")
+def launch_widget():
+    """Electron 위젯 실행 또는 이미 실행 중이면 창 앞으로 꺼내기."""
+    # 1. 이미 실행 중인지 확인 (electron.exe 중 daily-focus-widget 포함)
+    activate_ps = r"""
+$w = Get-Process -Name electron -ErrorAction SilentlyContinue |
+     Where-Object { $_.MainWindowHandle -ne 0 } |
+     Select-Object -First 1
+if ($w) {
+    $code = '[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h); [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);'
+    Add-Type -MemberDefinition $code -Name W32e -Namespace U32e -ErrorAction SilentlyContinue
+    [U32e.W32e]::ShowWindow($w.MainWindowHandle, 9) | Out-Null
+    [U32e.W32e]::SetForegroundWindow($w.MainWindowHandle) | Out-Null
+    Write-Output "activated"
+} else {
+    Write-Output "notfound"
+}
+"""
+    try:
+        r = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", activate_ps],
+            capture_output=True, text=True, timeout=5,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        if r.stdout.strip() == "activated":
+            return {"ok": True, "method": "activated"}
+    except Exception:
+        pass
+
+    # 2. VBS로 무소음 실행
+    if not os.path.exists(WIDGET_VBS):
+        return {"ok": False, "error": f"widget-start-silent.vbs 없음: {WIDGET_VBS}"}
+    try:
+        subprocess.Popen(
+            ["wscript.exe", WIDGET_VBS],
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        return {"ok": True, "method": "launched"}
+    except Exception as ex:
+        return {"ok": False, "error": str(ex)}
+
+
+def _is_claude_active(proj: str, cutoff_minutes: int = 10) -> bool:
+    """~/.claude/projects/ JSONL 수정 시간으로 활성 CC 세션 감지.
+    proj 이름이 폴더명에 포함(C--work-daily-focus 등)되고
+    cutoff_minutes 이내에 수정된 파일이 있으면 True.
+    """
+    import time
+    claude_dir = Path.home() / ".claude" / "projects"
+    if not claude_dir.exists():
+        return False
+    cutoff = time.time() - cutoff_minutes * 60
+    # 프로젝트명 정규화: daily-focus → daily-focus (폴더명: C--work-daily-focus)
+    proj_norm = proj.lower().replace("_", "-")
+    for folder in claude_dir.iterdir():
+        if not folder.is_dir():
+            continue
+        if proj_norm not in folder.name.lower():
+            continue
+        for jsonl in folder.glob("*.jsonl"):
+            if jsonl.stat().st_mtime > cutoff:
+                return True
+    return False
+
+
 @app.post("/api/open-claude")
 def open_claude(proj: str, prompt: str = ""):
-    """프로젝트명으로 레포를 찾아 Claude Code 터미널 열기"""
+    """프로젝트명으로 레포를 찾아 Claude Code 터미널 열기.
+    - 활성 CC 세션 감지: ~/.claude/projects/ JSONL 수정시간 (최근 10분)
+    - 활성 중 → WindowsTerminal 창 앞으로 꺼내기
+    - 비활성 → 새 cmd 창에서 해당 폴더 이동 후 claude 실행
+    """
     repo = find_repo_for_project(proj)
     if not repo or not repo.get("path"):
         return {"ok": False, "error": f"경로를 찾을 수 없음: {proj}"}
     target_path = repo["path"]
 
-    # Claude CMD: 다중 후보에서 존재하는 첫 번째 경로 사용
-    CLAUDE_CANDIDATES = [
-        r"C:\Users\USER\.local\bin\claude.exe",
-        r"C:\Users\USER\AppData\Roaming\npm\claude.cmd",
-        r"C:\Users\USER\AppData\Roaming\npm\claude",
-        shutil.which("claude") or "",
-    ]
-    CLAUDE_CMD = next((p for p in CLAUDE_CANDIDATES if p and os.path.exists(p)), "")
-
-    if not CLAUDE_CMD:
-        return {"ok": False, "error": "claude 실행파일을 찾을 수 없습니다. npm install -g @anthropic-ai/claude-code 로 설치하세요."}
-
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
-    prompt_clean = summarize_agent_text(clean_utf8_text(prompt), limit=1200)
 
-    # claude 인자 목록
-    claude_args = [CLAUDE_CMD]
-    if prompt_clean:
-        claude_args.append(prompt_clean)
-
-    # 실제 wt.exe 경로: AppxPackage 설치 경로에서 조회 (App Execution Alias 스텁 우회)
-    def _find_real_wt() -> str:
+    # ── 1. 활성 세션 감지 (JSONL 기반) ──────────────────────────────
+    if _is_claude_active(proj):
+        # Windows Terminal 또는 타이틀이 있는 cmd 창 앞으로 꺼내기
+        activate_ps = r"""
+$code = '[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h); [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);'
+Add-Type -MemberDefinition $code -Name W32 -Namespace U32 -ErrorAction SilentlyContinue
+# WindowsTerminal 우선, 없으면 cmd
+$w = Get-Process -Name WindowsTerminal -ErrorAction SilentlyContinue |
+     Sort-Object StartTime -Descending | Select-Object -First 1
+if (-not $w) {
+    $w = Get-Process -Name cmd -ErrorAction SilentlyContinue |
+         Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+}
+if ($w -and $w.MainWindowHandle -ne 0) {
+    [U32.W32]::ShowWindow($w.MainWindowHandle, 9) | Out-Null
+    [U32.W32]::SetForegroundWindow($w.MainWindowHandle) | Out-Null
+    Write-Output "activated"
+} else {
+    Write-Output "notfound"
+}
+"""
         try:
             r = subprocess.run(
-                ["powershell", "-NoProfile", "-Command",
-                 "(Get-AppxPackage -Name '*WindowsTerminal*').InstallLocation"],
+                ["powershell", "-NoProfile", "-Command", activate_ps],
                 capture_output=True, text=True, timeout=5,
                 creationflags=subprocess.CREATE_NO_WINDOW,
             )
-            loc = r.stdout.strip()
-            if loc:
-                candidate = os.path.join(loc, "wt.exe")
-                if os.path.exists(candidate):
-                    return candidate
+            if r.stdout.strip() == "activated":
+                return {"ok": True, "path": target_path, "method": "activated"}
         except Exception:
             pass
-        return ""
 
-    wt_real = _find_real_wt()
-    if not wt_real:
-        return {"ok": False, "error": "Windows Terminal을 찾을 수 없습니다. Microsoft Store에서 설치하세요."}
-
+    # ── 2. 새 cmd 창 열기: 해당 폴더 + claude 실행 ────────────────
     try:
         subprocess.Popen(
-            [wt_real, "new-window", "-d", target_path, "--", "cmd", "/k"] + claude_args,
-            shell=False,
+            ["cmd", "/k", f"title CC:{proj} & claude"],
+            cwd=target_path,
             env=env,
-            creationflags=subprocess.CREATE_NO_WINDOW,
+            creationflags=subprocess.CREATE_NEW_CONSOLE,
         )
     except Exception as ex:
         return {"ok": False, "error": f"실행 실패: {str(ex)}"}
 
-    # 2) 새 WT 창 최대화 + 최상위 포커스 (화면 강제 표시)
-    ps = r"""
-$sig = @'
-[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
-[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-[DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
-[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
-[DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr hWnd);
-[DllImport("user32.dll")] public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
-[DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
-[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
-'@
-Add-Type -MemberDefinition $sig -Name 'Win32' -Namespace 'WinAPI' -ErrorAction SilentlyContinue
-Start-Sleep -Milliseconds 800
-$wt = Get-Process -Name 'WindowsTerminal' -ErrorAction SilentlyContinue | Sort-Object StartTime -Descending | Select-Object -First 1
-if ($wt) {
-    $hwnd = $wt.MainWindowHandle
-    # 최대화
-    [WinAPI.Win32]::ShowWindow($hwnd, 3) | Out-Null
-    Start-Sleep -Milliseconds 300
-    # 포커스 강제 전환 (AttachThreadInput trick)
-    $fgHwnd = [WinAPI.Win32]::GetForegroundWindow()
-    $curThread = [WinAPI.Win32]::GetCurrentThreadId()
-    $dummy = 0
-    $fgThread = [WinAPI.Win32]::GetWindowThreadProcessId($fgHwnd, [ref]$dummy)
-    if ($fgThread -ne $curThread) {
-        [WinAPI.Win32]::AttachThreadInput($curThread, $fgThread, $true) | Out-Null
-    }
-    [WinAPI.Win32]::BringWindowToTop($hwnd) | Out-Null
-    [WinAPI.Win32]::SetForegroundWindow($hwnd) | Out-Null
-    if ($fgThread -ne $curThread) {
-        [WinAPI.Win32]::AttachThreadInput($curThread, $fgThread, $false) | Out-Null
-    }
-}
-"""
-    subprocess.Popen(
-        ["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps],
-        shell=False,
-        creationflags=subprocess.CREATE_NO_WINDOW,
-    )
-
-    return {"ok": True, "path": target_path, "method": "wt", "prompted": bool(prompt_clean)}
+    return {"ok": True, "path": target_path, "method": "cmd_new"}
 
 
 @app.get("/api/settings/token-limit")
@@ -4710,6 +5017,361 @@ async def get_strategic_brief():
             "today": today_block,
             "recommendation": recommendation_block,
         }
+    finally:
+        conn.close()
+
+
+# ─────────────────────────────────────────────────────────────
+# UI Prefs — server-side persistence (replaces localStorage)
+# ─────────────────────────────────────────────────────────────
+
+class UiPrefsRequest(BaseModel):
+    prefs: dict
+
+
+@app.get("/api/ui-prefs")
+def get_ui_prefs():
+    conn = get_db()
+    try:
+        raw = get_setting(conn, "ui_prefs", "{}")
+        try:
+            prefs = json.loads(raw)
+        except Exception:
+            prefs = {}
+        return prefs
+    finally:
+        conn.close()
+
+
+@app.post("/api/ui-prefs")
+def save_ui_prefs(payload: UiPrefsRequest):
+    conn = get_db()
+    try:
+        set_setting(conn, "ui_prefs", json.dumps(payload.prefs, ensure_ascii=False))
+        conn.commit()
+        return {"ok": True}
+    finally:
+        conn.close()
+
+
+# ─────────────────────────────────────────────────────────────
+# User Activity Log
+# ─────────────────────────────────────────────────────────────
+
+def log_activity(conn, action: str, detail: dict) -> None:
+    conn.execute(
+        "INSERT INTO user_activity (action, detail) VALUES (?, ?)",
+        (action, json.dumps(detail, ensure_ascii=False)),
+    )
+
+
+@app.get("/api/user-activity")
+def get_user_activity(limit: int = 100):
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT id, action, detail, created_at FROM user_activity ORDER BY id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [
+            {
+                "id": r["id"],
+                "action": r["action"],
+                "detail": json.loads(r["detail"] or "{}"),
+                "created_at": r["created_at"],
+            }
+            for r in rows
+        ]
+    finally:
+        conn.close()
+
+
+# ─────────────────────────────────────────────────────────────
+# WF Groups (project folder groupings) — server-side persistence
+# ─────────────────────────────────────────────────────────────
+
+class WfGroupsRequest(BaseModel):
+    groups: list
+
+
+@app.get("/api/wf-groups")
+def get_wf_groups():
+    conn = get_db()
+    try:
+        raw = get_setting(conn, "wf_groups", "[]")
+        try:
+            groups = json.loads(raw)
+        except Exception:
+            groups = []
+        return {"groups": groups}
+    finally:
+        conn.close()
+
+
+@app.post("/api/wf-groups")
+def save_wf_groups(payload: WfGroupsRequest):
+    conn = get_db()
+    try:
+        set_setting(conn, "wf_groups", json.dumps(payload.groups, ensure_ascii=False))
+        log_activity(conn, "wf_groups_save", {"group_count": len(payload.groups)})
+        conn.commit()
+        return {"ok": True}
+    finally:
+        conn.close()
+
+
+# ─────────────────────────────────────────────────────────────
+# Telegram helper
+# ─────────────────────────────────────────────────────────────
+
+def send_telegram_message(token: str, chat_id: str, text: str) -> bool:
+    """Send a plain-text message via Telegram Bot API. Returns True on success."""
+    import urllib.request as _ur
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    data = json.dumps({"chat_id": chat_id, "text": text}).encode("utf-8")
+    req = _ur.Request(url, data=data, headers={"Content-Type": "application/json"})
+    try:
+        with _ur.urlopen(req, timeout=8) as resp:
+            return resp.status == 200
+    except Exception:
+        return False
+
+
+# ─────────────────────────────────────────────────────────────
+# Telegram settings API
+# ─────────────────────────────────────────────────────────────
+
+@app.get("/api/settings/telegram")
+def get_telegram_settings():
+    conn = get_db()
+    try:
+        return {
+            "bot_token": get_setting(conn, "telegram_bot_token", ""),
+            "chat_id": get_setting(conn, "telegram_chat_id", ""),
+            "enabled": get_setting(conn, "telegram_enabled", "0") == "1",
+        }
+    finally:
+        conn.close()
+
+
+@app.post("/api/settings/telegram")
+def update_telegram_settings(payload: TelegramSettingsRequest):
+    conn = get_db()
+    try:
+        set_setting(conn, "telegram_bot_token", payload.bot_token.strip())
+        set_setting(conn, "telegram_chat_id", payload.chat_id.strip())
+        set_setting(conn, "telegram_enabled", "1" if payload.enabled else "0")
+        conn.commit()
+        return {"ok": True}
+    finally:
+        conn.close()
+
+
+@app.post("/api/telegram-test")
+def test_telegram_send():
+    conn = get_db()
+    try:
+        token = get_setting(conn, "telegram_bot_token", "")
+        chat_id = get_setting(conn, "telegram_chat_id", "")
+    finally:
+        conn.close()
+    if not token or not chat_id:
+        raise HTTPException(400, "Telegram bot_token / chat_id not configured")
+    ok = send_telegram_message(token, chat_id, "[Daily Focus] Telegram 연결 테스트 성공")
+    if not ok:
+        raise HTTPException(502, "Telegram send failed — check token and chat_id")
+    return {"ok": True}
+
+
+# ─────────────────────────────────────────────────────────────
+# End-of-day report
+# ─────────────────────────────────────────────────────────────
+
+def build_eod_report(conn, target_date: str) -> dict:
+    """오늘 마감 리포트 데이터 빌드."""
+    tasks_rows = conn.execute(
+        "SELECT * FROM tasks WHERE date = ? ORDER BY priority, id", (target_date,)
+    ).fetchall()
+    tasks = [dict(r) for r in tasks_rows]
+
+    done = [t for t in tasks if t.get("status") == "done"]
+    todo = [t for t in tasks if t.get("status") not in ("done", "carried_over")]
+    carried = [t for t in tasks if t.get("status") == "carried_over"]
+
+    done_min = sum(t.get("estimated_minutes", 30) for t in done)
+
+    goal_row = conn.execute(
+        "SELECT user_goal, recommended_goal, confirmed FROM daily_goal_plans WHERE date = ?",
+        (target_date,),
+    ).fetchone()
+    goal_text = ""
+    if goal_row:
+        goal_text = goal_row["user_goal"] or goal_row["recommended_goal"] or ""
+
+    cc_rows = conn.execute(
+        "SELECT project, task, status FROM agent_activity WHERE date(created_at) = ? ORDER BY created_at",
+        (target_date,),
+    ).fetchall()
+    cc_sessions = [dict(r) for r in cc_rows]
+
+    cc_projects = {}
+    for s in cc_sessions:
+        p = s.get("project", "?")
+        cc_projects[p] = cc_projects.get(p, 0) + 1
+
+    return {
+        "date": target_date,
+        "goal": goal_text,
+        "done_count": len(done),
+        "todo_count": len(todo),
+        "carried_count": len(carried),
+        "done_minutes": done_min,
+        "done_tasks": [{"title": strip_task_project(t["title"]), "minutes": t.get("estimated_minutes", 30)} for t in done],
+        "remaining_tasks": [{"title": strip_task_project(t["title"])} for t in todo],
+        "cc_sessions_count": len(cc_sessions),
+        "cc_projects": [{"project": k, "count": v} for k, v in cc_projects.items()],
+    }
+
+
+def format_eod_telegram(report: dict) -> str:
+    lines = [f"[Daily Focus] {report['date']} 마감 리포트"]
+    if report.get("goal"):
+        lines.append(f"오늘 목표: {report['goal']}")
+    lines.append(f"완료: {report['done_count']}개 ({report['done_minutes']}분)")
+    if report.get("remaining_tasks"):
+        lines.append(f"미완료: {report['todo_count']}개")
+        for t in report["remaining_tasks"][:3]:
+            lines.append(f"  - {t['title']}")
+        if report["todo_count"] > 3:
+            lines.append(f"  ... 외 {report['todo_count'] - 3}개")
+    if report.get("cc_sessions_count"):
+        lines.append(f"CC 세션: {report['cc_sessions_count']}회")
+    return "\n".join(lines)
+
+
+@app.get("/api/eod-report")
+def get_eod_report(d: Optional[str] = None):
+    target_date = d or str(date.today())
+    conn = get_db()
+    try:
+        return build_eod_report(conn, target_date)
+    finally:
+        conn.close()
+
+
+@app.post("/api/eod-report/send")
+def send_eod_report():
+    conn = get_db()
+    try:
+        token = get_setting(conn, "telegram_bot_token", "")
+        chat_id = get_setting(conn, "telegram_chat_id", "")
+        enabled = get_setting(conn, "telegram_enabled", "0") == "1"
+        if not (enabled and token and chat_id):
+            raise HTTPException(400, "Telegram not configured or disabled")
+        report = build_eod_report(conn, str(date.today()))
+    finally:
+        conn.close()
+    text = format_eod_telegram(report)
+    ok = send_telegram_message(token, chat_id, text)
+    if not ok:
+        raise HTTPException(502, "Telegram send failed")
+    return {"ok": True, "text": text}
+
+
+# ─────────────────────────────────────────────────────────────
+# Project health score
+# ─────────────────────────────────────────────────────────────
+
+def compute_project_health(conn) -> list[dict]:
+    """프로젝트별 건강 점수 계산 (0~100)."""
+    cutoff_7d = str(date.today() - timedelta(days=7))
+    cutoff_30d = str(date.today() - timedelta(days=30))
+    today_str = str(date.today())
+
+    # 프로젝트 추출: tasks 테이블에서 [proj] 패턴 + workspace_projects
+    proj_set: set[str] = set()
+
+    for row in conn.execute(
+        "SELECT DISTINCT title FROM tasks WHERE date >= ?", (cutoff_30d,)
+    ).fetchall():
+        title = row[0] or ""
+        if title.startswith("[") and "]" in title:
+            proj_set.add(title.split("]")[0].lstrip("[").strip())
+
+    wp_rows = conn.execute("SELECT project_name FROM workspace_projects WHERE active = 1").fetchall()
+    for r in wp_rows:
+        if r[0]:
+            proj_set.add(r[0].strip())
+
+    results = []
+    for proj in sorted(proj_set):
+        if not proj:
+            continue
+
+        # tasks 30d
+        all_tasks = conn.execute(
+            "SELECT status, date FROM tasks WHERE title LIKE ? AND date >= ?",
+            (f"[{proj}]%", cutoff_30d),
+        ).fetchall()
+        all_tasks = [dict(r) for r in all_tasks]
+
+        done_7d = sum(1 for t in all_tasks if t["status"] == "done" and t["date"] >= cutoff_7d)
+        todo_count = sum(1 for t in all_tasks if t["status"] == "todo" and t["date"] <= today_str)
+        stale_count = sum(1 for t in all_tasks if t["status"] == "todo" and t["date"] < today_str)
+
+        # CC activity 7d
+        cc_7d = conn.execute(
+            "SELECT COUNT(*) FROM agent_activity WHERE project = ? AND date(created_at) >= ?",
+            (proj, cutoff_7d),
+        ).fetchone()[0] or 0
+
+        # last activity
+        last_row = conn.execute(
+            "SELECT MAX(date(created_at)) FROM agent_activity WHERE project = ?", (proj,)
+        ).fetchone()
+        last_cc_date = last_row[0] if last_row and last_row[0] else None
+        last_task_row = conn.execute(
+            "SELECT MAX(date) FROM tasks WHERE title LIKE ? AND status = 'done'", (f"[{proj}]%",)
+        ).fetchone()
+        last_task_date = last_task_row[0] if last_task_row and last_task_row[0] else None
+
+        last_active = max(filter(None, [last_cc_date, last_task_date]), default=None)
+        days_idle = (date.today() - date.fromisoformat(last_active)).days if last_active else 99
+
+        # Score calculation
+        score = 60
+        score += min(done_7d * 5, 25)      # 최근 완료 (max +25)
+        score += min(cc_7d * 3, 15)         # CC 활동 (max +15)
+        score -= min(stale_count * 8, 30)   # 밀린 작업 패널티
+        score -= min(days_idle * 2, 30)     # 비활성 패널티
+        score = max(0, min(100, score))
+
+        if score >= 75:
+            status = "good"
+        elif score >= 45:
+            status = "warn"
+        else:
+            status = "poor"
+
+        results.append({
+            "project": proj,
+            "score": score,
+            "status": status,
+            "done_7d": done_7d,
+            "stale_count": stale_count,
+            "cc_7d": cc_7d,
+            "days_idle": days_idle,
+        })
+
+    results.sort(key=lambda x: x["score"])
+    return results
+
+
+@app.get("/api/project-health")
+def get_project_health():
+    conn = get_db()
+    try:
+        return {"projects": compute_project_health(conn)}
     finally:
         conn.close()
 
