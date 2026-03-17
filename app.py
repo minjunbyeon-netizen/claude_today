@@ -13,7 +13,22 @@ import shutil
 import subprocess
 import secrets
 import httpx
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
+
+# ── KST (UTC+9) 헬퍼 ─────────────────────────────────────────────────
+_KST = timezone(timedelta(hours=9))
+
+def kst_today() -> str:
+    """오늘 날짜를 KST 기준 YYYY-MM-DD 로 반환 (서버 timezone 무관)."""
+    return datetime.now(_KST).strftime("%Y-%m-%d")
+
+def kst_now() -> str:
+    """현재 시각을 KST 기준 YYYY-MM-DD HH:MM:SS 로 반환."""
+    return datetime.now(_KST).strftime("%Y-%m-%d %H:%M:%S")
+
+def kst_now_dt() -> datetime:
+    """KST 기준 현재 datetime (timezone-naive) 반환."""
+    return datetime.now(_KST).replace(tzinfo=None)
 
 app = FastAPI()
 
@@ -675,7 +690,7 @@ def build_checkin_feed(conn, target_date: str):
         ).fetchall()
 
     # Show the latest known CC session state until fresh activity events start building up.
-    if not activity_rows and target_date == str(date.today()):
+    if not activity_rows and target_date == kst_today():
         activity_rows = conn.execute(
             """SELECT project, task, status, url, updated_at AS created_at
                FROM agent_status
@@ -750,7 +765,7 @@ def minutes_since(value: Optional[str]) -> Optional[int]:
     parsed = parse_local_datetime(value)
     if parsed is None:
         return None
-    delta = datetime.now() - parsed
+    delta = kst_now_dt() - parsed
     return max(0, int(delta.total_seconds() // 60))
 
 
@@ -829,7 +844,7 @@ def collect_repo_snapshots() -> dict[str, dict]:
         return _REPO_SNAPSHOT_CACHE["data"]
 
     snapshots: dict[str, dict] = {}
-    today_start = f"{date.today().isoformat()} 00:00:00"
+    today_start = f"{kst_today()} 00:00:00"
 
     for root in REPO_SCAN_ROOTS:
         if not os.path.isdir(root):
@@ -955,8 +970,8 @@ def ensure_workspace_inbox_task(conn, project_name: str, folder_path: str) -> bo
     if existing:
         return False
 
-    today = str(date.today())
-    now = datetime.now().isoformat()
+    today = kst_today()
+    now = kst_now()
     title = workspace_discovery_task_title(project_name)
     note = f"자동 감지된 C:\\work 폴더: {folder_path}"
     conn.execute(
@@ -974,7 +989,7 @@ def backfill_workspace_inbox_tasks(conn) -> list[dict[str, object]]:
     if get_setting(conn, "workspace_backfill_completed", "0") == "1":
         return []
 
-    now = datetime.now().isoformat(timespec="seconds")
+    now = kst_now()
     rows = conn.execute(
         """
         SELECT project_name, folder_path
@@ -1006,7 +1021,7 @@ def backfill_workspace_inbox_tasks(conn) -> list[dict[str, object]]:
 
 def sync_workspace_projects(conn) -> list[dict[str, object]]:
     snapshots = collect_workspace_projects()
-    now = datetime.now().isoformat(timespec="seconds")
+    now = kst_now()
     seeded = get_setting(conn, "workspace_watch_seeded", "0") == "1"
     existing_rows = {
         row["project_name"]: dict(row)
@@ -1552,7 +1567,7 @@ def build_task_stats(tasks: list[dict]) -> dict[str, object]:
             "needs_attention": watch_count + stale_count + critical_count,
             "active_now_count": active_now_count,
             "auto_refresh_seconds": 20,
-            "last_refreshed_at": datetime.now().isoformat(timespec="seconds"),
+            "last_refreshed_at": kst_now(),
         },
     }
 
@@ -1793,7 +1808,7 @@ def build_ops_brief(conn, target_date: str, tasks: list[dict], stats: dict[str, 
             "detail": "작게라도 완료 1개를 먼저 만들면 전체 진행률과 집중감이 같이 올라갑니다.",
         })
 
-    if not latest_manual and target_date == str(date.today()):
+    if not latest_manual and target_date == kst_today():
         next_actions.append({
             "tone": "note",
             "title": "체크인 남기기",
@@ -1829,7 +1844,7 @@ def build_ops_brief(conn, target_date: str, tasks: list[dict], stats: dict[str, 
         latest_note_time = latest_manual["checkin_time"] or ""
 
     # ── [A] 시간 인텔리전스 ──────────────────────────────────────
-    now = datetime.now()
+    now = kst_now_dt()
     work_end_hour = 19  # 오후 7시 마감 가정
     remaining_work_min = max(0, (work_end_hour * 60) - (now.hour * 60 + now.minute))
     task_rem = int(stats.get("remaining_minutes") or 0)
@@ -1850,7 +1865,7 @@ def build_ops_brief(conn, target_date: str, tasks: list[dict], stats: dict[str, 
         if not t.get("carry_from"):
             continue
         origin_id = t["carry_from"]
-        origin_date = t.get("date", str(date.today()))
+        origin_date = t.get("date", kst_today())
         for _ in range(30):
             row = conn.execute(
                 "SELECT id, carry_from, date FROM tasks WHERE id=?", (origin_id,)
@@ -1861,7 +1876,7 @@ def build_ops_brief(conn, target_date: str, tasks: list[dict], stats: dict[str, 
             origin_id = row["carry_from"]
             origin_date = row["date"]
         try:
-            days = (date.today() - datetime.strptime(origin_date, "%Y-%m-%d").date()).days
+            days = (datetime.now(_KST).date() - datetime.strptime(origin_date, "%Y-%m-%d").date()).days
         except Exception:
             days = 1
         carry_info.append({"task": t, "days": max(1, days)})
@@ -1873,7 +1888,7 @@ def build_ops_brief(conn, target_date: str, tasks: list[dict], stats: dict[str, 
         cc_rows = conn.execute(
             "SELECT project, task, status, created_at FROM agent_activity "
             "WHERE date(created_at,'localtime')=? ORDER BY created_at DESC LIMIT 30",
-            (str(date.today()),),
+            (kst_today(),),
         ).fetchall()
         seen_p: set[str] = set()
         for row in cc_rows:
@@ -2154,9 +2169,9 @@ def build_morning_board(
     is_due = False
     time_status = ""
 
-    if target_date == str(date.today()):
+    if target_date == kst_today():
         due_at = datetime.strptime(f"{target_date} {morning_time}", "%Y-%m-%d %H:%M")
-        minutes_until = int((due_at - datetime.now()).total_seconds() // 60)
+        minutes_until = int((due_at - kst_now_dt()).total_seconds() // 60)
         is_due = minutes_until <= 0
         if minutes_until > 0:
             hours = minutes_until // 60
@@ -2317,7 +2332,7 @@ def init_org_data():
                 user,
             )
 
-        today = date.today()
+        today = datetime.now(_KST).date()
         week_start = get_week_start(today)
         demo_tasks = [
             (1, "3월 핵심 캠페인 총괄", "대표가 마케팅 팀장에게 위임한 핵심 과제입니다.", "in_progress", 1, str(today + timedelta(days=2)), 1, 2, None, "수요일 오후 중간 점검"),
@@ -2501,7 +2516,7 @@ class DemoLoginRequest(BaseModel):
 
 def get_week_start(d=None):
     if d is None:
-        d = date.today()
+        d = datetime.now(_KST).date()
     elif isinstance(d, str):
         d = datetime.strptime(d, "%Y-%m-%d").date()
     return str(d - timedelta(days=d.weekday()))
@@ -2721,14 +2736,14 @@ def confirm_project_comment(proj: str, comment_id: int, request: Request):
 @app.get("/api/today")
 def get_today(d: Optional[str] = None):
     if not d:
-        d = str(date.today())
+        d = kst_today()
     return build_day_snapshot(d)
 
 
 @app.get("/api/ops-brief")
 def get_ops_brief(d: Optional[str] = None):
     if not d:
-        d = str(date.today())
+        d = kst_today()
     snapshot = build_day_snapshot(d)
     return snapshot["brief"]
 
@@ -2736,7 +2751,7 @@ def get_ops_brief(d: Optional[str] = None):
 @app.get("/api/morning-brief")
 def get_morning_brief(d: Optional[str] = None):
     if not d:
-        d = str(date.today())
+        d = kst_today()
     snapshot = build_day_snapshot(d)
     return snapshot["morning"]
 
@@ -2765,7 +2780,7 @@ def update_morning_brief_time(payload: MorningBriefTimeRequest):
 
 @app.post("/api/today-goal")
 def update_today_goal(payload: TodayGoalUpdate):
-    target_date = payload.date or str(date.today())
+    target_date = payload.date or kst_today()
     custom_goal = collapse_spaces(payload.user_goal or "")
 
     if not payload.use_recommended and not custom_goal:
@@ -2787,7 +2802,7 @@ def update_today_goal(payload: TodayGoalUpdate):
         today_goal = build_today_goal_summary(conn, target_date, brief, weekly_summary)
 
         stored_goal = "" if payload.use_recommended else custom_goal
-        confirmed_at = datetime.now().isoformat()
+        confirmed_at = kst_now()
         conn.execute(
             """
             INSERT INTO daily_goal_plans (date, recommended_goal, user_goal, confirmed, confirmed_at, updated_at)
@@ -2816,11 +2831,11 @@ def update_today_goal(payload: TodayGoalUpdate):
 @app.post("/api/tasks")
 def create_task(task: TaskCreate):
     if not task.date:
-        task.date = str(date.today())
+        task.date = kst_today()
     conn = get_db()
     cur = conn.execute(
         "INSERT INTO tasks (date, title, estimated_minutes, priority, updated_at) VALUES (?, ?, ?, ?, ?)",
-        (task.date, task.title, task.estimated_minutes, task.priority, datetime.now().isoformat()),
+        (task.date, task.title, task.estimated_minutes, task.priority, kst_now()),
     )
     log_activity(conn, "task_create", {"id": cur.lastrowid, "title": task.title, "date": task.date})
     conn.commit()
@@ -2837,11 +2852,11 @@ def update_task(task_id: int, update: TaskUpdate):
         raise HTTPException(404, "Not found")
     updates = {k: v for k, v in update.dict().items() if v is not None}
     if update.status == "done" and task["status"] != "done":
-        updates["completed_at"] = datetime.now().isoformat()
+        updates["completed_at"] = kst_now()
     elif update.status == "todo":
         updates["completed_at"] = None
     if updates:
-        updates["updated_at"] = datetime.now().isoformat()
+        updates["updated_at"] = kst_now()
         sets = ", ".join(f"{k} = ?" for k in updates)
         conn.execute(f"UPDATE tasks SET {sets} WHERE id = ?", (*updates.values(), task_id))
         log_activity(conn, "task_update", {"id": task_id, "changes": {k: v for k, v in updates.items() if k != "updated_at"}})
@@ -2868,7 +2883,7 @@ def decide_task(task_id: int, decision: TaskDecisionRequest):
         raise HTTPException(404, "Not found")
 
     task_dict = dict(task)
-    now = datetime.now().isoformat()
+    now = kst_now()
     note = collapse_spaces(decision.note or "")
     payload: dict[str, object] = {}
     created_tasks: list[dict[str, object]] = []
@@ -3008,7 +3023,7 @@ def delete_task(task_id: int):
 @app.get("/api/calendar")
 def get_calendar_activity(year: int = 0, month: int = 0):
     """달력용 월별 활동 데이터 — done 작업 + CC 활동을 날짜별로 반환."""
-    today = date.today()
+    today = datetime.now(_KST).date()
     if not year:
         year = today.year
     if not month:
@@ -3070,7 +3085,7 @@ def get_week(week_start: Optional[str] = None):
         daily[d]["total"] += 1
         if t["status"] == "done":
             daily[d]["done"] += 1
-    return {"week_start": week_start, "goals": [dict(g) for g in goals], "daily": daily, "server_today": str(date.today())}
+    return {"week_start": week_start, "goals": [dict(g) for g in goals], "daily": daily, "server_today": kst_today()}
 
 
 @app.post("/api/week/goals")
@@ -3112,7 +3127,7 @@ def delete_goal(goal_id: int):
 
 @app.post("/api/checkin")
 def do_checkin(checkin: CheckinCreate):
-    today = str(date.today())
+    today = kst_today()
     conn = get_db()
     tasks = conn.execute("SELECT * FROM tasks WHERE date = ?", (today,)).fetchall()
     done = sum(1 for t in tasks if t["status"] == "done")
@@ -3129,7 +3144,7 @@ def do_checkin(checkin: CheckinCreate):
 @app.get("/api/checkins")
 def get_checkins(d: Optional[str] = None):
     if not d:
-        d = str(date.today())
+        d = kst_today()
     conn = get_db()
     checkins = build_checkin_feed(conn, d)
     conn.close()
@@ -3138,7 +3153,7 @@ def get_checkins(d: Optional[str] = None):
 
 @app.get("/api/yesterday-undone")
 def yesterday_undone():
-    yesterday = str(date.today() - timedelta(days=1))
+    yesterday = str(datetime.now(_KST).date() - timedelta(days=1))
     conn = get_db()
     tasks = conn.execute(
         "SELECT * FROM tasks WHERE date = ? AND status NOT IN ('done', 'carried_over') AND COALESCE(task_state, 'active') = 'active'",
@@ -3150,8 +3165,8 @@ def yesterday_undone():
 
 @app.post("/api/carry-over")
 def carry_over():
-    today = str(date.today())
-    yesterday = str(date.today() - timedelta(days=1))
+    today = kst_today()
+    yesterday = str(datetime.now(_KST).date() - timedelta(days=1))
     conn = get_db()
     undone = conn.execute(
         "SELECT * FROM tasks WHERE date = ? AND status NOT IN ('done', 'carried_over') AND COALESCE(task_state, 'active') = 'active'",
@@ -3181,7 +3196,7 @@ def sync_logs(logs_path: Optional[str] = None):
     if not logs_path:
         logs_path = r"C:\work\squad-team\logs"
 
-    today = str(date.today())
+    today = kst_today()
     results = {"imported": [], "updated": [], "skipped": [], "project": None, "error": None}
 
     if not os.path.isdir(logs_path):
@@ -3251,7 +3266,7 @@ def sync_logs(logs_path: Optional[str] = None):
                 if is_done and existing[title]["status"] != "done":
                     conn.execute(
                         "UPDATE tasks SET status='done', completed_at=? WHERE id=?",
-                        (datetime.now().isoformat(), existing[title]["id"]),
+                        (kst_now(), existing[title]["id"]),
                     )
                     existing[title]["status"] = "done"
                     results["updated"].append(title)
@@ -3260,7 +3275,7 @@ def sync_logs(logs_path: Optional[str] = None):
             else:
                 # 신규 추가
                 status = "done" if is_done else "todo"
-                completed_at = datetime.now().isoformat() if is_done else None
+                completed_at = kst_now() if is_done else None
                 conn.execute(
                     "INSERT INTO tasks (date, title, estimated_minutes, priority, status, completed_at, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
                     (today, title, 30, priority, status, completed_at, f"출처: {fname} | {progress or ''}"),
@@ -3281,7 +3296,7 @@ class SyncLogsUpload(BaseModel):
 @app.post("/api/sync-logs-upload")
 def sync_logs_upload(payload: SyncLogsUpload):
     """브라우저에서 업로드한 _todo.md 파일 내용을 파싱해 DB에 반영"""
-    today = str(date.today())
+    today = kst_today()
     results = {"imported": [], "updated": [], "skipped": [], "project": None}
 
     conn = get_db()
@@ -3325,7 +3340,7 @@ def sync_logs_upload(payload: SyncLogsUpload):
                 if is_done and existing[title]["status"] != "done":
                     conn.execute(
                         "UPDATE tasks SET status='done', completed_at=? WHERE id=?",
-                        (datetime.now().isoformat(), existing[title]["id"]),
+                        (kst_now(), existing[title]["id"]),
                     )
                     existing[title]["status"] = "done"
                     results["updated"].append(title)
@@ -3333,7 +3348,7 @@ def sync_logs_upload(payload: SyncLogsUpload):
                     results["skipped"].append(title)
             else:
                 status = "done" if is_done else "todo"
-                completed_at = datetime.now().isoformat() if is_done else None
+                completed_at = kst_now() if is_done else None
                 conn.execute(
                     "INSERT INTO tasks (date, title, estimated_minutes, priority, status, completed_at, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
                     (today, title, 30, priority, status, completed_at, f"출처: {fname} | {progress or ''}"),
@@ -3356,7 +3371,7 @@ def sync_git():
     """
     SCAN_ROOTS = REPO_SCAN_ROOTS
     MAX_DEPTH = 3
-    today = str(date.today())
+    today = kst_today()
     today_dt = f"{today} 00:00:00"
     updated = []
     scanned = []
@@ -3465,7 +3480,7 @@ def sync_git():
                 if should_done:
                     conn.execute(
                         "UPDATE tasks SET status='done', completed_at=? WHERE id=?",
-                        (datetime.now().isoformat(), task_id),
+                        (kst_now(), task_id),
                     )
                     updated.append(title)
 
@@ -3549,7 +3564,7 @@ def update_request(req_id: int, payload: RequestUpdate, http_req: Request):
         updates = {k: v for k, v in payload.dict().items() if v is not None}
         if not updates:
             raise HTTPException(400, "변경사항 없음")
-        updates["updated_at"] = datetime.now().isoformat()
+        updates["updated_at"] = kst_now()
         sets = ", ".join(f"{k}=?" for k in updates)
         conn.execute(f"UPDATE requests SET {sets} WHERE id=?", (*updates.values(), req_id))
         conn.commit()
@@ -3683,7 +3698,7 @@ def create_reply(req_id: int, payload: ReplyCreate, http_req: Request):
         )
         conn.execute(
             "UPDATE requests SET updated_at=? WHERE id=?",
-            (datetime.now().isoformat(), req_id),
+            (kst_now(), req_id),
         )
         conn.commit()
         row = conn.execute("SELECT * FROM request_replies WHERE id=?", (cur.lastrowid,)).fetchone()
@@ -3755,7 +3770,7 @@ def list_alarms(request: Request, date: Optional[str] = None):
 def list_today_alarms(request: Request):
     user = request.session.get("user", {})
     login = user.get("login", "") if isinstance(user, dict) else ""
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = kst_today()
     conn = get_db()
     rows = conn.execute(
         "SELECT * FROM date_alarms WHERE target_date = ? AND acknowledged_at IS NULL AND (created_by = ? OR created_by = '') ORDER BY created_at",
@@ -3784,7 +3799,7 @@ def ack_alarm(alarm_id: int, request: Request):
     row = conn.execute("SELECT * FROM date_alarms WHERE id = ?", (alarm_id,)).fetchone()
     if not row:
         raise HTTPException(404, "알람을 찾을 수 없습니다")
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = kst_now()
     conn.execute(
         "UPDATE date_alarms SET acknowledged_at = ? WHERE id = ?",
         (now, alarm_id)
@@ -4009,8 +4024,8 @@ def claude_usage():
     if not os.path.isdir(projects_dir):
         return {"error": "~/.claude/projects 없음", "total": {}, "by_project": {}}
 
-    today_prefix  = date.today().isoformat()          # "2026-03-07"
-    month_prefix  = date.today().strftime("%Y-%m")    # "2026-03"
+    today_prefix  = kst_today()          # "2026-03-07"
+    month_prefix  = datetime.now(_KST).strftime("%Y-%m")    # "2026-03"
 
     # 한도 조회
     conn_s = get_db()
@@ -4205,7 +4220,7 @@ def claude_usage():
         "weekly_sonnet_pct":      sonnet_pct,
         "weekly_sonnet_limit":    weekly_sonnet_limit,
         "by_project":   sorted_projects,
-        "month_label":  date.today().strftime("%Y년 %m월"),
+        "month_label":  datetime.now(_KST).strftime("%Y년 %m월"),
     }
 
     import json as _json2, urllib.request as _ur
@@ -4274,7 +4289,7 @@ def claude_usage_cached():
         return {"error": "캐시 없음",
                 "month_tokens": 0, "today_tokens": 0, "month_total": {},
                 "today_total": {}, "used_pct": 0, "remain_pct": 100,
-                "by_project": [], "month_label": date.today().strftime("%Y년 %m월")}
+                "by_project": [], "month_label": datetime.now(_KST).strftime("%Y년 %m월")}
     return _json3.loads(row["value"])
 
 
@@ -4399,7 +4414,7 @@ def can_manage_org_task(conn, actor_row, task_row):
 
 def make_org_summary(actor, tasks, logs_today, visible_users):
     open_tasks = [task for task in tasks if task["status"] != "done"]
-    overdue = [task for task in open_tasks if task["due_date"] < str(date.today())]
+    overdue = [task for task in open_tasks if task["due_date"] < kst_today()]
     blocked = [task for task in open_tasks if task["status"] == "blocked"]
     review = [task for task in tasks if task["status"] == "review"]
     return {
@@ -4417,7 +4432,7 @@ def make_org_summary(actor, tasks, logs_today, visible_users):
 
 
 def build_org_dashboard(conn, actor_row):
-    today = str(date.today())
+    today = kst_today()
     week_start = get_week_start(today)
     visible_ids = set(get_visible_org_user_ids(conn, actor_row))
     users = [user for user in get_all_org_users(conn) if user["id"] in visible_ids]
@@ -4645,7 +4660,7 @@ def create_org_task(task: OrgTaskCreate):
     if not can_assign_org_task(conn, actor, task.assignee_id):
         conn.close()
         raise HTTPException(403, "You cannot assign work to that user")
-    due_date = task.due_date or str(date.today())
+    due_date = task.due_date or kst_today()
     cur = conn.execute(
         """
         INSERT INTO org_tasks (title, description, priority, due_date, created_by, assignee_id, parent_task_id)
@@ -4684,7 +4699,7 @@ def update_org_task(task_id: int, update: OrgTaskUpdate):
             raise HTTPException(403, "Members can only update status and notes")
 
     if update.status == "done" and task["status"] != "done":
-        updates["completed_at"] = datetime.now().isoformat()
+        updates["completed_at"] = kst_now()
     elif update.status and update.status != "done" and task["status"] == "done":
         updates["completed_at"] = None
 
@@ -4738,7 +4753,7 @@ def upsert_org_worklog(payload: OrgWorkLogUpsert):
         raise HTTPException(403, "You can only write logs for your own tasks")
 
     progress = max(0, min(100, payload.progress))
-    log_date = payload.log_date or str(date.today())
+    log_date = payload.log_date or kst_today()
     conn.execute(
         """
         INSERT INTO org_work_logs
@@ -4792,7 +4807,7 @@ def review_org_worklog(worklog_id: int, payload: OrgWorkLogReview):
 
     conn.execute(
         "UPDATE org_work_logs SET review_status = ?, review_note = ?, reviewed_by = ?, reviewed_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        (review_status, payload.review_note, payload.actor_id, datetime.now().isoformat(), worklog_id),
+        (review_status, payload.review_note, payload.actor_id, kst_now(), worklog_id),
     )
     conn.commit()
     updated = conn.execute("SELECT * FROM org_work_logs WHERE id = ?", (worklog_id,)).fetchone()
@@ -4840,7 +4855,7 @@ def post_agent_status(report: AgentStatusReport):
         )
 
     # ── 오늘 태스크 자동 동기화 ──────────────────────────────────────
-    today = date.today().isoformat()
+    today = kst_today()
     proj_key = normalize_project_key(project)
 
     # 오늘 날짜 태스크 중 같은 프로젝트 항목 검색 (수동 + 자동 모두)
@@ -5074,9 +5089,9 @@ def get_agent_status():
 @app.get("/api/strategic-brief")
 async def get_strategic_brief():
     """전략적 비서: 어제/오늘/지금 할 것 브리핑"""
-    today = str(date.today())
-    yesterday = str(date.today() - timedelta(days=1))
-    now = datetime.now()
+    today = kst_today()
+    yesterday = str(datetime.now(_KST).date() - timedelta(days=1))
+    now = kst_now_dt()
 
     conn = get_db()
     try:
@@ -5484,7 +5499,7 @@ def format_eod_telegram(report: dict) -> str:
 
 @app.get("/api/eod-report")
 def get_eod_report(d: Optional[str] = None):
-    target_date = d or str(date.today())
+    target_date = d or kst_today()
     conn = get_db()
     try:
         return build_eod_report(conn, target_date)
@@ -5501,7 +5516,7 @@ def send_eod_report():
         enabled = get_setting(conn, "telegram_enabled", "0") == "1"
         if not (enabled and token and chat_id):
             raise HTTPException(400, "Telegram not configured or disabled")
-        report = build_eod_report(conn, str(date.today()))
+        report = build_eod_report(conn, kst_today())
     finally:
         conn.close()
     text = format_eod_telegram(report)
@@ -5517,9 +5532,9 @@ def send_eod_report():
 
 def compute_project_health(conn) -> list[dict]:
     """프로젝트별 건강 점수 계산 (0~100)."""
-    cutoff_7d = str(date.today() - timedelta(days=7))
-    cutoff_30d = str(date.today() - timedelta(days=30))
-    today_str = str(date.today())
+    cutoff_7d = str(datetime.now(_KST).date() - timedelta(days=7))
+    cutoff_30d = str(datetime.now(_KST).date() - timedelta(days=30))
+    today_str = kst_today()
 
     # 프로젝트 추출: tasks 테이블에서 [proj] 패턴 + workspace_projects
     proj_set: set[str] = set()
@@ -5569,7 +5584,7 @@ def compute_project_health(conn) -> list[dict]:
         last_task_date = last_task_row[0] if last_task_row and last_task_row[0] else None
 
         last_active = max(filter(None, [last_cc_date, last_task_date]), default=None)
-        days_idle = (date.today() - date.fromisoformat(last_active)).days if last_active else 99
+        days_idle = (datetime.now(_KST).date() - date.fromisoformat(last_active)).days if last_active else 99
 
         # Score calculation
         score = 60

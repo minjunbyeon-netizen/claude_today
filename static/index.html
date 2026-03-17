@@ -3234,7 +3234,7 @@ function switchTab(tab, noSave) {
 }
 function switchSubTab(sub, noSave) {
   const isLog = sub === 'log';
-  const isToday = currentViewDate >= todayStr();
+  const isToday = currentViewDate >= serverToday;
   document.getElementById('subTabWork').style.display = isLog ? 'none' : '';
   document.getElementById('subTabLog').style.display  = isLog ? '' : 'none';
   document.getElementById('subBtnWork').classList.toggle('active', !isLog);
@@ -3648,7 +3648,7 @@ function fmtTok(n) {
 function updateMainHeader() {
   const titleEl = document.getElementById('mainTitle');
   const subEl   = document.getElementById('mainSub');
-  const today   = todayStr();
+  const today   = serverToday;
 
   if (currentProject) {
     titleEl.textContent = '[' + currentProject + '] 프로젝트';
@@ -3838,7 +3838,7 @@ function selectGroup(groupId) {
 function selectDate(ds) {
   currentViewDate = ds;
   currentProject  = null;
-  const today    = todayStr();
+  const today    = serverToday;
   const isPast   = ds < today;
   const isFuture = ds > today;
   const addCard  = document.getElementById('addTaskCard');
@@ -4565,7 +4565,7 @@ function updateProgressFromAllStats() {
 // ── Load by date ──────────────────────────────────────────────
 async function loadTodayByDate(ds) {
   try {
-    const isToday = ds === todayStr();
+    const isToday = ds === serverToday;
     const url     = isToday ? appUrl('api/today') : appUrl(`api/today?d=${ds}`);
     const r = await fetch(url);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -4586,7 +4586,7 @@ async function loadTodayByDate(ds) {
     document.getElementById('progRefreshTime').textContent =
       `${p2(now.getHours())}:${p2(now.getMinutes())}:${p2(now.getSeconds())} 기준`;
 
-    const isPastDay = ds < todayStr();
+    const isPastDay = ds < serverToday;
     if (currentProject) {
       applyProjectFilter();
     } else if (isPastDay) {
@@ -4637,18 +4637,18 @@ async function loadTodayByDate(ds) {
 
 async function loadToday() {
   const addCard = document.getElementById('addTaskCard');
-  if (addCard) addCard.style.display = currentViewDate < todayStr() ? 'none' : '';
+  if (addCard) addCard.style.display = currentViewDate < serverToday ? 'none' : '';
   await loadTodayByDate(currentViewDate);
 }
 
 function refreshMain() {
   if (currentProject) {
-    return loadTodayByDate(todayStr());
+    return loadTodayByDate(serverToday);
   } else {
     const addCard = document.getElementById('addTaskCard');
     // 미래 날짜 futureMode 중엔 addTaskCard 건드리지 않음
-    if (addCard && currentViewDate <= todayStr()) {
-      addCard.style.display = currentViewDate < todayStr() ? 'none' : '';
+    if (addCard && currentViewDate <= serverToday) {
+      addCard.style.display = currentViewDate < serverToday ? 'none' : '';
     }
     return loadTodayByDate(currentViewDate);
   }
@@ -4703,7 +4703,15 @@ async function loadWeekTaskMap() {
     const r = await fetch(appUrl('api/week'));
     const data = await r.json();
     weekTaskMap = data.daily || {};
-    if (data.server_today) serverToday = data.server_today;
+    if (data.server_today) {
+      const prev = serverToday;
+      serverToday = data.server_today;
+      // currentViewDate가 초기 todayStr()에 묶여있고 서버 날짜와 다르면 보정
+      if (currentViewDate === prev && currentViewDate !== serverToday) {
+        currentViewDate = serverToday;
+        updateMainHeader();
+      }
+    }
     renderCalendar();
     renderWeekList();
   } catch(err) {
