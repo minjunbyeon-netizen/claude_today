@@ -3251,13 +3251,14 @@ function switchSubTab(sub, noSave) {
     const btn = document.querySelector('.btn-ci');
     if (btn) btn.style.display = 'none';
   } else {
-    // 과거 날짜 LOG 탭: 항상 초기화하고 loadCheckins가 채워줌
+    // 과거 날짜 LOG 탭: 초기화 후 즉시 loadCheckins 호출
     const hist = document.getElementById('ciHist');
     if (hist) hist.innerHTML = '<div style="padding:24px 0;text-align:center;font-size:13px;color:var(--muted)">불러오는 중...</div>';
     const form = document.getElementById('ciForm');
     if (form) form.style.display = 'none';
     const btn = document.querySelector('.btn-ci');
     if (btn) btn.style.display = 'none';
+    loadCheckins(currentViewDate);
   }
 }
 

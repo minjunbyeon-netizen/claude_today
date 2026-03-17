@@ -67,12 +67,14 @@ body { font-family: -apple-system,'Helvetica Neue',sans-serif; background:#F5F5F
   font-size:15px; font-weight:700; font-family:inherit; color:var(--text);
   background:transparent; padding:0 0 5px; margin-bottom:8px;
 }
+.compose-title-input:focus { border-bottom-color:#0071E3; box-shadow:none; }
 .compose-title-input::placeholder { color:var(--muted); font-weight:400; font-size:14px; }
 .compose-proj-input {
   width:100%; border:none; outline:none; font-size:11px; font-weight:700;
   color:var(--accent); font-family:inherit; background:transparent;
   padding:0 0 8px; border-bottom:1px solid var(--border); margin-bottom:8px;
 }
+.compose-proj-input:focus { border-bottom-color:#0071E3; }
 .compose-proj-input::placeholder { color:rgba(0,113,227,.35); font-weight:400; }
 .compose-desc {
   width:100%; border:1px solid var(--border); border-radius:7px;
@@ -220,7 +222,7 @@ body { font-family: -apple-system,'Helvetica Neue',sans-serif; background:#F5F5F
 .del-modal {
   background:#fff; border-radius:12px; padding:24px 24px 20px;
   width:320px; max-width:90vw; box-shadow:0 8px 32px rgba(0,0,0,.18);
-  animation:dm-slide-in 140ms ease-out;
+  animation:dm-slide-in 140ms ease-out; overflow:hidden;
 }
 @keyframes dm-slide-in { from { transform:scale(.94); opacity:0; } to { transform:scale(1); opacity:1; } }
 .del-modal-title { font-size:15px; font-weight:700; color:var(--text); margin-bottom:6px; }
@@ -609,7 +611,8 @@ async function deleteRequest(reqId) {
   showDelModal(title, '삭제하면 댓글을 포함한 모든 내용이 사라지며 복구할 수 없습니다.', async () => {
     const res = await fetch(`/api/requests/${reqId}`, { method:'DELETE' });
     if (res.status === 403) { showToast('본인이 작성한 요청만 삭제할 수 있습니다', 'error'); return; }
-    if (res.status === 404) { showToast('이미 삭제된 요청입니다', 'warn'); }
+    if (res.status === 404) { showToast('이미 삭제된 요청입니다', 'warn'); return; }
+    if (!res.ok) { showToast('삭제에 실패했습니다', 'error'); return; }
     allRequests = allRequests.filter(r=>r.id!==reqId);
     currentReqId = null;
     document.getElementById('detailPanel').style.display = 'none';

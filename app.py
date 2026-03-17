@@ -3740,23 +3740,26 @@ def list_alarms(request: Request, date: Optional[str] = None):
     conn = get_db()
     if date:
         rows = conn.execute(
-            "SELECT * FROM date_alarms WHERE target_date = ? ORDER BY created_at",
-            (date,)
+            "SELECT * FROM date_alarms WHERE target_date = ? AND (created_by = ? OR created_by = '') ORDER BY created_at",
+            (date, login)
         ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT * FROM date_alarms ORDER BY target_date, created_at"
+            "SELECT * FROM date_alarms WHERE created_by = ? OR created_by = '' ORDER BY target_date, created_at",
+            (login,)
         ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 @app.get("/api/alarms/today")
 def list_today_alarms(request: Request):
+    user = request.session.get("user", {})
+    login = user.get("login", "") if isinstance(user, dict) else ""
     today = datetime.now().strftime("%Y-%m-%d")
     conn = get_db()
     rows = conn.execute(
-        "SELECT * FROM date_alarms WHERE target_date = ? AND acknowledged_at IS NULL ORDER BY created_at",
-        (today,)
+        "SELECT * FROM date_alarms WHERE target_date = ? AND acknowledged_at IS NULL AND (created_by = ? OR created_by = '') ORDER BY created_at",
+        (today, login)
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
