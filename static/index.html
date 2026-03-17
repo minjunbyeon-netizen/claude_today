@@ -128,6 +128,37 @@ body {
   margin-bottom: 10px;
 }
 
+/* ── 협업 요청 독립 섹션 (최상단) ── */
+.req-shortcut {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(255,149,0,.1);
+  border-bottom: 1px solid rgba(255,149,0,.2);
+  cursor: pointer;
+  transition: background 150ms ease-out;
+  user-select: none;
+}
+.req-shortcut:hover { background: rgba(255,149,0,.18); }
+.req-shortcut-dot {
+  width: 6px; height: 6px;
+  background: #FF9500;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.req-shortcut-label {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 700;
+  color: #FF9500;
+  letter-spacing: -.01em;
+}
+.req-shortcut-arrow {
+  font-size: 11px;
+  color: rgba(255,149,0,.7);
+}
+
 /* 사이드바 서브 아이템 (C-08) */
 .sidebar-item {
   padding: 6px 16px 6px 24px;
@@ -421,6 +452,77 @@ body {
 .stat b { color: #1D1D1F; font-weight: 700; }
 
 /* ── Agent Sessions ── */
+/* ── Future Date Alarm Styles ── */
+.future-alarm-item {
+  position: relative;
+  background: #fff;
+  border-radius: 8px;
+  padding: 10px 36px 10px 12px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.future-alarm-item.acked { opacity: .5; }
+.fa-msg { font-size: 13px; color: var(--text); line-height: 1.5; white-space: pre-wrap; }
+.fa-meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.fa-acked-badge { display: inline-block; font-size: 10px; font-weight: 700; background: #e8f5e9; color: #1a7f37; padding: 1px 6px; border-radius: 4px; margin-left: 6px; }
+.fa-del-btn { position: absolute; top: 8px; right: 10px; background: none; border: none; cursor: pointer; font-size: 16px; color: var(--muted); line-height: 1; padding: 2px 4px; border-radius: 4px; }
+.fa-del-btn:hover { color: var(--danger); }
+
+/* ── Today Alarms Panel ── */
+.today-alarms-wrap {
+  background: #fff8e7;
+  border: 1.5px solid rgba(255,149,0,.3);
+  border-radius: var(--r);
+  padding: 14px 16px 10px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.today-alarms-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+.today-alarms-icon {
+  font-size: 10px;
+  color: #FF9500;
+  animation: ta-pulse 1.4s ease-in-out infinite;
+}
+.today-alarms-title { font-size: 13px; font-weight: 700; color: #b54708; }
+.today-alarms-count { font-size: 11px; color: #b54708; background: rgba(255,149,0,.18); padding: 1px 7px; border-radius: 99px; }
+
+.today-alarm-item {
+  background: #fff;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-left: 3px solid #FF9500;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 180ms ease-out, transform 180ms ease-out, background 150ms;
+}
+.today-alarm-item.ta-animate-in { opacity: 1; transform: translateY(0); }
+.today-alarm-item.ta-acking { opacity: 0; transform: translateY(-8px); transition: opacity 200ms, transform 200ms; }
+.ta-msg { font-size: 13px; color: var(--text); line-height: 1.5; white-space: pre-wrap; margin-bottom: 6px; }
+.ta-meta { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+.ta-ack-btn {
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  background: #000;
+  color: #fff;
+  border: none;
+  border-radius: 980px;
+  cursor: pointer;
+}
+.ta-ack-btn:hover { background: #333; }
+
+@keyframes ta-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .3; }
+}
+
 .sessions-card {
   background: #F5F5F7;
   border: none;
@@ -2025,6 +2127,31 @@ body {
   transition: color .15s, border-color .15s;
 }
 .grp-folder-view:hover { color: var(--accent); border-color: var(--accent); }
+/* ── CC 마지막 보고 이력 행 ── */
+.cc-act-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 8px 3px 10px;
+  opacity: .55;
+  transition: opacity 150ms;
+}
+.cc-act-row:hover { opacity: 1; }
+.cc-act-row.cc-act-latest { opacity: .85; }
+.cc-act-dot {
+  width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; margin-top: 2px;
+}
+.cc-act-dot-done  { background: #1a7f37; }
+.cc-act-dot-start { background: #0071E3; }
+.cc-act-dot-step  { background: #8e8e93; }
+.cc-act-dot-warn  { background: #FF9500; }
+.cc-act-task {
+  flex: 1; font-size: 11px; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cc-act-latest .cc-act-task { color: var(--text); font-weight: 700; }
+.cc-act-time { font-size: 10px; color: var(--muted); flex-shrink: 0; opacity: .7; }
+
 .grp-task-row {
   display: flex;
   align-items: center;
@@ -2354,7 +2481,7 @@ body {
 .profile-menu-item.danger { color: var(--danger); }
 .profile-menu-divider { height: 1px; background: var(--border); margin: 4px 0; }
 
-/* ── 구과장님 요청 패널 ── */
+/* ── 협업 요청 패널 ── */
 .req-overlay {
   display: none; position: fixed; inset: 0;
   background: rgba(0,0,0,.55); z-index: 1000; overflow-y: auto;
@@ -2429,12 +2556,28 @@ body {
 .req-item-action-btn { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 3px 10px; font-size: 11px; cursor: pointer; font-family: inherit; color: var(--muted); }
 .req-item-action-btn:hover { border-color: #1D1D1F; color: #1D1D1F; }
 
-/* 구과장님 그룹 고정 표시 */
+/* 구과장님 그룹 — 최상단 고정 + 강조 색상 */
+.wf-group-pinned {
+  background: rgba(255, 149, 0, 0.12);
+  border-radius: 6px;
+  margin: 0 4px 6px;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 149, 0, 0.25);
+}
+.wf-group-pinned .wf-group-name {
+  color: #FF9500;
+  font-size: 11px;
+  letter-spacing: -.01em;
+  text-transform: none;
+}
 .wf-group-pinned .wf-group-name::before {
   content: '';
   display: inline-block; width: 5px; height: 5px;
-  background: var(--accent); border-radius: 50%;
+  background: #FF9500; border-radius: 50%;
   margin-right: 5px; vertical-align: middle;
+}
+.wf-group-pinned .wf-group-arrow {
+  color: #FF9500;
 }
 
 /* ── 알림 패널 ── */
@@ -2490,7 +2633,7 @@ body {
     <div class="dot dot-r"></div>
     <div class="dot dot-y"></div>
     <div class="dot dot-g"></div>
-    <div class="titlebar-title">Daily Focus — 전략적 비서</div>
+    <div class="titlebar-title">Daily Focus</div>
     <div class="titlebar-right">
       <button id="widgetBtn" onclick="launchWidget()" title="위젯 열기 / 앞으로" style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.08);border:none;border-radius:6px;padding:4px 10px;cursor:pointer;color:rgba(255,255,255,.7);font-size:11px;font-weight:700;letter-spacing:.02em;transition:background 150ms;font-family:inherit;" onmouseenter="this.style.background='rgba(255,255,255,.16)'" onmouseleave="this.style.background='rgba(255,255,255,.08)'">
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
@@ -2526,7 +2669,7 @@ body {
 
     <div class="sidebar-brand">
       <div class="label">DAILY FOCUS</div>
-      <div class="name">전략적 비서</div>
+      <div class="name">Daily Focus</div>
     </div>
 
     <!-- 1. 월별 캘린더 -->
@@ -2542,6 +2685,13 @@ body {
 
     <!-- 2. hidden weekList (data kept for calendar dots) -->
     <div id="weekList" style="display:none"></div>
+
+    <!-- 협업 요청 — 캘린더 아래 독립 섹션 -->
+    <div class="req-shortcut" onclick="location.href='/requests'">
+      <span class="req-shortcut-dot"></span>
+      <span class="req-shortcut-label">협업 요청</span>
+      <span class="req-shortcut-arrow">→</span>
+    </div>
 
     <!-- 3. 프로젝트별 -->
     <div class="sidebar-section">
@@ -2566,11 +2716,11 @@ body {
 
   </aside>
 
-  <!-- 구과장님 요청 패널 -->
+  <!-- 협업 요청 패널 -->
   <div class="req-overlay" id="reqOverlay" onclick="if(event.target===this)closeReqPanel()">
     <div class="req-panel">
       <div class="req-panel-hd">
-        <span class="req-panel-title">구과장님 요청</span>
+        <span class="req-panel-title">협업 요청</span>
         <button class="req-panel-close" onclick="closeReqPanel()">✕</button>
       </div>
       <!-- 새 요청 폼 -->
@@ -2637,8 +2787,29 @@ body {
       <!-- TAB: 보고 -->
       <div id="tabReport">
 
+      <!-- Today Alarms Panel (shown when today has unacknowledged alarms) -->
+      <div id="todayAlarmsPanel" style="display:none"></div>
+
+      <!-- Future Date View (shown instead of all content for future dates) -->
+      <div id="futureView" style="display:none">
+        <div class="main-hd">
+          <div class="main-hd-left">
+            <div class="main-hd-title" id="futureViewTitle"></div>
+            <div class="main-hd-sub" id="futureViewSub" style="color:var(--muted)">예정된 날 — 알람을 설정해두면 당일 알림이 표시됩니다</div>
+          </div>
+        </div>
+        <div id="futureAlarmCompose" style="padding:0 0 16px">
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px">이 날 알람 설정</div>
+          <textarea id="futureAlarmInput" placeholder="이 날 할 일이나 메모를 입력하세요..." style="width:100%;min-height:72px;padding:10px;font-size:13px;font-family:inherit;border:1px solid var(--border);border-radius:8px;resize:none;background:#fff;color:var(--text);line-height:1.5;outline:none;box-shadow:none" onfocus="this.style.borderColor='#000';this.style.boxShadow='0 0 0 2px rgba(0,0,0,0.08)'" onblur="this.style.borderColor='var(--border)';this.style.boxShadow='none'"></textarea>
+          <div style="display:flex;justify-content:flex-end;margin-top:8px">
+            <button type="button" onclick="saveFutureAlarm()" style="padding:7px 18px;font-size:12px;font-weight:700;background:#000;color:#fff;border:none;border-radius:980px;cursor:pointer;font-family:inherit">알람 저장</button>
+          </div>
+        </div>
+        <div id="futureAlarmList"></div>
+      </div>
+
       <!-- Main Header -->
-      <div class="main-hd">
+      <div class="main-hd" id="reportMainHd">
         <div class="main-hd-left">
           <div class="main-hd-title" id="mainTitle"></div>
           <div class="main-hd-sub" id="mainSub"></div>
@@ -2894,7 +3065,7 @@ body {
       <!-- Project Health -->
       <div class="sessions-card collapsible-card" id="healthCard">
         <div class="sessions-title collapsible-header" onclick="toggleCard('health')">
-          <span>프로젝트 건강</span>
+          <span>프로젝트 현황</span>
           <span class="collapse-arrow" id="healthArrow">▶</span>
         </div>
         <div class="collapsible-body" id="healthBody" style="display:none;padding:12px 0 4px">
@@ -3062,19 +3233,240 @@ function switchTab(tab, noSave) {
   if (!noSave) setUiPref('active_tab', tab);
 }
 function switchSubTab(sub, noSave) {
+  // 금일 이상 날짜에서 LOG 탭 진입 시 비움 (당일 로그 미표시)
   const isLog = sub === 'log';
+  const isToday = currentViewDate >= todayStr();
   document.getElementById('subTabWork').style.display = isLog ? 'none' : '';
   document.getElementById('subTabLog').style.display  = isLog ? '' : 'none';
   document.getElementById('subBtnWork').classList.toggle('active', !isLog);
   document.getElementById('subBtnLog').classList.toggle('active', isLog);
   if (!noSave) setUiPref('active_subtab', sub);
-  if (!isLog) renderGrid(allTasks);
+  if (!isLog) {
+    renderGrid(allTasks);
+  } else if (isToday) {
+    // 당일/미래 LOG 탭: 빈 안내 메시지만 표시
+    const hist = document.getElementById('ciHist');
+    if (hist) hist.innerHTML = '<div style="padding:24px 0;text-align:center;font-size:13px;color:var(--muted)">작업 로그는 다음 날부터 확인할 수 있습니다</div>';
+    const form = document.getElementById('ciForm');
+    if (form) form.style.display = 'none';
+    const btn = document.querySelector('.btn-ci');
+    if (btn) btn.style.display = 'none';
+  }
+}
+
+// 보고 탭에서 알림설정 카드를 최상단으로 이동
+function _moveNotifSettingToTop() {
+  const tabReport = document.getElementById('tabReport');
+  const telegramCard = document.getElementById('telegramCard');
+  if (!tabReport || !telegramCard) return;
+  // mainHd 다음, 즉 tabReport의 두 번째 자식 위치에 삽입
+  const anchor = tabReport.children[1]; // strategicPanel 위치
+  if (anchor && anchor !== telegramCard) {
+    tabReport.insertBefore(telegramCard, anchor);
+  }
+}
+
+// ── 미래 날짜 뷰 전환 ──────────────────────────────────────────────
+// normalIds: 미래 모드에서 숨길 카드 목록
+const _REPORT_NORMAL_IDS = [
+  'reportMainHd','strategicPanel','strategicToast',
+  'claude-card-wrap','sessionsCard','morningCard','ops-card-wrap',
+  'healthCard','eodCard','telegramCard',
+];
+function _setFutureMode(on, ds) {
+  const futureView = document.getElementById('futureView');
+  const todayPanel = document.getElementById('todayAlarmsPanel');
+  if (!futureView) return;
+
+  // 숨기거나 표시할 실제 카드 요소 목록 (class 기반도 지원)
+  const hideEls = [
+    document.getElementById('reportMainHd'),
+    document.getElementById('strategicPanel'),
+    document.getElementById('strategicToast'),
+    document.querySelector('.claude-card'),
+    document.getElementById('sessionsCard'),
+    document.getElementById('morningCard'),
+    document.querySelector('.ops-card'),
+    document.getElementById('healthCard'),
+    document.getElementById('eodCard'),
+    document.getElementById('telegramCard'),
+  ].filter(Boolean);
+
+  if (on) {
+    // 원래 display 값 저장 후 숨김
+    hideEls.forEach(el => {
+      el.dataset.prevDisplay = el.style.display;
+      el.style.display = 'none';
+    });
+    if (todayPanel) todayPanel.style.display = 'none';
+    futureView.style.display = '';
+    // 날짜 표시
+    const titleEl = document.getElementById('futureViewTitle');
+    if (titleEl && ds) {
+      const d = new Date(ds + 'T00:00:00');
+      const dayNames = ['일','월','화','수','목','금','토'];
+      titleEl.textContent = `${d.getMonth()+1}월 ${d.getDate()}일 (${dayNames[d.getDay()]})`;
+    }
+    const inp = document.getElementById('futureAlarmInput');
+    if (inp) inp.value = '';
+    loadFutureAlarms(ds);
+  } else {
+    futureView.style.display = 'none';
+    // 저장된 display 값으로 복구 (없으면 '')
+    hideEls.forEach(el => {
+      el.style.display = el.dataset.prevDisplay ?? '';
+      delete el.dataset.prevDisplay;
+    });
+  }
+}
+
+// ── 미래 알람 목록 로드 ────────────────────────────────────────────
+async function loadFutureAlarms(ds) {
+  const list = document.getElementById('futureAlarmList');
+  if (!list) return;
+  try {
+    const res = await fetch(appUrl(`api/alarms?date=${ds}`));
+    const alarms = await res.json();
+    if (!alarms.length) {
+      list.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 0">설정된 알람이 없습니다.</div>';
+      return;
+    }
+    list.innerHTML = alarms.map(a => `
+      <div class="future-alarm-item${a.acknowledged_at ? ' acked' : ''}" id="falarm-${a.id}">
+        <div class="fa-msg">${escHtml(a.message)}</div>
+        <div class="fa-meta">
+          <span>${a.created_by ? a.created_by + ' · ' : ''}${fmtAlarmTs(a.created_at)}</span>
+          ${a.acknowledged_at ? '<span class="fa-acked-badge">확인됨</span>' : ''}
+        </div>
+        <button type="button" class="fa-del-btn" onclick="deleteFutureAlarm(${a.id})" title="삭제">×</button>
+      </div>
+    `).join('');
+  } catch(e) {
+    list.innerHTML = '<div style="font-size:12px;color:var(--muted)">불러오기 실패</div>';
+  }
+}
+
+const escHtml = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function fmtAlarmTs(ts) {
+  if (!ts) return '';
+  const d = new Date(ts.replace(' ','T'));
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mi = String(d.getMinutes()).padStart(2,'0');
+  return `${mm}/${dd} ${hh}:${mi}`;
+}
+
+async function saveFutureAlarm() {
+  const inp = document.getElementById('futureAlarmInput');
+  const msg = inp ? inp.value.trim() : '';
+  if (!msg) return;
+  const ds = currentViewDate;
+  try {
+    const res = await fetch(appUrl('api/alarms'), {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({target_date: ds, message: msg})
+    });
+    if (!res.ok) throw new Error();
+    inp.value = '';
+    loadFutureAlarms(ds);
+  } catch(e) {
+    alert('저장 실패');
+  }
+}
+
+async function deleteFutureAlarm(id) {
+  await fetch(appUrl(`api/alarms/${id}`), {method:'DELETE'});
+  loadFutureAlarms(currentViewDate);
+}
+
+// ── 오늘 알람 패널 (보고 탭 최상단) ──────────────────────────────
+async function loadTodayAlarms() {
+  const panel = document.getElementById('todayAlarmsPanel');
+  if (!panel) return;
+  try {
+    const res = await fetch(appUrl('api/alarms/today'));
+    const alarms = await res.json();
+    if (!alarms.length) {
+      panel.style.display = 'none';
+      return;
+    }
+    panel.style.display = '';
+    panel.innerHTML = `
+      <div class="today-alarms-wrap">
+        <div class="today-alarms-header">
+          <span class="today-alarms-icon">&#9654;</span>
+          <span class="today-alarms-title">오늘의 알람</span>
+          <span class="today-alarms-count">${alarms.length}건</span>
+        </div>
+        ${alarms.map(a => `
+          <div class="today-alarm-item" id="talarm-${a.id}">
+            <div class="ta-msg">${escHtml(a.message)}</div>
+            <div class="ta-meta">${a.created_by ? a.created_by + ' · ' : ''}${fmtAlarmTs(a.created_at)} 작성</div>
+            <button type="button" class="ta-ack-btn" onclick="ackTodayAlarm(${a.id})">확인 완료</button>
+          </div>
+        `).join('')}
+      </div>`;
+    // 입장 애니메이션 트리거
+    requestAnimationFrame(() => {
+      panel.querySelectorAll('.today-alarm-item').forEach((el, i) => {
+        el.style.animationDelay = `${i * 80}ms`;
+        el.classList.add('ta-animate-in');
+      });
+    });
+  } catch(e) {
+    panel.style.display = 'none';
+  }
+}
+
+async function ackTodayAlarm(id) {
+  const el = document.getElementById(`talarm-${id}`);
+  if (el) {
+    el.classList.add('ta-acking');
+    await new Promise(r => setTimeout(r, 200));
+  }
+  try {
+    await fetch(appUrl(`api/alarms/${id}/ack`), {method:'PATCH'});
+    loadTodayAlarms();
+  } catch(e) {}
 }
 let currentView = 'grid';
 
 function switchView(v) {
   currentView = 'grid';
   renderGrid(allTasks);
+}
+
+// ── CC 마지막 보고 이력 렌더 (태스크 없는 폴더용) ──────────────────
+function buildLastActivityRows(proj) {
+  const acts = agentLastActivity[proj];
+  if (!acts || !acts.length) {
+    return `<div class="grp-task-row" style="padding-left:10px">
+      <span style="font-size:11px;color:var(--muted)">태스크 없음</span>
+    </div>`;
+  }
+  const statusDot = s => {
+    const cls = s === 'done' ? 'cc-act-dot-done'
+              : s === 'start' ? 'cc-act-dot-start'
+              : s === 'warn' ? 'cc-act-dot-warn'
+              : 'cc-act-dot-step';
+    return `<span class="cc-act-dot ${cls}"></span>`;
+  };
+  const fmtAgo = ts => {
+    if (!ts) return '';
+    const diff = (Date.now() - new Date(ts.replace(' ','T')).getTime()) / 60000;
+    if (diff < 1)   return '방금';
+    if (diff < 60)  return `${Math.round(diff)}분 전`;
+    if (diff < 1440) return `${Math.floor(diff/60)}시간 전`;
+    return `${Math.floor(diff/1440)}일 전`;
+  };
+  return acts.map((a, i) => `
+    <div class="cc-act-row${i === 0 ? ' cc-act-latest' : ''}">
+      ${statusDot(a.status)}
+      <span class="cc-act-task">${esc(a.task)}</span>
+      <span class="cc-act-time">${fmtAgo(a.created_at)}</span>
+    </div>`).join('');
 }
 
 function renderGrid(tasks) {
@@ -3136,7 +3528,7 @@ function renderGrid(tasks) {
         </div>
       </div>
       ${shown.map(taskRow).join('')}
-      ${!items.length ? `<div class="grp-task-row" style="padding-left:10px"><span style="font-size:11px;color:var(--muted)">태스크 없음</span></div>` : ''}
+      ${!items.length ? buildLastActivityRows(proj) : ''}
       <div class="grp-folder-cmt-panel" id="fcmt-${projId}">
         <div class="comment-list" id="fcmt-list-${projId}"></div>
         <div class="comment-input-row">
@@ -3438,17 +3830,33 @@ function selectGroup(groupId) {
 function selectDate(ds) {
   currentViewDate = ds;
   currentProject  = null;
-  const isPast = ds < todayStr();
-  const addCard = document.getElementById('addTaskCard');
+  const today    = todayStr();
+  const isPast   = ds < today;
+  const isFuture = ds > today;
+  const addCard  = document.getElementById('addTaskCard');
   if (addCard) addCard.style.display = isPast ? 'none' : '';
   updateMainHeader();
   renderCalendar();
   renderWeekList();
   loadTodayByDate(ds);
-  loadCheckins(ds);
-  // 사이드바 클릭 시 작업 탭으로 자동 이동
-  switchTab('work');
-  switchSubTab('work');
+
+  if (isPast) {
+    // 과거 날짜: 작업탭 → LOG 서브탭 자동 전환 + 체크인 로드
+    _setFutureMode(false);
+    switchTab('work');
+    switchSubTab('log');
+    loadCheckins(ds);
+  } else if (isFuture) {
+    // 미래 날짜: 보고탭 전환, 모든 콘텐츠 숨기고 알람 화면만 표시
+    switchTab('report');
+    _setFutureMode(true, ds);
+  } else {
+    // 금일: 보고탭 전환 + 알림설정 최상단 이동
+    _setFutureMode(false);
+    switchTab('report');
+    _moveNotifSettingToTop();
+    loadTodayAlarms();
+  }
 }
 
 function selectProject(proj) {
@@ -4230,7 +4638,10 @@ function refreshMain() {
     return loadTodayByDate(todayStr());
   } else {
     const addCard = document.getElementById('addTaskCard');
-    if (addCard) addCard.style.display = currentViewDate < todayStr() ? 'none' : '';
+    // 미래 날짜 futureMode 중엔 addTaskCard 건드리지 않음
+    if (addCard && currentViewDate <= todayStr()) {
+      addCard.style.display = currentViewDate < todayStr() ? 'none' : '';
+    }
     return loadTodayByDate(currentViewDate);
   }
 }
@@ -5492,27 +5903,14 @@ function renderWfList(rows) {
     </div>`;
   };
 
-  // 구과장님 요청 그룹 최상위 고정
-  const isPinned = g => g.name && g.name.includes('구과장');
-  const sortedGroups = [...groups].sort((a, b) => {
-    if (isPinned(a) && !isPinned(b)) return -1;
-    if (!isPinned(a) && isPinned(b)) return 1;
-    return 0;
-  });
+  // 구과장님 그룹은 사이드바 최상단 독립 섹션으로 분리됨 — wfList에서 제외
+  const regularGroups = groups.filter(g => !(g.name && (g.name.includes('구과장') || g.name.includes('협업 요청'))));
 
   let html = '';
-  sortedGroups.forEach(g => {
-    const pinned = isPinned(g);
+
+  regularGroups.forEach(g => {
     const gFolders = (g.folders || []).filter(f => rowMap[f]);
     const collapsed = (getUiPref('wfg_states', {}))[g.id] === true;
-    if (pinned) {
-      // 구과장님 그룹: 클릭 시 요청 패널 오픈
-      html += `<div class="wf-group-header wf-group-pinned" onclick="openReqPanel()" style="cursor:pointer">
-        <span class="wf-group-name">${esc(g.name)}</span>
-        <span class="wf-group-arrow" style="font-size:10px;color:var(--accent)">→</span>
-      </div>`;
-      return;
-    }
     html += `<div class="wf-group-header" onclick="toggleWfGroup('${esc(g.id)}')">
       <span class="wf-group-name">${esc(g.name)}</span>
       <span class="wf-group-arrow" id="wfga-${esc(g.id)}">${collapsed ? '▶' : '▼'}</span>
@@ -5633,17 +6031,23 @@ function removeFolderFromGroup(gid, folder) {
 }
 
 // 4) 세션 현황 로드
+// 프로젝트별 마지막 CC 보고 이력 (태스크 없는 폴더에 표시)
+const agentLastActivity = {};  // project -> [{task, status, created_at}, ...]
+
 async function loadAgentStatus() {
   try {
     const rows = await fetch(appUrl('api/agent-status')).then(r => r.json());
     const el = document.getElementById('sessionsList');
     document.getElementById('sessionsTime').textContent =
       new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
-    // update url map
+    // update url map + activity map
     liveProjects.clear();
     rows.forEach(r => {
       if (r.url) agentUrls[r.project] = r.url;
       if (r.is_live) liveProjects.add(r.project);
+      if (r.recent_activity && r.recent_activity.length) {
+        agentLastActivity[r.project] = r.recent_activity;
+      }
     });
     // liveProjects 갱신 후 아코디언 재정렬 (live 프로젝트 최상단)
     if (allTasks.length) {
@@ -5697,6 +6101,8 @@ async function loadAgentStatus() {
   loadMorningProjectBoard();
   loadLastLog();
   loadCalendarActivity();
+  // 오늘 미확인 알람 표시
+  loadTodayAlarms();
 })();
 
 // ── Strategic Advisor ──────────────────────────────────────────
@@ -5816,7 +6222,7 @@ function doLogout() {
   window.location.href = '/logout';
 }
 
-// ── 구과장님 요청 패널 ──────────────────────────────────────────
+// ── 협업 요청 패널 ──────────────────────────────────────────
 let _reqPendingFiles = [];
 
 function openReqPanel() {

@@ -227,11 +227,13 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
             body TEXT DEFAULT '',
+            project_name TEXT DEFAULT '',
+            description TEXT DEFAULT '',
             status TEXT DEFAULT 'open',
             priority INTEGER DEFAULT 2,
             created_by TEXT DEFAULT '',
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            updated_at TEXT DEFAULT (datetime('now','localtime'))
         );
         CREATE TABLE IF NOT EXISTS request_attachments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -250,6 +252,22 @@ def init_db():
             ref_id INTEGER DEFAULT 0,
             is_read INTEGER DEFAULT 0,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS request_replies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            request_id INTEGER NOT NULL,
+            body TEXT NOT NULL,
+            created_by TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            FOREIGN KEY (request_id) REFERENCES requests(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS date_alarms (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            target_date TEXT NOT NULL,
+            message TEXT NOT NULL,
+            created_by TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            acknowledged_at TEXT DEFAULT NULL
         );
     """)
     conn.commit()
@@ -273,6 +291,8 @@ def ensure_base_schema() -> None:
     ensure_table_column(conn, "tasks", "updated_at", "TEXT")
     ensure_table_column(conn, "tasks", "task_state", "TEXT")
     ensure_table_column(conn, "tasks", "decision_note", "TEXT")
+    ensure_table_column(conn, "requests", "project_name", "TEXT DEFAULT ''")
+    ensure_table_column(conn, "requests", "description", "TEXT DEFAULT ''")
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('morning_brief_time', '09:00')")
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('workspace_watch_seeded', '0')")
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('workspace_backfill_completed', '0')")
@@ -648,7 +668,7 @@ def build_checkin_feed(conn, target_date: str):
         activity_rows = conn.execute(
             """SELECT project, task, status, url, created_at
                FROM agent_activity
-               WHERE date(created_at, 'localtime') = ?
+               WHERE date(created_at) = ?
                ORDER BY created_at DESC
                LIMIT 40""",
             (target_date,),
@@ -3463,11 +3483,15 @@ WIDGET_VBS = str(Path(__file__).parent / "widget" / "widget-start-silent.vbs")
 class RequestCreate(BaseModel):
     title: str
     body: str = ""
+    project_name: str = ""
+    description: str = ""
     priority: int = 2
 
 class RequestUpdate(BaseModel):
     title: Optional[str] = None
     body: Optional[str] = None
+    project_name: Optional[str] = None
+    description: Optional[str] = None
     status: Optional[str] = None
     priority: Optional[int] = None
 
@@ -3493,8 +3517,8 @@ async def create_request(payload: RequestCreate, http_req: Request):
     conn = get_db()
     try:
         cur = conn.execute(
-            "INSERT INTO requests (title, body, priority, created_by) VALUES (?, ?, ?, ?)",
-            (payload.title.strip(), payload.body, payload.priority, author),
+            "INSERT INTO requests (title, body, project_name, description, priority, created_by) VALUES (?, ?, ?, ?, ?, ?)",
+            (payload.title.strip(), payload.body, payload.project_name.strip(), payload.description.strip(), payload.priority, author),
         )
         req_id = cur.lastrowid
         # 알림 자동 생성
@@ -3510,9 +3534,18 @@ async def create_request(payload: RequestCreate, http_req: Request):
 
 
 @app.patch("/api/requests/{req_id}")
-def update_request(req_id: int, payload: RequestUpdate):
+def update_request(req_id: int, payload: RequestUpdate, http_req: Request):
+    user = http_req.session.get("user", {})
+    login = user.get("login", "") if isinstance(user, dict) else ""
     conn = get_db()
     try:
+        row = conn.execute("SELECT created_by FROM requests WHERE id=?", (req_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "요청을 찾을 수 없습니다")
+        # 소유자 또는 관리자(ALLOWED_GITHUB_USERS 첫 번째)만 수정 가능
+        admins = list(ALLOWED_GITHUB_USERS)[:1]
+        if row["created_by"] and login and row["created_by"] != login and login not in admins:
+            raise HTTPException(403, "본인이 작성한 요청만 수정할 수 있습니다")
         updates = {k: v for k, v in payload.dict().items() if v is not None}
         if not updates:
             raise HTTPException(400, "변경사항 없음")
@@ -3521,17 +3554,23 @@ def update_request(req_id: int, payload: RequestUpdate):
         conn.execute(f"UPDATE requests SET {sets} WHERE id=?", (*updates.values(), req_id))
         conn.commit()
         row = conn.execute("SELECT * FROM requests WHERE id=?", (req_id,)).fetchone()
-        if not row:
-            raise HTTPException(404, "Not found")
         return dict(row)
     finally:
         conn.close()
 
 
 @app.delete("/api/requests/{req_id}")
-def delete_request(req_id: int):
+def delete_request(req_id: int, http_req: Request):
+    user = http_req.session.get("user", {})
+    login = user.get("login", "") if isinstance(user, dict) else ""
     conn = get_db()
     try:
+        row = conn.execute("SELECT created_by FROM requests WHERE id=?", (req_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "요청을 찾을 수 없습니다")
+        admins = list(ALLOWED_GITHUB_USERS)[:1]
+        if row["created_by"] and login and row["created_by"] != login and login not in admins:
+            raise HTTPException(403, "본인이 작성한 요청만 삭제할 수 있습니다")
         # 첨부파일 물리 삭제
         atts = conn.execute("SELECT filename FROM request_attachments WHERE request_id=?", (req_id,)).fetchall()
         for a in atts:
@@ -3610,6 +3649,165 @@ def download_attachment(req_id: int, att_id: int):
         return FileResponse(str(fp), filename=row["original_name"])
     finally:
         conn.close()
+
+
+# ── Replies ──────────────────────────────────────────────────────────
+
+class ReplyCreate(BaseModel):
+    body: str
+
+@app.get("/api/requests/{req_id}/replies")
+def list_replies(req_id: int):
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM request_replies WHERE request_id=? ORDER BY created_at ASC",
+            (req_id,),
+        ).fetchall()
+        return {"replies": [dict(r) for r in rows]}
+    finally:
+        conn.close()
+
+@app.post("/api/requests/{req_id}/replies")
+def create_reply(req_id: int, payload: ReplyCreate, http_req: Request):
+    user = http_req.session.get("user", {})
+    author = user.get("login", "unknown") if isinstance(user, dict) else str(user)
+    body = payload.body.strip()
+    if not body:
+        raise HTTPException(400, "내용 없음")
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "INSERT INTO request_replies (request_id, body, created_by) VALUES (?,?,?)",
+            (req_id, body, author),
+        )
+        conn.execute(
+            "UPDATE requests SET updated_at=? WHERE id=?",
+            (datetime.now().isoformat(), req_id),
+        )
+        conn.commit()
+        row = conn.execute("SELECT * FROM request_replies WHERE id=?", (cur.lastrowid,)).fetchone()
+        return dict(row)
+    finally:
+        conn.close()
+
+@app.delete("/api/requests/{req_id}/replies/{reply_id}")
+def delete_reply(req_id: int, reply_id: int, http_req: Request):
+    user = http_req.session.get("user", {})
+    login = user.get("login", "") if isinstance(user, dict) else ""
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT created_by FROM request_replies WHERE id=? AND request_id=?", (reply_id, req_id)).fetchone()
+        if not row:
+            raise HTTPException(404, "댓글을 찾을 수 없습니다")
+        admins = list(ALLOWED_GITHUB_USERS)[:1]
+        if row["created_by"] and login and row["created_by"] != login and login not in admins:
+            raise HTTPException(403, "본인이 작성한 댓글만 삭제할 수 있습니다")
+        conn.execute("DELETE FROM request_replies WHERE id=? AND request_id=?", (reply_id, req_id))
+        conn.commit()
+        return {"ok": True}
+    finally:
+        conn.close()
+
+
+# ── 이미지 업로드 (클립보드 붙여넣기용) ──────────────────────────────
+
+@app.post("/api/upload-image")
+async def upload_image(file: UploadFile = File(...)):
+    allowed = {"image/png", "image/jpeg", "image/gif", "image/webp"}
+    if file.content_type not in allowed:
+        raise HTTPException(400, "이미지 파일만 업로드 가능합니다")
+    img_dir = Path("data/uploads/images")
+    img_dir.mkdir(parents=True, exist_ok=True)
+    ext = file.filename.rsplit(".", 1)[-1] if "." in file.filename else "png"
+    safe_name = f"{int(datetime.now().timestamp()*1000)}.{ext}"
+    dest = img_dir / safe_name
+    content = await file.read()
+    dest.write_bytes(content)
+    return {"url": f"/uploads/images/{safe_name}"}
+
+
+# ── Date Alarms API ─────────────────────────────────────────────────
+
+class AlarmCreate(BaseModel):
+    target_date: str
+    message: str
+
+@app.get("/api/alarms")
+def list_alarms(request: Request, date: Optional[str] = None):
+    user = request.session.get("user", {})
+    login = user.get("login", "") if isinstance(user, dict) else ""
+    conn = get_db()
+    if date:
+        rows = conn.execute(
+            "SELECT * FROM date_alarms WHERE target_date = ? ORDER BY created_at",
+            (date,)
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM date_alarms ORDER BY target_date, created_at"
+        ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+@app.get("/api/alarms/today")
+def list_today_alarms(request: Request):
+    today = datetime.now().strftime("%Y-%m-%d")
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM date_alarms WHERE target_date = ? AND acknowledged_at IS NULL ORDER BY created_at",
+        (today,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+@app.post("/api/alarms")
+def create_alarm(data: AlarmCreate, request: Request):
+    user = request.session.get("user", {})
+    login = user.get("login", "") if isinstance(user, dict) else ""
+    conn = get_db()
+    cur = conn.execute(
+        "INSERT INTO date_alarms (target_date, message, created_by) VALUES (?, ?, ?)",
+        (data.target_date, data.message, login)
+    )
+    conn.commit()
+    row = conn.execute("SELECT * FROM date_alarms WHERE id = ?", (cur.lastrowid,)).fetchone()
+    conn.close()
+    return dict(row)
+
+@app.patch("/api/alarms/{alarm_id}/ack")
+def ack_alarm(alarm_id: int, request: Request):
+    conn = get_db()
+    row = conn.execute("SELECT * FROM date_alarms WHERE id = ?", (alarm_id,)).fetchone()
+    if not row:
+        raise HTTPException(404, "알람을 찾을 수 없습니다")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn.execute(
+        "UPDATE date_alarms SET acknowledged_at = ? WHERE id = ?",
+        (now, alarm_id)
+    )
+    conn.commit()
+    row = conn.execute("SELECT * FROM date_alarms WHERE id = ?", (alarm_id,)).fetchone()
+    conn.close()
+    return dict(row)
+
+@app.delete("/api/alarms/{alarm_id}")
+def delete_alarm(alarm_id: int, request: Request):
+    conn = get_db()
+    conn.execute("DELETE FROM date_alarms WHERE id = ?", (alarm_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+# ── /requests 페이지 ─────────────────────────────────────────────────
+
+@app.get("/requests")
+def requests_page():
+    return FileResponse(
+        "static/requests.html",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -4833,6 +5031,38 @@ def get_agent_status():
         pass
 
     result.sort(key=lambda x: x.get("minutes_ago", 99999))
+
+    # ── 프로젝트별 최근 보고 이력 3개 주입 ──────────────────────────
+    try:
+        conn2 = get_db()
+        # 한 번에 전체 이력 가져와서 Python에서 프로젝트별 분류
+        activity_rows = conn2.execute(
+            """SELECT project, task, status, created_at
+               FROM agent_activity
+               WHERE task != '' AND task IS NOT NULL
+               ORDER BY created_at DESC
+               LIMIT 500"""
+        ).fetchall()
+        conn2.close()
+        # project -> [last 3 entries]
+        _act_map: dict = {}
+        for row in activity_rows:
+            p = row["project"]
+            if p not in _act_map:
+                _act_map[p] = []
+            if len(_act_map[p]) < 3:
+                _act_map[p].append({
+                    "task": row["task"],
+                    "status": row["status"],
+                    "created_at": row["created_at"],
+                })
+        for r in result:
+            r["recent_activity"] = _act_map.get(r["project"], [])
+    except Exception:
+        for r in result:
+            if "recent_activity" not in r:
+                r["recent_activity"] = []
+
     return result
 
 
@@ -5377,6 +5607,7 @@ def get_project_health():
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/uploads", StaticFiles(directory="data/uploads"), name="uploads")
 
 # SessionMiddleware must be added LAST so it executes FIRST (outermost layer),
 # making request.session available to auth_middleware above.

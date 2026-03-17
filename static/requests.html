@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>협업 요청 — Daily Focus</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232C2C2E'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' font-size='18' fill='%23FF9500'>R</text></svg>">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --text:   #1D1D1F;
+  --muted:  #6E6E73;
+  --border: #E5E5E5;
+  --soft:   #F5F5F7;
+  --accent: #0071E3;
+  --danger: #FF3B30;
+  --amber:  #FF9500;
+  --sw:     200px;
+}
+body { font-family: -apple-system,'Helvetica Neue',sans-serif; background:#F5F5F7; color:var(--text); height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+
+/* ── Titlebar ── */
+.titlebar { height:40px; background:#1C1C1E; display:flex; align-items:center; justify-content:space-between; padding:0 16px; flex-shrink:0; }
+.tb-left { display:flex; align-items:center; gap:8px; }
+.tb-back { display:flex; align-items:center; gap:4px; background:none; border:none; cursor:pointer; color:rgba(255,255,255,.4); font-size:11px; font-family:inherit; padding:3px 6px; border-radius:4px; transition:color 150ms; }
+.tb-back:hover { color:rgba(255,255,255,.8); }
+.tb-sep { color:rgba(255,255,255,.2); font-size:12px; }
+.tb-title { font-size:12px; font-weight:700; color:rgba(255,255,255,.7); }
+.tb-page { font-size:12px; font-weight:700; color:var(--amber); }
+.tb-user { font-size:11px; color:rgba(255,255,255,.35); }
+
+/* ── Layout ── */
+.layout { display:flex; flex:1; overflow:hidden; }
+
+/* ── Sidebar ── */
+.sidebar { width:var(--sw); background:#2C2C2E; display:flex; flex-direction:column; overflow-y:auto; flex-shrink:0; }
+.sidebar::-webkit-scrollbar { width:3px; }
+.sidebar::-webkit-scrollbar-thumb { background:rgba(255,255,255,.12); border-radius:99px; }
+.sb-brand { padding:16px 14px 12px; border-bottom:1px solid rgba(255,255,255,.07); }
+.sb-brand-lbl { font-size:9px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,.3); }
+.sb-brand-name { font-size:13px; font-weight:700; color:rgba(255,255,255,.85); margin-top:2px; }
+.sb-active { display:flex; align-items:center; gap:7px; padding:9px 14px; background:rgba(255,149,0,.15); border-bottom:1px solid rgba(255,149,0,.2); }
+.sb-active-dot { width:5px; height:5px; background:var(--amber); border-radius:50%; flex-shrink:0; }
+.sb-active-lbl { font-size:11px; font-weight:700; color:var(--amber); }
+.sb-link { display:flex; align-items:center; gap:7px; padding:9px 14px; font-size:11px; color:rgba(255,255,255,.45); text-decoration:none; transition:color 150ms; }
+.sb-link:hover { color:rgba(255,255,255,.8); }
+.sb-section { padding:12px 14px 8px; }
+.sb-section-lbl { font-size:9px; font-weight:700; color:rgba(255,255,255,.25); letter-spacing:.06em; text-transform:uppercase; margin-bottom:6px; }
+.filter-btn { display:flex; align-items:center; justify-content:space-between; width:100%; padding:5px 6px; background:none; border:none; cursor:pointer; border-radius:5px; font-size:11px; color:rgba(255,255,255,.45); font-family:inherit; transition:all 150ms; text-align:left; margin-bottom:1px; }
+.filter-btn:hover { color:rgba(255,255,255,.8); }
+.filter-btn.on { color:var(--amber); font-weight:700; }
+.fc { font-size:10px; color:rgba(255,255,255,.25); }
+.filter-btn.on .fc { color:rgba(255,149,0,.6); }
+
+/* ── Main ── */
+.main { flex:1; display:flex; overflow:hidden; }
+
+/* ── Feed col ── */
+.feed-col { width:460px; min-width:320px; flex-shrink:0; display:flex; flex-direction:column; border-right:1px solid var(--border); background:#fff; overflow:hidden; }
+
+/* ── Compose ── */
+.compose { padding:14px 16px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.compose-as { font-size:10px; color:var(--muted); margin-bottom:10px; }
+.compose-as strong { color:var(--text); }
+.compose-title-input {
+  width:100%; border:none; border-bottom:1.5px solid var(--text); outline:none;
+  font-size:15px; font-weight:700; font-family:inherit; color:var(--text);
+  background:transparent; padding:0 0 5px; margin-bottom:8px;
+}
+.compose-title-input::placeholder { color:var(--muted); font-weight:400; font-size:14px; }
+.compose-proj-input {
+  width:100%; border:none; outline:none; font-size:11px; font-weight:700;
+  color:var(--accent); font-family:inherit; background:transparent;
+  padding:0 0 8px; border-bottom:1px solid var(--border); margin-bottom:8px;
+}
+.compose-proj-input::placeholder { color:rgba(0,113,227,.35); font-weight:400; }
+.compose-desc {
+  width:100%; border:1px solid var(--border); border-radius:7px;
+  padding:8px 10px; font-size:13px; font-family:inherit; color:var(--text);
+  resize:none; outline:none; line-height:1.55; min-height:64px; max-height:140px;
+  background:#FAFAFA; transition:border 150ms;
+}
+.compose-desc:focus { border-color:#000; background:#fff; box-shadow:0 0 0 2px rgba(0,0,0,.05); }
+.compose-desc::placeholder { color:var(--muted); }
+.compose-foot { display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-top:8px; }
+.char-cnt { font-size:10px; color:var(--muted); }
+.btn-submit { background:#1D1D1F; color:#fff; border:none; border-radius:980px; padding:7px 18px; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; transition:opacity 150ms; }
+.btn-submit:hover { opacity:.82; }
+.btn-submit:disabled { opacity:.3; cursor:default; }
+
+/* ── Feed header ── */
+.feed-hdr { padding:8px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+.feed-hdr-title { font-size:12px; font-weight:700; color:var(--muted); }
+.feed-cnt { font-size:11px; color:var(--muted); }
+.feed-list { overflow-y:auto; flex:1; }
+.feed-list::-webkit-scrollbar { width:3px; }
+.feed-list::-webkit-scrollbar-thumb { background:var(--border); border-radius:99px; }
+.feed-empty { padding:40px 24px; text-align:center; color:var(--muted); font-size:13px; }
+
+/* ── Post card ── */
+.post {
+  padding:12px 16px 12px 19px;
+  border-bottom:1px solid var(--border);
+  border-left:3px solid transparent;
+  cursor:pointer;
+  transition:background 150ms, border-left-color 150ms;
+}
+.post:hover { background:#FAFAFA; }
+.post.sel { border-left-color:var(--amber); background:rgba(255,149,0,.03); }
+.post.mine { background:rgba(0,113,227,.02); }
+.post.mine.sel { background:rgba(255,149,0,.03); }
+.post-meta { display:flex; align-items:center; gap:6px; margin-bottom:4px; flex-wrap:wrap; }
+.post-author { font-size:11px; font-weight:700; color:var(--muted); }
+.post-time   { font-size:11px; color:var(--muted); opacity:.7; }
+.post-proj   { font-size:10px; font-weight:700; color:var(--accent); background:rgba(0,113,227,.07); padding:1px 6px; border-radius:99px; }
+.post-title  { font-size:14px; font-weight:700; line-height:1.35; margin-bottom:3px; }
+.post-desc   { font-size:12px; color:var(--muted); line-height:1.5; }
+.post-foot   { display:flex; align-items:center; gap:10px; margin-top:6px; }
+.post-stat   { font-size:11px; color:var(--muted); display:flex; align-items:center; gap:3px; }
+.st-badge { font-size:10px; font-weight:700; padding:1px 7px; border-radius:99px; }
+.st-open        { background:rgba(255,149,0,.1);  color:#b06000; }
+.st-in_progress { background:rgba(0,113,227,.09); color:var(--accent); }
+.st-done        { background:rgba(26,127,55,.09); color:#1a7f37; }
+.st-closed      { background:rgba(0,0,0,.05);     color:var(--muted); }
+
+/* ── Detail col ── */
+.detail-col { flex:1; display:flex; flex-direction:column; overflow:hidden; background:#F5F5F7; }
+.detail-empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--muted); gap:8px; }
+.detail-empty p { font-size:12px; }
+.detail-panel { display:flex; flex-direction:column; height:100%; overflow:hidden; }
+
+/* Detail header */
+.dp-hdr { padding:16px 20px; border-bottom:1px solid var(--border); background:#fff; flex-shrink:0; }
+.dp-top-row { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.dp-meta-row { font-size:11px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+.dp-author-name { font-weight:700; color:var(--text); }
+.dp-status-sel { font-size:11px; font-weight:700; padding:3px 10px; border-radius:980px; border:1px solid var(--border); cursor:pointer; background:#fff; font-family:inherit; color:var(--muted); margin-left:auto; }
+.dp-title-in {
+  width:100%; border:none; border-bottom:1px solid transparent; outline:none;
+  font-size:17px; font-weight:700; font-family:inherit; color:var(--text);
+  background:transparent; padding:2px 0; transition:border 150ms; margin-bottom:6px;
+}
+.dp-title-in:focus { border-bottom-color:var(--text); }
+.dp-proj-in {
+  width:100%; border:none; outline:none; font-size:11px; font-weight:700;
+  color:var(--accent); font-family:inherit; background:transparent;
+  padding:2px 0; border-bottom:1px solid transparent; transition:border 150ms; margin-bottom:6px;
+}
+.dp-proj-in:focus { border-bottom-color:var(--accent); }
+.dp-desc-in {
+  width:100%; border:1px solid transparent; border-radius:6px; outline:none;
+  font-size:13px; font-family:inherit; color:#3a3a3c; background:transparent;
+  padding:4px 0; resize:none; line-height:1.6; transition:all 150ms;
+}
+.dp-desc-in:focus { border-color:var(--border); padding:6px 8px; background:#FAFAFA; }
+.dp-actions { display:flex; gap:6px; margin-top:10px; padding-top:10px; border-top:1px solid var(--border); }
+.btn-act { font-size:11px; font-weight:700; padding:5px 12px; border-radius:980px; cursor:pointer; font-family:inherit; transition:all 150ms; }
+.btn-save    { background:#1D1D1F; border:1px solid #1D1D1F; color:#fff; }
+.btn-danger  { background:none; border:1px solid rgba(255,59,48,.25); color:var(--danger); margin-left:auto; }
+.btn-danger:hover { background:rgba(255,59,48,.05); }
+
+/* Thread */
+.thread-bar { padding:6px 20px; font-size:10px; font-weight:700; color:var(--muted); letter-spacing:.04em; text-transform:uppercase; background:#EFEFEF; border-bottom:1px solid var(--border); flex-shrink:0; }
+.thread-area { flex:1; overflow-y:auto; }
+.thread-area::-webkit-scrollbar { width:3px; }
+.thread-area::-webkit-scrollbar-thumb { background:var(--border); border-radius:99px; }
+
+/* Reply item */
+.reply-item {
+  padding:10px 20px;
+  border-bottom:1px solid var(--border);
+  background:#fff;
+  position:relative;
+}
+.reply-item.mine { background:rgba(0,113,227,.02); }
+.reply-item:last-child { border-bottom:none; }
+.reply-top { display:flex; align-items:center; gap:6px; margin-bottom:3px; }
+.reply-author { font-size:11px; font-weight:700; color:var(--muted); }
+.reply-time   { font-size:11px; color:var(--muted); opacity:.7; }
+.reply-text   { font-size:13px; color:var(--text); line-height:1.55; white-space:pre-wrap; }
+.reply-del { position:absolute; top:8px; right:14px; background:none; border:none; cursor:pointer; color:var(--muted); font-size:14px; opacity:0; transition:opacity 150ms; line-height:1; }
+.reply-item:hover .reply-del { opacity:1; }
+.reply-del:hover { color:var(--danger); }
+
+/* Reply compose */
+.reply-compose { padding:10px 16px; border-top:1px solid var(--border); background:#fff; flex-shrink:0; }
+.reply-input {
+  flex:1; border:1px solid var(--border); border-radius:8px;
+  padding:8px 12px; font-size:13px; font-family:inherit; resize:none;
+  outline:none; line-height:1.5; min-height:38px; max-height:120px;
+  transition:border 150ms;
+}
+.reply-input:focus { border-color:#000; box-shadow:0 0 0 2px rgba(0,0,0,.05); }
+.reply-input::placeholder { color:var(--muted); }
+.reply-wrap { display:flex; align-items:flex-end; gap:8px; }
+.btn-reply {
+  flex-shrink:0; align-self:flex-end;
+  background:var(--amber); color:#fff; border:none; border-radius:980px;
+  padding:8px 14px; font-size:11px; font-weight:700; cursor:pointer;
+  font-family:inherit; transition:opacity 150ms; white-space:nowrap;
+}
+.btn-reply:hover { opacity:.85; }
+.btn-reply:disabled { opacity:.4; cursor:default; }
+
+/* 이미지 프리뷰 */
+.img-preview-area { display:flex; flex-wrap:wrap; gap:6px; padding:0 0 8px; }
+.img-preview-wrap { position:relative; }
+.img-preview { width:72px; height:72px; object-fit:cover; border-radius:6px; border:1px solid var(--border); display:block; cursor:pointer; }
+.img-preview-del { position:absolute; top:-5px; right:-5px; width:16px; height:16px; border-radius:50%; background:#1D1D1F; color:#fff; border:none; cursor:pointer; font-size:10px; display:flex; align-items:center; justify-content:center; }
+.img-uploading { width:72px; height:72px; border-radius:6px; border:1px dashed var(--border); display:flex; align-items:center; justify-content:center; font-size:10px; color:var(--muted); background:#FAFAFA; }
+.reply-img { max-width:100%; max-height:280px; border-radius:7px; margin-top:6px; display:block; cursor:pointer; border:1px solid var(--border); }
+
+/* ── Delete confirm modal ── */
+.del-modal-backdrop {
+  position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:1000;
+  display:flex; align-items:center; justify-content:center;
+  animation:dm-fade-in 120ms ease-out;
+}
+@keyframes dm-fade-in { from { opacity:0; } to { opacity:1; } }
+.del-modal {
+  background:#fff; border-radius:12px; padding:24px 24px 20px;
+  width:320px; max-width:90vw; box-shadow:0 8px 32px rgba(0,0,0,.18);
+  animation:dm-slide-in 140ms ease-out;
+}
+@keyframes dm-slide-in { from { transform:scale(.94); opacity:0; } to { transform:scale(1); opacity:1; } }
+.del-modal-title { font-size:15px; font-weight:700; color:var(--text); margin-bottom:6px; }
+.del-modal-desc  { font-size:13px; color:var(--muted); line-height:1.55; margin-bottom:20px; }
+.del-modal-btns  { display:flex; gap:8px; justify-content:flex-end; }
+.del-modal-cancel {
+  padding:7px 16px; font-size:12px; font-weight:700; font-family:inherit;
+  background:#fff; color:var(--text); border:1.5px solid var(--border);
+  border-radius:980px; cursor:pointer;
+}
+.del-modal-cancel:hover { border-color:#000; }
+.del-modal-confirm {
+  padding:7px 16px; font-size:12px; font-weight:700; font-family:inherit;
+  background:var(--danger); color:#fff; border:none; border-radius:980px; cursor:pointer;
+}
+.del-modal-confirm:hover { opacity:.85; }
+</style>
+</head>
+<body>
+
+<!-- Delete Confirm Modal -->
+<div id="delModal" class="del-modal-backdrop" style="display:none" onclick="if(event.target===this)closeDelModal()">
+  <div class="del-modal">
+    <div class="del-modal-title" id="delModalTitle">삭제하시겠습니까?</div>
+    <div class="del-modal-desc"  id="delModalDesc">이 작업은 되돌릴 수 없습니다.</div>
+    <div class="del-modal-btns">
+      <button class="del-modal-cancel"  onclick="closeDelModal()">취소</button>
+      <button class="del-modal-confirm" id="delModalConfirm" onclick="confirmDelModal()">삭제</button>
+    </div>
+  </div>
+</div>
+
+<!-- Titlebar -->
+<div class="titlebar">
+  <div class="tb-left">
+    <button class="tb-back" onclick="location.href='/'">
+      <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M10 3L5 8l5 5"/></svg>
+      메인
+    </button>
+    <span class="tb-sep">/</span>
+    <span class="tb-title">Daily Focus</span>
+    <span class="tb-sep">/</span>
+    <span class="tb-page">협업 요청</span>
+  </div>
+  <span class="tb-user" id="tbUser"></span>
+</div>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sb-brand">
+      <div class="sb-brand-lbl">Daily Focus</div>
+      <div class="sb-brand-name">협업 요청</div>
+    </div>
+    <div class="sb-active">
+      <span class="sb-active-dot"></span>
+      <span class="sb-active-lbl">협업 요청</span>
+    </div>
+    <a href="/" class="sb-link">
+      <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
+      메인 대시보드
+    </a>
+    <div class="sb-section">
+      <div class="sb-section-lbl">필터</div>
+      <button class="filter-btn on" id="fAll"      onclick="setFilter('all')"        >전체     <span class="fc" id="cAll">0</span></button>
+      <button class="filter-btn"    id="fOpen"     onclick="setFilter('open')"       >대기     <span class="fc" id="cOpen">0</span></button>
+      <button class="filter-btn"    id="fProgress" onclick="setFilter('in_progress')">진행 중  <span class="fc" id="cProgress">0</span></button>
+      <button class="filter-btn"    id="fDone"     onclick="setFilter('done')"       >완료     <span class="fc" id="cDone">0</span></button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+
+    <!-- Feed -->
+    <div class="feed-col">
+
+      <!-- Compose -->
+      <div class="compose">
+        <div class="compose-as" id="composeAs">작성자: <strong>—</strong></div>
+        <input class="compose-title-input" id="cTitle" type="text"
+          placeholder="요청 제목" oninput="updateBtn()">
+        <input class="compose-proj-input" id="cProject" type="text"
+          placeholder="프로젝트명 (선택)">
+        <textarea class="compose-desc" id="cDesc"
+          placeholder="요청 내용을 자유롭게 작성하세요..."
+          rows="3" oninput="autoResize(this);updateBtn()"></textarea>
+        <div class="compose-foot">
+          <span class="char-cnt" id="charCnt"></span>
+          <button class="btn-submit" id="btnSubmit" onclick="submitRequest()" disabled>전송</button>
+        </div>
+      </div>
+
+      <!-- Feed header -->
+      <div class="feed-hdr">
+        <span class="feed-hdr-title" id="feedLabel">전체</span>
+        <span class="feed-cnt" id="feedCount">0</span>
+      </div>
+
+      <div class="feed-list" id="feedList">
+        <div class="feed-empty">불러오는 중...</div>
+      </div>
+    </div>
+
+    <!-- Detail -->
+    <div class="detail-col">
+      <div class="detail-empty" id="detailEmpty">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".25"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <p>요청을 선택하면 대화를 볼 수 있습니다</p>
+      </div>
+      <div class="detail-panel" id="detailPanel" style="display:none"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let allRequests = [];
+let currentFilter = 'all';
+let currentReqId  = null;
+let meLogin = '';
+
+// ── Helpers ──────────────────────────────────────────────────────
+const COLORS = ['#5856D6','#34C759','#FF9500','#0071E3','#FF2D55','#AF52DE','#30B0C7'];
+function avatarColor(name) {
+  let h = 0;
+  for (let c of String(name||'')) h = (h*31 + c.charCodeAt(0)) & 0xffff;
+  return COLORS[h % COLORS.length];
+}
+function fmtTs(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  if (isNaN(d)) return ts;
+  const mm=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
+  const hh=String(d.getHours()).padStart(2,'0'),   mi=String(d.getMinutes()).padStart(2,'0');
+  return `${mm}/${dd} ${hh}:${mi}`;
+}
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function autoResize(el) { el.style.height='auto'; el.style.height=el.scrollHeight+'px'; }
+function renderReplyBody(raw) {
+  return String(raw||'').split(/(!\[.*?\]\(.*?\))/g).map(p => {
+    const m = p.match(/^!\[(.*?)\]\((.*?)\)$/);
+    if (m) return `<img class="reply-img" src="${esc(m[2])}" onclick="window.open('${esc(m[2])}','_blank')" loading="lazy">`;
+    return esc(p).replace(/\n/g,'<br>');
+  }).join('');
+}
+function stBadge(s) {
+  const m = {open:'<span class="st-badge st-open">대기</span>',in_progress:'<span class="st-badge st-in_progress">진행 중</span>',done:'<span class="st-badge st-done">완료</span>',closed:'<span class="st-badge st-closed">닫힘</span>'};
+  return m[s]||'';
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const d = await (await fetch('/api/me')).json();
+    meLogin = d.login || '익명';
+  } catch { meLogin = '익명'; }
+  document.getElementById('tbUser').textContent = meLogin;
+  document.getElementById('composeAs').innerHTML = `작성자: <strong>${esc(meLogin)}</strong>`;
+  await loadRequests();
+}
+
+// ── Load / Filter ─────────────────────────────────────────────────
+async function loadRequests() {
+  try {
+    const d = await (await fetch('/api/requests')).json();
+    allRequests = d.requests || [];
+  } catch(e) {
+    allRequests = [];
+    document.getElementById('feedList').innerHTML =
+      '<div class="feed-empty">데이터를 불러올 수 없습니다. 새로고침을 시도해주세요.</div>';
+    return;
+  }
+  updateCounts();
+  renderFeed();
+  if (currentReqId) {
+    const req = allRequests.find(r => r.id === currentReqId);
+    if (req) await renderDetail(req);
+  }
+}
+
+function updateCounts() {
+  document.getElementById('cAll').textContent      = allRequests.length;
+  document.getElementById('cOpen').textContent     = allRequests.filter(r=>r.status==='open').length;
+  document.getElementById('cProgress').textContent = allRequests.filter(r=>r.status==='in_progress').length;
+  document.getElementById('cDone').textContent     = allRequests.filter(r=>r.status==='done').length;
+}
+
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('on'));
+  ({all:'fAll',open:'fOpen',in_progress:'fProgress',done:'fDone'}[f] &&
+    document.getElementById({all:'fAll',open:'fOpen',in_progress:'fProgress',done:'fDone'}[f])?.classList.add('on'));
+  document.getElementById('feedLabel').textContent = {all:'전체',open:'대기',in_progress:'진행 중',done:'완료'}[f]||'전체';
+  renderFeed();
+}
+
+function renderFeed() {
+  const list = currentFilter === 'all' ? allRequests : allRequests.filter(r=>r.status===currentFilter);
+  document.getElementById('feedCount').textContent = list.length + '건';
+  if (!list.length) {
+    document.getElementById('feedList').innerHTML = '<div class="feed-empty">요청이 없습니다</div>';
+    return;
+  }
+  document.getElementById('feedList').innerHTML = list.map(req => {
+    const isMine = req.created_by === meLogin;
+    const sel    = req.id === currentReqId;
+    const desc   = (req.description || req.body || '').slice(0, 90);
+    return `<div class="post${sel?' sel':''}${isMine?' mine':''}" onclick="openDetail(${req.id})">
+      <div class="post-meta">
+        <span class="post-author" style="color:${avatarColor(req.created_by||'?')}">${esc(req.created_by||'익명')}</span>
+        <span class="post-time">${fmtTs(req.created_at)}</span>
+        ${req.project_name ? `<span class="post-proj">${esc(req.project_name)}</span>` : ''}
+        ${stBadge(req.status)}
+      </div>
+      <div class="post-title">${esc(req.title)}</div>
+      ${desc ? `<div class="post-desc">${esc(desc)}${(req.description||req.body||'').length>90?'…':''}</div>` : ''}
+      <div class="post-foot">
+        <span class="post-stat">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          ${req.reply_count||0}
+        </span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Detail ────────────────────────────────────────────────────────
+async function openDetail(reqId) {
+  currentReqId = reqId;
+  renderFeed();
+  document.getElementById('detailEmpty').style.display = 'none';
+  document.getElementById('detailPanel').style.display = 'flex';
+  const req = allRequests.find(r => r.id === reqId);
+  if (!req) return;
+  await renderDetail(req);
+  await loadReplies(reqId);
+}
+
+async function renderDetail(req) {
+  const statusOpts = ['open','in_progress','done','closed'].map(s =>
+    `<option value="${s}" ${req.status===s?'selected':''}>${{open:'대기',in_progress:'진행 중',done:'완료',closed:'닫힘'}[s]}</option>`
+  ).join('');
+  const updatedLine = req.updated_at && req.updated_at !== req.created_at
+    ? ` · 수정 ${fmtTs(req.updated_at)}` : '';
+
+  document.getElementById('detailPanel').innerHTML = `
+    <div class="dp-hdr">
+      <div class="dp-top-row">
+        <div class="dp-meta-row">
+          <span class="dp-author-name" style="color:${avatarColor(req.created_by||'?')}">${esc(req.created_by||'익명')}</span>
+          <span>${fmtTs(req.created_at)}${updatedLine}</span>
+        </div>
+        <select class="dp-status-sel" onchange="changeStatus(${req.id},this.value)">${statusOpts}</select>
+      </div>
+      <input class="dp-title-in" id="dp_title" value="${esc(req.title)}" placeholder="제목">
+      <input class="dp-proj-in"  id="dp_proj"  value="${esc(req.project_name||'')}" placeholder="프로젝트명">
+      <textarea class="dp-desc-in" id="dp_desc" rows="3"
+        oninput="autoResize(this)">${esc(req.description||req.body||'')}</textarea>
+      <div class="dp-actions">
+        <button class="btn-act btn-save" onclick="saveDetail(${req.id})">변경사항 저장</button>
+        <button class="btn-act btn-danger" onclick="deleteRequest(${req.id})">삭제</button>
+      </div>
+    </div>
+    <div class="thread-bar">댓글 <span id="replyCnt"></span></div>
+    <div class="thread-area" id="threadArea"></div>
+    <div class="reply-compose">
+      <div id="imgPreviewArea" class="img-preview-area" style="display:none"></div>
+      <div class="reply-wrap">
+        <textarea class="reply-input" id="replyInput"
+          placeholder="의견을 남겨보세요... (Ctrl+Enter 전송, 이미지 Ctrl+V)"
+          rows="1" oninput="autoResize(this)"
+          onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){sendReply(${req.id});event.preventDefault()}"
+          onpaste="handlePaste(event,${req.id})"></textarea>
+        <button class="btn-reply" onclick="sendReply(${req.id})">전송</button>
+      </div>
+    </div>
+  `;
+  const ta = document.getElementById('dp_desc');
+  if (ta) autoResize(ta);
+}
+
+async function loadReplies(reqId) {
+  const d = await (await fetch(`/api/requests/${reqId}/replies`)).json();
+  const replies = d.replies || [];
+  const area = document.getElementById('threadArea');
+  const cnt  = document.getElementById('replyCnt');
+  if (!area) return;
+  if (cnt) cnt.textContent = replies.length ? `(${replies.length})` : '';
+  if (!replies.length) {
+    area.innerHTML = '<div style="padding:20px;text-align:center;font-size:12px;color:var(--muted)">아직 댓글이 없습니다</div>';
+    return;
+  }
+  area.innerHTML = replies.map(rep => {
+    const isMine = meLogin && meLogin !== '익명' && rep.created_by === meLogin;
+    return `<div class="reply-item${isMine?' mine':''}">
+      <div class="reply-top">
+        <span class="reply-author" style="color:${avatarColor(rep.created_by||'?')}">${esc(rep.created_by||'익명')}</span>
+        <span class="reply-time">${fmtTs(rep.created_at)}</span>
+      </div>
+      <div class="reply-text">${renderReplyBody(rep.body)}</div>
+      ${isMine ? `<button class="reply-del" onclick="deleteReply(${reqId},${rep.id})">×</button>` : ''}
+    </div>`;
+  }).join('');
+  area.scrollTop = area.scrollHeight;
+}
+
+// ── Compose ───────────────────────────────────────────────────────
+function updateBtn() {
+  const t = document.getElementById('cTitle').value.trim();
+  const d = document.getElementById('cDesc').value.trim();
+  document.getElementById('charCnt').textContent = (t.length+d.length) || '';
+  document.getElementById('btnSubmit').disabled = !t;
+}
+
+async function submitRequest() {
+  const title   = document.getElementById('cTitle').value.trim();
+  const project = document.getElementById('cProject').value.trim();
+  const desc    = document.getElementById('cDesc').value.trim();
+  if (!title) return;
+  document.getElementById('btnSubmit').disabled = true;
+  try {
+    await fetch('/api/requests', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ title, project_name:project, description:desc, body:desc, priority:2 }),
+    });
+    ['cTitle','cProject','cDesc'].forEach(id => { const el=document.getElementById(id); if(el){el.value='';el.style.height='auto';} });
+    document.getElementById('charCnt').textContent = '';
+    await loadRequests();
+  } finally { document.getElementById('btnSubmit').disabled = false; }
+}
+
+async function saveDetail(reqId) {
+  const title   = document.getElementById('dp_title')?.value.trim();
+  const project = document.getElementById('dp_proj')?.value.trim();
+  const desc    = document.getElementById('dp_desc')?.value.trim();
+  if (!title) return;
+  const btn = document.querySelector('.btn-save');
+  if (btn) { btn.textContent = '저장 중...'; btn.disabled = true; }
+  try {
+    const res = await fetch(`/api/requests/${reqId}`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ title, project_name:project, description:desc }),
+    });
+    if (res.status === 403) { showToast('본인이 작성한 요청만 수정할 수 있습니다', 'error'); return; }
+    if (!res.ok) { showToast('저장에 실패했습니다', 'error'); return; }
+    if (btn) { btn.textContent = '저장됨'; setTimeout(() => { if(btn) { btn.textContent='변경사항 저장'; btn.disabled=false; } }, 1200); }
+    await loadRequests();
+  } catch(e) {
+    if (btn) { btn.textContent = '변경사항 저장'; btn.disabled = false; }
+    showToast('저장에 실패했습니다', 'error');
+  }
+}
+
+async function changeStatus(reqId, status) {
+  await fetch(`/api/requests/${reqId}`, {
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ status }),
+  });
+  const req = allRequests.find(r=>r.id===reqId);
+  if (req) req.status = status;
+  updateCounts(); renderFeed();
+}
+
+// ── Delete confirm modal ──────────────────────────────────────────
+let _delCallback = null;
+function showDelModal(title, desc, callback) {
+  document.getElementById('delModalTitle').textContent = title;
+  document.getElementById('delModalDesc').textContent  = desc;
+  _delCallback = callback;
+  document.getElementById('delModal').style.display = 'flex';
+}
+function closeDelModal() {
+  document.getElementById('delModal').style.display = 'none';
+  _delCallback = null;
+}
+function confirmDelModal() {
+  closeDelModal();
+  if (_delCallback) _delCallback();
+}
+
+async function deleteRequest(reqId) {
+  const req = allRequests.find(r => r.id === reqId);
+  const title = req ? `"${req.title}" 삭제` : '요청 삭제';
+  showDelModal(title, '삭제하면 댓글을 포함한 모든 내용이 사라지며 복구할 수 없습니다.', async () => {
+    const res = await fetch(`/api/requests/${reqId}`, { method:'DELETE' });
+    if (res.status === 403) { showToast('본인이 작성한 요청만 삭제할 수 있습니다', 'error'); return; }
+    if (res.status === 404) { showToast('이미 삭제된 요청입니다', 'warn'); }
+    allRequests = allRequests.filter(r=>r.id!==reqId);
+    currentReqId = null;
+    document.getElementById('detailPanel').style.display = 'none';
+    document.getElementById('detailEmpty').style.display = 'flex';
+    updateCounts(); renderFeed();
+  });
+}
+
+// ── Replies ───────────────────────────────────────────────────────
+async function sendReply(reqId) {
+  const input = document.getElementById('replyInput');
+  const text  = input.value.trim();
+  const imgs  = _pendingImages.filter(p => p.serverUrl);
+  if (!text && !imgs.length) return;
+  if (_pendingImages.some(p => !p.serverUrl)) {
+    const btn = document.querySelector('.btn-reply');
+    if (btn) { btn.textContent='업로드 중...'; btn.disabled=true; }
+    await new Promise(r => setTimeout(r, 1500));
+    if (btn) { btn.textContent='전송'; btn.disabled=false; }
+  }
+  const imgLines = _pendingImages.filter(p=>p.serverUrl).map(p=>`\n![이미지](${p.serverUrl})`).join('');
+  const body = (text + imgLines).trim();
+  if (!body) return;
+  input.value=''; input.style.height='auto';
+  _pendingImages.forEach(p=>URL.revokeObjectURL(p.localUrl));
+  _pendingImages=[];
+  renderImgPreviews(reqId);
+  await fetch(`/api/requests/${reqId}/replies`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ body }),
+  });
+  const req = allRequests.find(r=>r.id===reqId);
+  if (req) req.reply_count=(req.reply_count||0)+1;
+  renderFeed();
+  await loadReplies(reqId);
+}
+
+async function deleteReply(reqId, replyId) {
+  showDelModal('댓글 삭제', '이 댓글을 삭제하면 복구할 수 없습니다.', async () => {
+    const res = await fetch(`/api/requests/${reqId}/replies/${replyId}`, { method:'DELETE' });
+    if (res.status === 403) { showToast('본인이 작성한 댓글만 삭제할 수 있습니다', 'error'); return; }
+    const req = allRequests.find(r=>r.id===reqId);
+    if (req&&req.reply_count>0) req.reply_count--;
+    renderFeed();
+    await loadReplies(reqId);
+  });
+}
+
+// ── 클립보드 이미지 ───────────────────────────────────────────────
+let _pendingImages = [];
+
+function handlePaste(e, reqId) {
+  const img = Array.from(e.clipboardData?.items||[]).find(it=>it.type.startsWith('image/'));
+  if (!img) return;
+  e.preventDefault();
+  const blob = img.getAsFile();
+  if (!blob) return;
+  const localUrl = URL.createObjectURL(blob);
+  const pending  = { blob, localUrl, serverUrl:null };
+  _pendingImages.push(pending);
+  renderImgPreviews(reqId);
+  uploadPendingImage(pending, reqId);
+}
+
+function renderImgPreviews(reqId) {
+  const area = document.getElementById('imgPreviewArea');
+  if (!area) return;
+  if (!_pendingImages.length) { area.style.display='none'; return; }
+  area.style.display='flex';
+  area.innerHTML = _pendingImages.map((img,i) => `
+    <div class="img-preview-wrap">
+      ${img.serverUrl
+        ? `<img class="img-preview" src="${img.localUrl}" onclick="window.open('${img.serverUrl}')">`
+        : `<div class="img-uploading">업로드 중</div>`}
+      <button class="img-preview-del" onclick="removePendingImg(${i},${reqId})">×</button>
+    </div>`).join('');
+}
+
+async function uploadPendingImage(pending, reqId) {
+  const fd = new FormData();
+  const ext = pending.blob.type.split('/')[1]||'png';
+  fd.append('file', pending.blob, `paste.${ext}`);
+  try {
+    const d = await (await fetch('/api/upload-image', { method:'POST', body:fd })).json();
+    pending.serverUrl = d.url;
+    renderImgPreviews(reqId);
+  } catch(e) { console.error('업로드 실패', e); }
+}
+
+function removePendingImg(idx, reqId) {
+  URL.revokeObjectURL(_pendingImages[idx]?.localUrl);
+  _pendingImages.splice(idx,1);
+  renderImgPreviews(reqId);
+}
+
+init();
+
+// ESC 키로 삭제 모달 닫기
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeDelModal();
+});
+
+// ── 토스트 알림 ──────────────────────────────────────────────────
+function showToast(msg, type = 'info') {
+  let t = document.getElementById('reqToast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'reqToast';
+    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:9px 20px;border-radius:980px;font-size:12px;font-weight:700;font-family:inherit;color:#fff;z-index:2000;opacity:0;transition:opacity 180ms;pointer-events:none;';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.background = type === 'error' ? '#FF3B30' : type === 'warn' ? '#FF9500' : '#1D1D1F';
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.opacity = '0'; }, 2800);
+}
+
+// ── 30초 폴링 (협업자 변경사항 자동 반영) ─────────────────────────
+let _pollTimer = null;
+function startPolling() {
+  if (_pollTimer) return;
+  _pollTimer = setInterval(async () => {
+    // 모달 열려있거나 포커스된 입력창 있으면 스킵
+    if (document.getElementById('delModal')?.style.display !== 'none') return;
+    const focused = document.activeElement;
+    if (focused && (focused.tagName === 'TEXTAREA' || focused.tagName === 'INPUT')) return;
+    await loadRequests();
+  }, 30000);
+}
+startPolling();
+</script>
+</body>
+</html>
