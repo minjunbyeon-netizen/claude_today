@@ -4640,7 +4640,9 @@ function showUrlInput(proj) {
 function saveViewUrl(proj) {
   const input = document.getElementById('urlInputField');
   if (!input) return;
-  const trimmed = input.value.trim();
+  let trimmed = input.value.trim();
+  // BUG-S07 fix: http:// 없는 URL 자동 보정 (localhost:3000 등)
+  if (trimmed && !trimmed.includes('://')) trimmed = 'http://' + trimmed;
   document.getElementById('urlInputOverlay')?.remove();
   fetch(appUrl('api/agent-status/url'), {
     method: 'PATCH',
@@ -4673,9 +4675,16 @@ async function openClaude(proj) {
 }
 
 async function launchBriefItem(project, prompt) {
-  const r = await fetch(appUrl(`api/open-claude?proj=${encodeURIComponent(project)}&prompt=${encodeURIComponent(prompt)}`), {method:'POST'});
-  const d = await r.json();
-  if (!d.ok) alert(`추천 작업 열기 실패\n${d.error}`);
+  // BUG-S10 fix: URL 길이 초과 방지 — 클라이언트에서 1000자로 미리 자름
+  const safePrompt = (prompt || "").slice(0, 1000);
+  try {
+    const r = await fetch(appUrl(`api/open-claude?proj=${encodeURIComponent(project)}&prompt=${encodeURIComponent(safePrompt)}`), {method:"POST"});
+    const d = await r.json();
+    if (!d.ok) showToast(`추천 작업 열기 실패: ${d.error}`, "error");
+  } catch(e) {
+    // BUG-S09 fix: 서버 재시작 중 uncaught rejection 방지
+    showToast("서버 연결 실패", "error");
+  }
 }
 
 async function continueAndLaunch(taskId, project, prompt) {
