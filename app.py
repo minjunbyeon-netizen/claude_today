@@ -3228,48 +3228,19 @@ def open_claude(proj: str, prompt: str = ""):
     env.pop("CLAUDECODE", None)
     prompt_clean = summarize_agent_text(clean_utf8_text(prompt), limit=1200)
 
-    # wt.exe 다중 후보 (App Execution Alias는 PM2 환경 PATH에서 못 찾을 수 있음)
-    WT_CANDIDATES = [
-        r"C:\Users\USER\AppData\Local\Microsoft\WindowsApps\wt.exe",
-        r"C:\Program Files\WindowsApps\Microsoft.WindowsTerminal_1.19.10302.0_x64__8wekyb3d8bbwe\wt.exe",
-        shutil.which("wt") or "",
-    ]
-    WT_EXE = next((p for p in WT_CANDIDATES if p and os.path.exists(p)), "")
-
     # claude 인자 목록
     claude_args = [CLAUDE_CMD]
     if prompt_clean:
         claude_args.append(prompt_clean)
 
-    # Windows Terminal 없음 → cmd.exe 새 창으로 fallback
-    if not WT_EXE:
-        try:
-            cmd_str = f'cd /d "{target_path}" && ' + " ".join(f'"{a}"' for a in claude_args)
-            subprocess.Popen(
-                ["cmd.exe", "/k", cmd_str],
-                creationflags=subprocess.CREATE_NEW_CONSOLE,
-                env=env,
-            )
-        except FileNotFoundError as ex:
-            return {"ok": False, "error": f"실행파일 없음: {str(ex)}. Windows Terminal이 설치되어 있는지 확인하세요."}
-        except PermissionError as ex:
-            return {"ok": False, "error": f"권한 없음: {str(ex)}"}
-        except Exception as ex:
-            return {"ok": False, "error": f"cmd fallback 실패: {str(ex)}"}
-        return {"ok": True, "path": target_path, "method": "cmd", "prompted": bool(prompt_clean)}
+    # Start-Process wt — App Execution Alias를 shell이 올바르게 해석 (직접 경로 탐색 불필요)
+    # single-quote escaping for PowerShell string literals
+    def ps_sq(s: str) -> str:
+        return "'" + s.replace("'", "''") + "'"
 
-    # PowerShell & call-operator + 배열 인자 — ArgumentList 단일문자열 파싱 오류 우회
-    # 경로에 공백이 있을 수 있으므로 각 인자를 따옴표로 감쌈
-    def ps_quote(s):
-        return '"' + s.replace('"', '`"') + '"'
-
-    wt_arg_list = [
-        "new-window",
-        "-d", ps_quote(target_path),
-        "--", "cmd", "/k",
-    ] + [ps_quote(a) for a in claude_args]
-
-    ps_launch = f'& {ps_quote(WT_EXE)} {" ".join(wt_arg_list)}'
+    wt_ps_args = [ps_sq("new-window"), ps_sq("-d"), ps_sq(target_path), ps_sq("--"), ps_sq("cmd"), ps_sq("/k")]
+    wt_ps_args += [ps_sq(a) for a in claude_args]
+    ps_launch = f"Start-Process wt -ArgumentList @({','.join(wt_ps_args)})"
 
     try:
         subprocess.Popen(
@@ -3279,7 +3250,13 @@ def open_claude(proj: str, prompt: str = ""):
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
     except FileNotFoundError as ex:
-        return {"ok": False, "error": f"실행파일 없음: {str(ex)}. Windows Terminal이 설치되어 있는지 확인하세요."}
+        # PowerShell 자체를 못 찾은 경우 → cmd.exe 새 창으로 fallback
+        try:
+            cmd_str = f'cd /d "{target_path}" && ' + " ".join(f'"{a}"' for a in claude_args)
+            subprocess.Popen(["cmd.exe", "/k", cmd_str], creationflags=subprocess.CREATE_NEW_CONSOLE, env=env)
+        except Exception as ex2:
+            return {"ok": False, "error": f"실행 실패: {str(ex2)}"}
+        return {"ok": True, "path": target_path, "method": "cmd_fallback", "prompted": bool(prompt_clean)}
     except PermissionError as ex:
         return {"ok": False, "error": f"권한 없음: {str(ex)}"}
     except Exception as ex:
