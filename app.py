@@ -1772,6 +1772,154 @@ def build_ops_brief(conn, target_date: str, tasks: list[dict], stats: dict[str, 
         latest_note = collapse_spaces(latest_manual["note"] or "")
         latest_note_time = latest_manual["checkin_time"] or ""
 
+    # ── [A] 시간 인텔리전스 ──────────────────────────────────────
+    now = datetime.now()
+    work_end_hour = 19  # 오후 7시 마감 가정
+    remaining_work_min = max(0, (work_end_hour * 60) - (now.hour * 60 + now.minute))
+    task_rem = int(stats.get("remaining_minutes") or 0)
+    forecast_end = ""
+    if task_rem > 0:
+        fcast = now + timedelta(minutes=task_rem)
+        if fcast.date() == now.date():
+            suffix = "오후" if fcast.hour >= 12 else "오전"
+            h = fcast.hour if fcast.hour <= 12 else fcast.hour - 12
+            forecast_end = f"{suffix} {h}:{fcast.strftime('%M')} 마감 예상"
+        else:
+            forecast_end = "오늘 내 완료 어려움"
+    overload = task_rem > remaining_work_min and remaining_work_min > 0
+
+    # ── [B] 이월 추적 ─────────────────────────────────────────────
+    carry_info = []
+    for t in todo_tasks:
+        if not t.get("carry_from"):
+            continue
+        origin_id = t["carry_from"]
+        origin_date = t.get("date", str(date.today()))
+        for _ in range(30):
+            row = conn.execute(
+                "SELECT id, carry_from, date FROM tasks WHERE id=?", (origin_id,)
+            ).fetchone()
+            if not row or not row["carry_from"]:
+                origin_date = row["date"] if row else origin_date
+                break
+            origin_id = row["carry_from"]
+            origin_date = row["date"]
+        try:
+            days = (date.today() - datetime.strptime(origin_date, "%Y-%m-%d").date()).days
+        except Exception:
+            days = 1
+        carry_info.append({"task": t, "days": max(1, days)})
+    carry_info.sort(key=lambda x: -x["days"])
+
+    # ── [C] 오늘 CC 세션 ─────────────────────────────────────────
+    today_cc = []
+    try:
+        cc_rows = conn.execute(
+            "SELECT project, task, status, created_at FROM agent_activity "
+            "WHERE date(created_at,'localtime')=? ORDER BY created_at DESC LIMIT 30",
+            (str(date.today()),),
+        ).fetchall()
+        seen_p: set[str] = set()
+        for row in cc_rows:
+            p = (row["project"] or "").strip()
+            if p and p not in seen_p:
+                seen_p.add(p)
+                today_cc.append({"project": p, "task": row["task"] or "", "status": row["status"] or ""})
+        today_cc = today_cc[:5]
+    except Exception:
+        pass
+
+    # ── [D] THE COMMAND ───────────────────────────────────────────
+    cmd_task = None
+    cmd_reason = ""
+    nearly_done = next(
+        (
+            t for t in todo_tasks
+            if 65 <= int(t.get("progress_pct") or 0) < 100
+            and resolve_task_remaining_minutes(t) <= 35
+        ),
+        None,
+    )
+    if active_tasks:
+        cmd_task = active_tasks[0]
+        rem = resolve_task_remaining_minutes(cmd_task)
+        cmd_reason = f"흐름 유지 중 · 남은 {format_minutes_label(rem)}"
+    elif nearly_done:
+        cmd_task = nearly_done
+        rem = resolve_task_remaining_minutes(cmd_task)
+        cmd_reason = f"거의 완료 · {format_minutes_label(rem)} 더하면 닫힘"
+    elif focus_task:
+        cmd_task = focus_task
+        rem = resolve_task_remaining_minutes(cmd_task)
+        cmd_reason = f"오늘 최우선 · 남은 {format_minutes_label(rem)}"
+    elif todo_tasks:
+        cmd_task = todo_tasks[0]
+        cmd_reason = "다음 대기 작업"
+
+    command = None
+    if cmd_task:
+        pkg = build_task_launch_package(cmd_task, cmd_reason)
+        command = {
+            "task_id": cmd_task.get("id"),
+            "title": strip_task_project(cmd_task.get("title", "작업")),
+            "project": pkg.get("project", ""),
+            "reason": cmd_reason,
+            "progress_pct": int(cmd_task.get("progress_pct") or 0),
+            "remaining_label": format_minutes_label(resolve_task_remaining_minutes(cmd_task)),
+            "can_launch": pkg.get("can_launch", False),
+            "launch_prompt": pkg.get("launch_prompt", ""),
+            "command_preview": pkg.get("command_preview", ""),
+        }
+
+    # ── [E] SEQUENCE ──────────────────────────────────────────────
+    cmd_id = cmd_task.get("id") if cmd_task else -1
+    sequence = []
+    for t in todo_tasks:
+        if t.get("id") == cmd_id:
+            continue
+        if t.get("attention_level") == "critical":
+            continue
+        rem = resolve_task_remaining_minutes(t)
+        sequence.append({
+            "task_id": t.get("id"),
+            "title": strip_task_project(t.get("title", "작업")),
+            "remaining_label": format_minutes_label(rem),
+            "progress_pct": int(t.get("progress_pct") or 0),
+        })
+        if len(sequence) >= 3:
+            break
+
+    # ── [F] DECISIONS ─────────────────────────────────────────────
+    decisions = []
+    seen_dec: set[int] = set()
+    for ci in carry_info[:3]:
+        t = ci["task"]
+        tid = t.get("id")
+        if tid in seen_dec:
+            continue
+        seen_dec.add(tid)
+        decisions.append({
+            "task_id": tid,
+            "title": strip_task_project(t.get("title", "이월 작업")),
+            "label": f"{ci['days']}일째 이월",
+            "urgency": "high" if ci["days"] >= 3 else "normal",
+            "can_launch": bool(t.get("can_open_claude")),
+        })
+    for t in critical_tasks[:3]:
+        tid = t.get("id")
+        if tid in seen_dec:
+            continue
+        seen_dec.add(tid)
+        mins = t.get("attention_minutes", 0)
+        decisions.append({
+            "task_id": tid,
+            "title": strip_task_project(t.get("title", "정체 작업")),
+            "label": f"{mins}분째 정체",
+            "urgency": "high",
+            "can_launch": bool(t.get("can_open_claude")),
+        })
+    decisions = decisions[:4]
+
     return {
         "headline": headline,
         "objective_title": objective_title,
@@ -1783,6 +1931,19 @@ def build_ops_brief(conn, target_date: str, tasks: list[dict], stats: dict[str, 
         "risks": risks[:3],
         "latest_note": latest_note,
         "latest_note_time": latest_note_time,
+        "command": command,
+        "sequence": sequence,
+        "decisions": decisions,
+        "time_status": {
+            "current_time": now.strftime("%H:%M"),
+            "remaining_work_min": remaining_work_min,
+            "remaining_task_min": task_rem,
+            "forecast_end": forecast_end,
+            "overload": overload,
+            "done": stats.get("done", 0),
+            "total": stats.get("total", 0),
+        },
+        "cc_sessions": today_cc,
     }
 
 

@@ -1084,6 +1084,135 @@ body {
   color: var(--muted);
   line-height: 1.5;
 }
+/* ── Ops Brief v2 ── */
+.ops-command {
+  background: #F5F5F7;
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ops-command-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.ops-command-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1D1D1F;
+  line-height: 1.4;
+}
+.ops-command-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+.ops-command-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.ops-command-btn {
+  background: #1D1D1F;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 150ms;
+}
+.ops-command-btn:hover { opacity: .78; }
+.ops-seq {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 14px;
+}
+.ops-seq-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+}
+.ops-seq-item:last-child { border-bottom: none; }
+.ops-seq-num {
+  font-size: 11px;
+  color: var(--muted);
+  width: 16px;
+  flex-shrink: 0;
+  text-align: center;
+}
+.ops-seq-title {
+  flex: 1;
+  font-size: 13px;
+  color: #1D1D1F;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ops-seq-meta {
+  font-size: 11px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.ops-dec {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 14px;
+}
+.ops-dec-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+}
+.ops-dec-item:last-child { border-bottom: none; }
+.ops-dec-title {
+  flex: 1;
+  font-size: 13px;
+  color: #1D1D1F;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ops-dec-label {
+  font-size: 11px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.ops-dec-label.high { color: #1D1D1F; font-weight: 700; }
+.ops-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--border);
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.ops-status-item {
+  font-size: 12px;
+  color: var(--muted);
+}
+.ops-status-item b { color: #1D1D1F; font-weight: 700; }
+.ops-status-item.warn b { color: #1D1D1F; }
+.ops-sec-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: .04em;
+  margin-bottom: 6px;
+}
 .ops-note {
   margin-top: 20px;
   font-size: 12px;
@@ -2538,38 +2667,46 @@ body {
 
       <div class="ops-card">
         <div class="ops-top">
-          <div>
+          <div style="display:flex;align-items:baseline;gap:8px">
             <span class="sec-title">운영 브리프</span>
-            <div class="ops-headline" id="opsHeadline">오늘 운영 요약을 준비하는 중입니다</div>
+            <span class="ops-headline" id="opsHeadline"></span>
           </div>
-          <button class="icon-btn" onclick="refreshMain()" title="운영 브리프 새로고침">↻</button>
+          <button class="icon-btn" onclick="refreshMain()" title="새로고침">↻</button>
         </div>
-        <div class="ops-objective" style="margin-bottom:6px">
-          <div class="ops-objective-title" id="opsObjective">오늘의 목적을 계산하는 중입니다</div>
-          <div class="ops-objective-detail" id="opsObjectiveDetail">작업 흐름을 바탕으로 가장 중요한 목적을 뽑아냅니다.</div>
+
+        <!-- THE COMMAND -->
+        <div class="ops-command" id="opsCommand">
+          <div class="ops-command-label">지금 할 것</div>
+          <div class="ops-command-title" id="opsCommandTitle">계산 중...</div>
+          <div class="ops-command-meta" id="opsCommandMeta"></div>
+          <div class="ops-command-actions" id="opsCommandActions"></div>
         </div>
-        <div class="ops-focus" id="opsFocus">작업 흐름을 분석하는 중입니다.</div>
-        <div class="ops-grid">
-          <div>
-            <div class="ops-block-title">다음 액션</div>
-            <div class="ops-list" id="opsActions">
-              <span class="ops-empty">다음 액션을 계산하는 중입니다</span>
-            </div>
-          </div>
-          <div>
-            <div class="ops-block-title">추천 순서</div>
-            <div class="ops-list" id="opsQueue">
-              <span class="ops-empty">추천 순서를 계산하는 중입니다</span>
-            </div>
-          </div>
-          <div>
-            <div class="ops-block-title">리스크</div>
-            <div class="ops-list" id="opsRisks">
-              <span class="ops-empty">리스크를 계산하는 중입니다</span>
-            </div>
-          </div>
+
+        <!-- SEQUENCE -->
+        <div id="opsSeqWrap" style="display:none">
+          <div class="ops-sec-label">그 다음</div>
+          <div class="ops-seq" id="opsSeq"></div>
         </div>
-        <div class="ops-note" id="opsNote">최근 체크인 메모가 표시됩니다.</div>
+
+        <!-- DECISIONS -->
+        <div id="opsDecWrap" style="display:none">
+          <div class="ops-sec-label">오늘 결정할 것</div>
+          <div class="ops-dec" id="opsDec"></div>
+        </div>
+
+        <!-- STATUS BAR -->
+        <div class="ops-status-bar" id="opsStatusBar"></div>
+
+        <!-- NOTE -->
+        <div class="ops-note" id="opsNote"></div>
+
+        <!-- legacy hidden elements for JS compat -->
+        <span id="opsObjective" style="display:none"></span>
+        <span id="opsObjectiveDetail" style="display:none"></span>
+        <span id="opsFocus" style="display:none"></span>
+        <div id="opsActions" style="display:none"></div>
+        <div id="opsQueue" style="display:none"></div>
+        <div id="opsRisks" style="display:none"></div>
       </div>
 
       </div><!-- /tabReport -->
@@ -3355,24 +3492,107 @@ function renderOpsList(targetId, items, emptyText) {
 }
 
 function renderOpsBrief(brief) {
-  const safeBrief = brief || {};
-  document.getElementById('opsHeadline').textContent =
-    safeBrief.headline || '오늘 운영 요약을 준비하는 중입니다';
-  document.getElementById('opsObjective').textContent =
-    safeBrief.objective_title || '오늘의 목적을 계산하는 중입니다';
-  document.getElementById('opsObjectiveDetail').textContent =
-    safeBrief.objective_detail || '작업 흐름을 바탕으로 가장 중요한 목적을 뽑아냅니다.';
-  document.getElementById('opsFocus').textContent =
-    safeBrief.focus_message || '작업 흐름을 분석하는 중입니다.';
+  const b = brief || {};
 
-  renderOpsList('opsActions', safeBrief.next_actions, '지금은 별도 액션 없이 흐름을 유지해도 좋습니다');
-  renderOpsList('opsQueue', safeBrief.recommended_queue || safeBrief.wins, '아직 추천 순서가 없습니다');
-  renderOpsList('opsRisks', safeBrief.risks, '지금은 큰 리스크가 보이지 않습니다');
+  // headline (compact)
+  document.getElementById('opsHeadline').textContent = b.headline || '';
 
-  const note = safeBrief.latest_note
-    ? `최근 체크인 · ${safeBrief.latest_note}`
-    : '최근 체크인 메모가 없으면 다음 집중 포인트를 한 줄 남겨두는 편이 좋습니다.';
+  // legacy compat
+  ['opsObjective','opsObjectiveDetail','opsFocus'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '';
+  });
+
+  // ── THE COMMAND ──
+  const cmd = b.command;
+  const cmdTitle = document.getElementById('opsCommandTitle');
+  const cmdMeta  = document.getElementById('opsCommandMeta');
+  const cmdAct   = document.getElementById('opsCommandActions');
+  if (cmd) {
+    cmdTitle.textContent = cmd.title;
+    const projLabel = cmd.project ? `${cmd.project} · ` : '';
+    cmdMeta.textContent = projLabel + cmd.reason;
+    cmdAct.innerHTML = '';
+    if (cmd.can_launch && cmd.launch_prompt) {
+      const btn = document.createElement('button');
+      btn.className = 'ops-command-btn';
+      btn.textContent = '이어서 시작';
+      btn.onclick = () => launchBriefItem(cmd);
+      cmdAct.appendChild(btn);
+    }
+  } else if (b.objective_title) {
+    // fallback to old fields
+    cmdTitle.textContent = b.objective_title;
+    cmdMeta.textContent = b.focus_message || '';
+    cmdAct.innerHTML = '';
+  } else {
+    cmdTitle.textContent = '오늘 작업이 없습니다';
+    cmdMeta.textContent = '작업을 추가해서 흐름을 시작하세요';
+    cmdAct.innerHTML = '';
+  }
+
+  // ── SEQUENCE ──
+  const seqWrap = document.getElementById('opsSeqWrap');
+  const seqEl   = document.getElementById('opsSeq');
+  const seq = b.sequence || [];
+  if (seq.length > 0) {
+    seqEl.innerHTML = seq.map((s, i) =>
+      `<div class="ops-seq-item">
+        <span class="ops-seq-num">${i + 1}</span>
+        <span class="ops-seq-title">${esc(s.title)}</span>
+        <span class="ops-seq-meta">${esc(s.remaining_label || '')}</span>
+      </div>`
+    ).join('');
+    seqWrap.style.display = '';
+  } else {
+    seqWrap.style.display = 'none';
+  }
+
+  // ── DECISIONS ──
+  const decWrap = document.getElementById('opsDecWrap');
+  const decEl   = document.getElementById('opsDec');
+  const decs = b.decisions || [];
+  if (decs.length > 0) {
+    decEl.innerHTML = decs.map(d =>
+      `<div class="ops-dec-item">
+        <span class="ops-dec-title">${esc(d.title)}</span>
+        <span class="ops-dec-label ${d.urgency === 'high' ? 'high' : ''}">${esc(d.label || '')}</span>
+        ${d.can_launch ? `<button class="ops-action-btn" onclick="applyTaskDecision(${d.task_id},'hold')">보류</button>` : ''}
+      </div>`
+    ).join('');
+    decWrap.style.display = '';
+  } else {
+    decWrap.style.display = 'none';
+  }
+
+  // ── STATUS BAR ──
+  const bar = document.getElementById('opsStatusBar');
+  const ts = b.time_status || {};
+  const cc = (b.cc_sessions || []).length;
+  let barParts = [];
+  if (ts.done !== undefined)
+    barParts.push(`<span class="ops-status-item"><b>${ts.done}/${ts.total}</b> 완료</span>`);
+  if (ts.remaining_task_min > 0)
+    barParts.push(`<span class="ops-status-item${ts.overload ? ' warn' : ''}">남은 <b>${formatMinLabel(ts.remaining_task_min)}</b>${ts.overload ? ' (초과)' : ''}</span>`);
+  if (ts.forecast_end)
+    barParts.push(`<span class="ops-status-item">${esc(ts.forecast_end)}</span>`);
+  if (cc > 0)
+    barParts.push(`<span class="ops-status-item">CC 세션 <b>${cc}개</b></span>`);
+  bar.innerHTML = barParts.join('');
+
+  // ── NOTE ──
+  const note = b.latest_note
+    ? `마지막 체크인 · ${b.latest_note}`
+    : '';
   document.getElementById('opsNote').textContent = note;
+}
+
+function formatMinLabel(min) {
+  if (!min || min <= 0) return '0분';
+  if (min < 60) return min + '분';
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m > 0 ? h + '시간 ' + m + '분' : h + '시간';
 }
 
 // ── Render accordion ──────────────────────────────────────────
