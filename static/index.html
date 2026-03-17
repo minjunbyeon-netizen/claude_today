@@ -3233,7 +3233,6 @@ function switchTab(tab, noSave) {
   if (!noSave) setUiPref('active_tab', tab);
 }
 function switchSubTab(sub, noSave) {
-  // 금일 이상 날짜에서 LOG 탭 진입 시 비움 (당일 로그 미표시)
   const isLog = sub === 'log';
   const isToday = currentViewDate >= todayStr();
   document.getElementById('subTabWork').style.display = isLog ? 'none' : '';
@@ -3244,9 +3243,17 @@ function switchSubTab(sub, noSave) {
   if (!isLog) {
     renderGrid(allTasks);
   } else if (isToday) {
-    // 당일/미래 LOG 탭: 빈 안내 메시지만 표시
+    // 당일/미래 LOG 탭: 빈 안내 메시지
     const hist = document.getElementById('ciHist');
     if (hist) hist.innerHTML = '<div style="padding:24px 0;text-align:center;font-size:13px;color:var(--muted)">작업 로그는 다음 날부터 확인할 수 있습니다</div>';
+    const form = document.getElementById('ciForm');
+    if (form) form.style.display = 'none';
+    const btn = document.querySelector('.btn-ci');
+    if (btn) btn.style.display = 'none';
+  } else {
+    // 과거 날짜 LOG 탭: 항상 초기화하고 loadCheckins가 채워줌
+    const hist = document.getElementById('ciHist');
+    if (hist) hist.innerHTML = '<div style="padding:24px 0;text-align:center;font-size:13px;color:var(--muted)">불러오는 중...</div>';
     const form = document.getElementById('ciForm');
     if (form) form.style.display = 'none';
     const btn = document.querySelector('.btn-ci');
@@ -5297,11 +5304,13 @@ async function addProjectToGoal(proj, task) {
 }
 
 async function loadCheckins(d) {
+  const el = document.getElementById('ciHist');
+  try {
   const url = appUrl('api/checkins') + (d ? '?d=' + encodeURIComponent(d) : '');
   const r = await fetch(url);
+  if (!r.ok) { el.innerHTML = '<div class="ci-empty">아직 수동 체크인이나 CC 활동 기록이 없습니다</div>'; return; }
   const list = await r.json();
-  const el = document.getElementById('ciHist');
-  if (!list.length) {
+  if (!Array.isArray(list) || !list.length) {
     el.innerHTML = '<div class="ci-empty">아직 수동 체크인이나 CC 활동 기록이 없습니다</div>'; return;
   }
   // 날짜별 그룹핑
@@ -5321,6 +5330,9 @@ async function loadCheckins(d) {
       ${groups[key].map(renderCheckinItem).join('')}
     </div>`;
   }).join('');
+  } catch(e) {
+    if (el) el.innerHTML = '<div class="ci-empty">아직 수동 체크인이나 CC 활동 기록이 없습니다</div>';
+  }
 }
 
 // ── Sync ──────────────────────────────────────────────────────
