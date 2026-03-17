@@ -3394,18 +3394,31 @@ def open_claude(proj: str, prompt: str = ""):
     if prompt_clean:
         claude_args.append(prompt_clean)
 
-    # cmd.exe의 start 명령 → ShellExecuteEx 경유로 App Execution Alias(wt.exe) 해석
-    # "start "" wt ..." 형태: 첫 번째 ""는 창 제목(필수), 이후 wt + 인자
-    def _cmd_quote(s: str) -> str:
-        return '"' + s.replace('"', '""') + '"'
+    # 실제 wt.exe 경로: AppxPackage 설치 경로에서 조회 (App Execution Alias 스텁 우회)
+    def _find_real_wt() -> str:
+        try:
+            r = subprocess.run(
+                ["powershell", "-NoProfile", "-Command",
+                 "(Get-AppxPackage -Name '*WindowsTerminal*').InstallLocation"],
+                capture_output=True, text=True, timeout=5,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+            loc = r.stdout.strip()
+            if loc:
+                candidate = os.path.join(loc, "wt.exe")
+                if os.path.exists(candidate):
+                    return candidate
+        except Exception:
+            pass
+        return ""
 
-    wt_tail = ["new-window", "-d", _cmd_quote(target_path), "--", "cmd", "/k"]
-    wt_tail += [_cmd_quote(a) for a in claude_args]
-    cmd_launch = 'start "" wt ' + " ".join(wt_tail)
+    wt_real = _find_real_wt()
+    if not wt_real:
+        return {"ok": False, "error": "Windows Terminal을 찾을 수 없습니다. Microsoft Store에서 설치하세요."}
 
     try:
         subprocess.Popen(
-            ["cmd", "/c", cmd_launch],
+            [wt_real, "new-window", "-d", target_path, "--", "cmd", "/k"] + claude_args,
             shell=False,
             env=env,
             creationflags=subprocess.CREATE_NO_WINDOW,
