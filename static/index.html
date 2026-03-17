@@ -3517,7 +3517,7 @@ function renderOpsBrief(brief) {
       const btn = document.createElement('button');
       btn.className = 'ops-command-btn';
       btn.textContent = '이어서 시작';
-      btn.onclick = () => launchBriefItem(cmd);
+      btn.onclick = () => launchBriefItem(cmd.project, cmd.launch_prompt);
       cmdAct.appendChild(btn);
     }
   } else if (b.objective_title) {

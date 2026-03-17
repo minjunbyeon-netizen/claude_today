@@ -3394,32 +3394,20 @@ def open_claude(proj: str, prompt: str = ""):
     if prompt_clean:
         claude_args.append(prompt_clean)
 
-    # Start-Process wt — App Execution Alias를 shell이 올바르게 해석 (직접 경로 탐색 불필요)
-    # single-quote escaping for PowerShell string literals
-    def ps_sq(s: str) -> str:
-        return "'" + s.replace("'", "''") + "'"
+    # wt: URI scheme → ShellExecuteEx 경유, App Execution Alias를 Windows Shell이 올바르게 해석
+    # os.startfile() = ShellExecuteEx, pm2 환경의 PATH 무관하게 동작
+    def _quote_wt_arg(s: str) -> str:
+        # wt URI 내 인자는 공백 포함 시 큰따옴표로 감쌈
+        if " " in s or not s:
+            return '"' + s.replace('"', '\\"') + '"'
+        return s
 
-    wt_ps_args = [ps_sq("new-window"), ps_sq("-d"), ps_sq(target_path), ps_sq("--"), ps_sq("cmd"), ps_sq("/k")]
-    wt_ps_args += [ps_sq(a) for a in claude_args]
-    ps_launch = f"Start-Process wt -ArgumentList @({','.join(wt_ps_args)})"
+    wt_args = ["new-window", "-d", _quote_wt_arg(target_path), "--", "cmd", "/k"]
+    wt_args += [_quote_wt_arg(a) for a in claude_args]
+    wt_uri = "wt: " + " ".join(wt_args)
 
     try:
-        subprocess.Popen(
-            ["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps_launch],
-            shell=False,
-            env=env,
-            creationflags=subprocess.CREATE_NO_WINDOW,
-        )
-    except FileNotFoundError as ex:
-        # PowerShell 자체를 못 찾은 경우 → cmd.exe 새 창으로 fallback
-        try:
-            cmd_str = f'cd /d "{target_path}" && ' + " ".join(f'"{a}"' for a in claude_args)
-            subprocess.Popen(["cmd.exe", "/k", cmd_str], creationflags=subprocess.CREATE_NEW_CONSOLE, env=env)
-        except Exception as ex2:
-            return {"ok": False, "error": f"실행 실패: {str(ex2)}"}
-        return {"ok": True, "path": target_path, "method": "cmd_fallback", "prompted": bool(prompt_clean)}
-    except PermissionError as ex:
-        return {"ok": False, "error": f"권한 없음: {str(ex)}"}
+        os.startfile(wt_uri)
     except Exception as ex:
         return {"ok": False, "error": f"실행 실패: {str(ex)}"}
 
