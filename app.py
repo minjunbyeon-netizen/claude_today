@@ -3394,20 +3394,22 @@ def open_claude(proj: str, prompt: str = ""):
     if prompt_clean:
         claude_args.append(prompt_clean)
 
-    # wt: URI scheme → ShellExecuteEx 경유, App Execution Alias를 Windows Shell이 올바르게 해석
-    # os.startfile() = ShellExecuteEx, pm2 환경의 PATH 무관하게 동작
-    def _quote_wt_arg(s: str) -> str:
-        # wt URI 내 인자는 공백 포함 시 큰따옴표로 감쌈
-        if " " in s or not s:
-            return '"' + s.replace('"', '\\"') + '"'
-        return s
+    # cmd.exe의 start 명령 → ShellExecuteEx 경유로 App Execution Alias(wt.exe) 해석
+    # "start "" wt ..." 형태: 첫 번째 ""는 창 제목(필수), 이후 wt + 인자
+    def _cmd_quote(s: str) -> str:
+        return '"' + s.replace('"', '""') + '"'
 
-    wt_args = ["new-window", "-d", _quote_wt_arg(target_path), "--", "cmd", "/k"]
-    wt_args += [_quote_wt_arg(a) for a in claude_args]
-    wt_uri = "wt: " + " ".join(wt_args)
+    wt_tail = ["new-window", "-d", _cmd_quote(target_path), "--", "cmd", "/k"]
+    wt_tail += [_cmd_quote(a) for a in claude_args]
+    cmd_launch = 'start "" wt ' + " ".join(wt_tail)
 
     try:
-        os.startfile(wt_uri)
+        subprocess.Popen(
+            ["cmd", "/c", cmd_launch],
+            shell=False,
+            env=env,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
     except Exception as ex:
         return {"ok": False, "error": f"실행 실패: {str(ex)}"}
 
