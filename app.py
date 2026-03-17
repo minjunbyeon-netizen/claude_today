@@ -9,6 +9,7 @@ import json
 import sqlite3
 import os
 import re
+import shutil
 import subprocess
 import secrets
 import httpx
@@ -3211,22 +3212,51 @@ def open_claude(proj: str, prompt: str = ""):
         return {"ok": False, "error": f"경로를 찾을 수 없음: {proj}"}
     target_path = repo["path"]
 
-    # Claude CMD: native install 우선, npm fallback
-    CLAUDE_NATIVE = r"C:\Users\USER\.local\bin\claude.exe"
-    CLAUDE_NPM    = r"C:\Users\USER\AppData\Roaming\npm\claude.cmd"
-    CLAUDE_CMD = CLAUDE_NATIVE if os.path.exists(CLAUDE_NATIVE) else CLAUDE_NPM
+    # Claude CMD: 다중 후보에서 존재하는 첫 번째 경로 사용
+    CLAUDE_CANDIDATES = [
+        r"C:\Users\USER\.local\bin\claude.exe",
+        r"C:\Users\USER\AppData\Roaming\npm\claude.cmd",
+        r"C:\Users\USER\AppData\Roaming\npm\claude",
+        shutil.which("claude") or "",
+    ]
+    CLAUDE_CMD = next((p for p in CLAUDE_CANDIDATES if p and os.path.exists(p)), "")
+
+    if not CLAUDE_CMD:
+        return {"ok": False, "error": "claude 실행파일을 찾을 수 없습니다. npm install -g @anthropic-ai/claude-code 로 설치하세요."}
 
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
     prompt_clean = summarize_agent_text(clean_utf8_text(prompt), limit=1200)
 
-    # wt.exe 전체 경로 (App Execution Alias는 PM2 환경 PATH에서 못 찾음)
-    WT_EXE = r"C:\Users\USER\AppData\Local\Microsoft\WindowsApps\wt.exe"
+    # wt.exe 다중 후보 (App Execution Alias는 PM2 환경 PATH에서 못 찾을 수 있음)
+    WT_CANDIDATES = [
+        r"C:\Users\USER\AppData\Local\Microsoft\WindowsApps\wt.exe",
+        r"C:\Program Files\WindowsApps\Microsoft.WindowsTerminal_1.19.10302.0_x64__8wekyb3d8bbwe\wt.exe",
+        shutil.which("wt") or "",
+    ]
+    WT_EXE = next((p for p in WT_CANDIDATES if p and os.path.exists(p)), "")
 
     # claude 인자 목록
     claude_args = [CLAUDE_CMD]
     if prompt_clean:
         claude_args.append(prompt_clean)
+
+    # Windows Terminal 없음 → cmd.exe 새 창으로 fallback
+    if not WT_EXE:
+        try:
+            cmd_str = f'cd /d "{target_path}" && ' + " ".join(f'"{a}"' for a in claude_args)
+            subprocess.Popen(
+                ["cmd.exe", "/k", cmd_str],
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
+                env=env,
+            )
+        except FileNotFoundError as ex:
+            return {"ok": False, "error": f"실행파일 없음: {str(ex)}. Windows Terminal이 설치되어 있는지 확인하세요."}
+        except PermissionError as ex:
+            return {"ok": False, "error": f"권한 없음: {str(ex)}"}
+        except Exception as ex:
+            return {"ok": False, "error": f"cmd fallback 실패: {str(ex)}"}
+        return {"ok": True, "path": target_path, "method": "cmd", "prompted": bool(prompt_clean)}
 
     # PowerShell & call-operator + 배열 인자 — ArgumentList 단일문자열 파싱 오류 우회
     # 경로에 공백이 있을 수 있으므로 각 인자를 따옴표로 감쌈
@@ -3248,8 +3278,12 @@ def open_claude(proj: str, prompt: str = ""):
             env=env,
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
+    except FileNotFoundError as ex:
+        return {"ok": False, "error": f"실행파일 없음: {str(ex)}. Windows Terminal이 설치되어 있는지 확인하세요."}
+    except PermissionError as ex:
+        return {"ok": False, "error": f"권한 없음: {str(ex)}"}
     except Exception as ex:
-        return {"ok": False, "error": str(ex)}
+        return {"ok": False, "error": f"실행 실패: {str(ex)}"}
 
     # 2) 새 WT 창 최대화 + 최상위 포커스 (화면 강제 표시)
     ps = r"""

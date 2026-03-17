@@ -1473,7 +1473,7 @@ body {
 }
 .btn-cc:hover { background: rgba(26,127,55,.1); }
 .btn-cc:active { transform: scale(.95); }
-.btn-cc.disabled { opacity: .35; cursor: default; pointer-events: none; }
+.btn-cc.disabled { opacity: .35; cursor: default; }
 
 /* ── VIEW button ── */
 .btn-view {
@@ -3556,7 +3556,7 @@ function renderAccordion(tasks) {
           <span class="acc-badge">${totalMin}분</span>
           <button class="btn-order" onclick="event.stopPropagation();moveProjOrder('${esc(proj)}',-1)" title="위로">↑</button>
           <button class="btn-order" onclick="event.stopPropagation();moveProjOrder('${esc(proj)}',1)" title="아래로">↓</button>
-          <button class="btn-cc${canOpenClaude?'':' disabled'}" onclick="event.stopPropagation();${canOpenClaude ? `openClaude('${esc(proj)}')` : ''}" title="${canOpenClaude ? 'Claude Code 열기' : '연결된 로컬 프로젝트 폴더 없음'}">CC</button>
+          <button class="btn-cc${canOpenClaude?'':' disabled'}" onclick="event.stopPropagation();${canOpenClaude ? `openClaude('${esc(proj)}')` : `showToast('프로젝트 경로를 찾을 수 없습니다. C:\\\\work 또는 Desktop에 없는 폴더입니다.', 'error')`}" title="${canOpenClaude ? 'Claude Code 열기' : '연결된 로컬 프로젝트 폴더 없음'}">CC</button>
           <button class="btn-view" onclick="event.stopPropagation();openView('${esc(proj)}')" title="프로젝트 웹 홈${agentUrls[proj]?' — '+agentUrls[proj]:' — URL 없음 (클릭하여 등록)'}">VIEW${agentUrls[proj]?'':'<span style="font-size:9px;opacity:.5;margin-left:2px">+</span>'}</button>
         </div>
         <div class="acc-body ${isOpen?'open':''}">
@@ -4031,7 +4031,13 @@ async function toggleComments(e, taskId) {
 
 // ── Folder-level CC / VIEW / Comment ──────────────────────────
 async function openCC(proj) {
-  await fetch(appUrl(`api/open-claude?proj=${encodeURIComponent(proj)}`), { method: 'POST' });
+  try {
+    const r = await fetch(appUrl(`api/open-claude?proj=${encodeURIComponent(proj)}`), { method: 'POST' });
+    const d = await r.json();
+    if (!d.ok) showToast(d.error || 'CC 열기 실패', 'error');
+  } catch(e) {
+    showToast('서버 연결 실패', 'error');
+  }
 }
 
 function toggleFolderCmt(proj, projId) {
@@ -4605,10 +4611,37 @@ async function deleteWeeklyGoal(goalId) {
 function openView(proj) {
   const url = agentUrls[proj];
   if (url) { window.open(url, '_blank'); return; }
-  // URL 없으면 입력 받아서 저장
-  const input = prompt(`${proj} VIEW URL 입력\n예: http://localhost:3000`, '');
-  if (input === null) return;
-  const trimmed = input.trim();
+  showUrlInput(proj);
+}
+
+function showUrlInput(proj) {
+  document.getElementById('urlInputOverlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'urlInputOverlay';
+  overlay.style.cssText = 'position:fixed;bottom:72px;right:24px;z-index:200;background:#fff;border:1px solid #E5E5E5;border-radius:12px;padding:16px;width:280px;box-shadow:0 4px 16px rgba(0,0,0,.12);';
+  const projSafe = proj.replace(/'/g, "\\'");
+  overlay.innerHTML = `
+    <div style="font-size:12px;font-weight:700;color:#1D1D1F;margin-bottom:8px">${esc(proj)} VIEW URL 등록</div>
+    <input id="urlInputField" type="url" placeholder="http://localhost:3000"
+      style="width:100%;padding:7px 10px;border:1px solid #E5E5E5;border-radius:6px;font-size:13px;outline:none;box-sizing:border-box;margin-bottom:8px"
+      value="http://localhost:">
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="document.getElementById('urlInputOverlay').remove()"
+        style="padding:5px 12px;border:1px solid #E5E5E5;border-radius:980px;background:#fff;font-size:12px;cursor:pointer">취소</button>
+      <button onclick="saveViewUrl('${projSafe}')"
+        style="padding:5px 12px;background:#1D1D1F;color:#fff;border:none;border-radius:980px;font-size:12px;font-weight:700;cursor:pointer">저장 후 열기</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById('urlInputField')?.focus(), 50);
+}
+
+function saveViewUrl(proj) {
+  const input = document.getElementById('urlInputField');
+  if (!input) return;
+  const trimmed = input.value.trim();
+  document.getElementById('urlInputOverlay')?.remove();
   fetch(appUrl('api/agent-status/url'), {
     method: 'PATCH',
     headers: {'Content-Type': 'application/json'},
@@ -4617,16 +4650,26 @@ function openView(proj) {
     if (trimmed) {
       agentUrls[proj] = trimmed;
       window.open(trimmed, '_blank');
+      showToast(`${proj} URL 저장됨`, 'success');
     }
     loadAgentStatus();
-  });
+  }).catch(() => showToast('URL 저장 실패', 'error'));
 }
 
 // ── Open Claude Code ──────────────────────────────────────────
 async function openClaude(proj) {
-  const r = await fetch(appUrl(`api/open-claude?proj=${encodeURIComponent(proj)}`), {method:'POST'});
-  const d = await r.json();
-  if (!d.ok) alert(`Claude Code 열기 실패\n${d.error}`);
+  const btn = document.querySelector(`.btn-cc[onclick*="${CSS.escape(proj)}"]`);
+  if (btn) { btn.textContent = '...'; btn.style.pointerEvents = 'none'; }
+  try {
+    const r = await fetch(appUrl(`api/open-claude?proj=${encodeURIComponent(proj)}`), {method:'POST'});
+    const d = await r.json();
+    if (!d.ok) showToast(d.error || 'CC 열기 실패', 'error');
+    else showToast('Claude Code 열기 중...', 'success');
+  } catch(e) {
+    showToast('서버 연결 실패', 'error');
+  } finally {
+    if (btn) { btn.textContent = 'CC'; btn.style.pointerEvents = ''; }
+  }
 }
 
 async function launchBriefItem(project, prompt) {
