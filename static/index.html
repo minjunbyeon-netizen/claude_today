@@ -2628,6 +2628,13 @@ body {
 
 <div class="window">
 
+  <!-- ── Foundation OS 시간 블록 배너 ── -->
+  <div id="fdnBlockBanner" class="pre">
+    <span class="fdn-block-dot"></span>
+    <span id="fdnBlockLabel">준비 시간</span>
+    <span class="fdn-block-time" id="fdnBlockTime"></span>
+  </div>
+
   <!-- ── Title bar ── -->
   <div class="titlebar">
     <div class="dot dot-r"></div>
@@ -3150,6 +3157,26 @@ body {
 
       <!-- Sub-tab: 작업 -->
       <div id="subTabWork">
+
+      <!-- ── Foundation OS 패널 ────────────────────────────── -->
+      <!-- Daily Boot 배너 (미완료 시 표시) -->
+      <div id="fdnBootBanner">
+        <span>Daily Boot 미완료</span>
+        <button onclick="openDailyBootModal()">시작하기</button>
+      </div>
+
+      <!-- Stack 현황 패널 -->
+      <div id="fdnStackPanel" style="display:none">
+        <div class="fdn-stack-title">PRODUCT STACK 현황</div>
+        <div id="fdnStackRows"></div>
+      </div>
+
+      <!-- 자동 판정 결과 패널 (17:00 이후 표시) -->
+      <div id="fdnJudgePanel">
+        <div class="fdn-stack-title" style="margin-bottom:8px">오늘의 자동 판정 결과</div>
+        <div id="fdnJudgeRows"></div>
+      </div>
+      <!-- ─────────────────────────────────────────────────── -->
 
       <!-- Project filter notice -->
       <div class="filter-bar" id="filterBar" style="display:none">
@@ -4400,10 +4427,12 @@ function renderAccordion(tasks) {
             <div class="task-top">
               <div class="task-title">
                 ${t.carry_from ? '<span class="carry-badge">이월</span>' : ''}
+                ${_fdnStackBadge(t.stack)}
                 ${esc(title)}
                 ${t.task_state_label ? `<span class="task-state-badge">${esc(t.task_state_label)}</span>` : ''}
                 ${attentionRank(t.attention_level) > 0 ? `<span class="task-attn ${attentionTone(t.attention_level)}${t.attention_level === 'critical' || t.attention_level === 'stale' ? ' blink' : ''}" title="${escAttr(t.attention_reason || '')}">${esc(t.attention_label || '체크')}</span>` : ''}
               </div>
+              ${_fdnFkcRow(t)}
               <div class="task-actions">
                 <button class="task-refresh" onclick="refreshTaskProgress(event,${t.id})" title="${escAttr((t.progress_source || '현재 진행률 반영') + ' 기준으로 새로고침')}">↻</button>
                 <div class="task-min-wrap">
@@ -4690,10 +4719,206 @@ async function autoRefreshTick() {
     if (_lastStats && allTasks.length) {
       renderMonitorPanel(allTasks, _lastStats);
     }
+    // Foundation OS 상태 갱신 (1분마다)
+    if (_syncGitTick % 1 === 0) loadFoundationStatus();
   } catch (err) {
     console.error('autoRefreshTick 실패:', err);
   } finally {
     autoRefreshBusy = false;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// FOUNDATION OS — 프론트엔드 (Phase 5)
+// ══════════════════════════════════════════════════════════════
+
+let _fdnSelectedStack = '';
+let _fdnTimers = {};  // task_id → {start, interval}
+
+const _STACK_CLASS = { '수익': 'revenue', '성장': 'growth', '실험': 'experiment' };
+const _BLOCK_LABELS = {
+  block1: '블록 1 — 성장 제품', block2: '블록 2 — 수익 제품',
+  block3a: '블록 3-A — 내일 도면', block3b: '블록 3-B — 자동 판정',
+  block3c: '블록 3-C — 실험 제품', lunch: '점심 + 메시지 확인',
+  pre: 'Daily Boot 준비', done: '하루 종료'
+};
+
+function _fdnStackBadge(stack) {
+  if (!stack) return '';
+  const cls = _STACK_CLASS[stack] || '';
+  return cls ? `<span class="fdn-stack ${cls}">${stack}</span>` : '';
+}
+
+function _fdnFkcRow(t) {
+  // Stale/Critical 작업에만 FKC 버튼 표시
+  const lvl = t.attention_level;
+  if (!lvl || (lvl !== 'stale' && lvl !== 'critical')) return '';
+  if (t.status === 'done') return '';
+  return `<div class="fkc-row">
+    <button class="fkc-btn fill" onclick="postFKC(${t.id},'fill')">FILL — 계속</button>
+    <button class="fkc-btn kill" onclick="postFKC(${t.id},'kill')">KILL — 종료</button>
+    <button class="fkc-btn call" onclick="postFKC(${t.id},'call')">CALL — 보류</button>
+  </div>`;
+}
+
+async function postFKC(taskId, verdict) {
+  const reasonMap = { fill: '계속 진행', kill: '3일 이상 정체 — 즉시 종료', call: '조건부 보류' };
+  try {
+    await fetch(appUrl(`api/tasks/${taskId}/fkc`), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ verdict, reason: reasonMap[verdict] })
+    });
+    await refreshMain();
+    await loadFoundationStatus();
+  } catch (_) {}
+}
+
+async function loadFoundationStatus() {
+  try {
+    // 시간 블록 배너
+    const blk = await fetch(appUrl('api/foundation/time-block/current')).then(r => r.json());
+    const banner = document.getElementById('fdnBlockBanner');
+    if (banner) {
+      banner.className = blk.key || 'pre';
+      document.getElementById('fdnBlockLabel').textContent = _BLOCK_LABELS[blk.key] || blk.label || '';
+      document.getElementById('fdnBlockTime').textContent = blk.now ? `${blk.start}–${blk.end}` : '';
+    }
+  } catch (_) {}
+
+  try {
+    // Stack 현황
+    const st = await fetch(appUrl('api/foundation/stack-status')).then(r => r.json());
+    const panel = document.getElementById('fdnStackPanel');
+    const rows = document.getElementById('fdnStackRows');
+    if (panel && rows && st.stacks) {
+      const hasAny = st.stacks.some(s => s.count > 0);
+      panel.style.display = hasAny ? '' : 'none';
+      const colors = { '수익': '#1A7F37', '성장': '#0057B3', '실험': '#C25A00' };
+      rows.innerHTML = st.stacks.map(s => `
+        <div class="fdn-stack-row">
+          <span class="fdn-stack-row-label" style="color:${colors[s.stack]||'#6E6E73'}">${s.stack}</span>
+          <div class="fdn-stack-bar-wrap">
+            <div class="fdn-stack-bar-fill" style="width:${Math.min(100,s.count/s.limit*100)}%;background:${colors[s.stack]||'#6E6E73'}"></div>
+          </div>
+          <span class="fdn-stack-count ${s.over?'fdn-stack-over':''}">${s.count}/${s.limit}</span>
+        </div>`).join('');
+    }
+  } catch (_) {}
+
+  try {
+    // Daily Boot 배너
+    const boot = await fetch(appUrl('api/daily-boot/today')).then(r => r.json());
+    const bootBanner = document.getElementById('fdnBootBanner');
+    if (bootBanner) {
+      const now = new Date();
+      const hm = now.getHours() * 100 + now.getMinutes();
+      // 10:00 이전이고 미완료이면 배너 표시
+      bootBanner.style.display = (!boot.confirmed && hm < 1000) ? 'flex' : 'none';
+    }
+  } catch (_) {}
+
+  try {
+    // 자동 판정 결과 (17:00 이후)
+    const now = new Date();
+    if (now.getHours() >= 17) {
+      const judge = await fetch(appUrl('api/foundation/auto-judge')).then(r => r.json());
+      const panel = document.getElementById('fdnJudgePanel');
+      const rows = document.getElementById('fdnJudgeRows');
+      if (panel && rows && judge.items && judge.items.length > 0) {
+        panel.style.display = '';
+        rows.innerHTML = judge.items.slice(0,10).map(it => `
+          <div class="fdn-judge-row">
+            <span class="fdn-judge-verdict ${it.verdict}">${(it.verdict||'').toUpperCase()}</span>
+            <span style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.title||'')}</span>
+            <span style="font-size:10px;color:#6E6E73">${esc(it.reason||'')}</span>
+          </div>`).join('');
+      }
+    }
+  } catch (_) {}
+}
+
+// Daily Boot 모달
+function openDailyBootModal() {
+  const overlay = document.createElement('div');
+  overlay.id = 'fdnBootOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:14px;padding:28px;width:420px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,0.16)">
+      <div style="font-size:14px;font-weight:700;margin-bottom:4px">Daily Boot</div>
+      <div style="font-size:12px;color:#6E6E73;margin-bottom:20px">오늘 작업 시작 전 3가지 확인</div>
+      <label style="font-size:11px;font-weight:700;color:#6E6E73">어제 완료한 것</label>
+      <input id="bootYest" placeholder="예: daily-focus 스케줄러 구현 완료" style="width:100%;margin-top:4px;margin-bottom:12px;padding:8px 10px;border:1px solid rgba(0,0,0,0.12);border-radius:6px;font-size:12px;font-family:inherit">
+      <label style="font-size:11px;font-weight:700;color:#6E6E73">오늘 Task 완료 기준 <span style="color:#FF3B30">*</span></label>
+      <input id="bootCriteria" placeholder="예: 자동 판정 API가 17:00에 정상 실행된다" style="width:100%;margin-top:4px;margin-bottom:12px;padding:8px 10px;border:1px solid rgba(0,0,0,0.12);border-radius:6px;font-size:12px;font-family:inherit">
+      <label style="font-size:11px;font-weight:700;color:#6E6E73">예상 막힘 포인트</label>
+      <input id="bootBlock" placeholder="예: DB 마이그레이션 순서 확인 필요" style="width:100%;margin-top:4px;margin-bottom:20px;padding:8px 10px;border:1px solid rgba(0,0,0,0.12);border-radius:6px;font-size:12px;font-family:inherit">
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="document.getElementById('fdnBootOverlay').remove()" style="padding:8px 16px;border:1px solid rgba(0,0,0,0.12);border-radius:980px;background:#F5F5F7;font-size:12px;cursor:pointer">취소</button>
+        <button onclick="submitDailyBoot()" style="padding:8px 16px;border:none;border-radius:980px;background:#1D1D1F;color:#fff;font-size:12px;font-weight:700;cursor:pointer">확인 — 블록 1 시작</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function submitDailyBoot() {
+  const criteria = (document.getElementById('bootCriteria') || {}).value || '';
+  if (!criteria.trim()) {
+    alert('완료 기준을 입력하세요.');
+    return;
+  }
+  try {
+    await fetch(appUrl('api/daily-boot'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        yesterday_done: (document.getElementById('bootYest') || {}).value || '',
+        completion_criteria: criteria,
+        expected_blocker: (document.getElementById('bootBlock') || {}).value || ''
+      })
+    });
+    document.getElementById('fdnBootOverlay').remove();
+    loadFoundationStatus();
+  } catch (_) {}
+}
+
+// Stack 선택 (작업 생성 폼에 주입)
+function _initFdnAddTaskExtras() {
+  // addTaskCard 내부에 stack picker + criteria 필드 주입
+  const card = document.getElementById('addTaskCard');
+  if (!card || card.querySelector('.fdn-stack-picker')) return;  // 이미 있으면 스킵
+  const extras = document.createElement('div');
+  extras.innerHTML = `
+    <div style="margin-top:8px">
+      <div style="font-size:10px;font-weight:700;color:#6E6E73;margin-bottom:4px">STACK</div>
+      <div class="fdn-stack-picker">
+        <button class="fdn-stack-pick-btn" onclick="_pickStack(this,'수익')">수익</button>
+        <button class="fdn-stack-pick-btn" onclick="_pickStack(this,'성장')">성장</button>
+        <button class="fdn-stack-pick-btn" onclick="_pickStack(this,'실험')">실험</button>
+      </div>
+      <div style="font-size:10px;font-weight:700;color:#6E6E73;margin-top:8px;margin-bottom:2px">완료 기준</div>
+      <input id="inCriteria" class="fdn-criteria-input" placeholder="이 작업이 완료되면 어떤 상태인가? (한 문장)">
+    </div>`;
+  card.appendChild(extras);
+}
+
+function _pickStack(btn, stack) {
+  _fdnSelectedStack = stack;
+  const cls = _STACK_CLASS[stack] || '';
+  document.querySelectorAll('.fdn-stack-pick-btn').forEach(b => {
+    b.classList.remove('selected', 'revenue', 'growth', 'experiment');
+  });
+  btn.classList.add('selected', cls);
+}
+
+// 작업 완료 시 output_note 입력 요청 (toggleTask 후 호출)
+async function _fdnPromptOutput(taskId) {
+  const note = window.prompt('오늘 만든 것 / 결과물을 한 줄로 기록하세요.\n(Foundation OS — 아웃풋 기준)', '');
+  if (note && note.trim()) {
+    try {
+      await fetch(appUrl(`api/tasks/${taskId}`), {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ output_note: note.trim() })
+      });
+    } catch (_) {}
   }
 }
 
@@ -4726,13 +4951,20 @@ async function addTask() {
   if (!title) return;
   const min      = parseInt(document.getElementById('inMin').value)||15;
   const priority = parseInt(document.getElementById('inPri').value);
+  // Foundation OS: stack + completion_criteria
+  const stack = _fdnSelectedStack || '';
+  const criteria = (document.getElementById('inCriteria') || {}).value || '';
   await fetch(appUrl('api/tasks'), {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({title, estimated_minutes:min, priority})
+    body: JSON.stringify({title, estimated_minutes:min, priority, stack, completion_criteria: criteria})
   });
   document.getElementById('inTitle').value = '';
   document.getElementById('inMin').value = '15';
+  if (document.getElementById('inCriteria')) document.getElementById('inCriteria').value = '';
+  _fdnSelectedStack = '';
+  document.querySelectorAll('.fdn-stack-pick-btn').forEach(b => b.classList.remove('selected'));
   await refreshMain();
+  await loadFoundationStatus();
 }
 
 // --- Project Order ---
@@ -6124,6 +6356,16 @@ async function loadAgentStatus() {
   loadCalendarActivity();
   // 오늘 미확인 알람 표시
   loadTodayAlarms();
+  // Foundation OS 초기 로딩
+  loadFoundationStatus();
+  setInterval(loadFoundationStatus, 60000);
+  // addTaskCard가 나타나면 stack picker 주입
+  const _cardObserver = new MutationObserver(() => {
+    const card = document.getElementById('addTaskCard');
+    if (card && card.style.display !== 'none') _initFdnAddTaskExtras();
+  });
+  const _cardEl = document.getElementById('addTaskCard');
+  if (_cardEl) _cardObserver.observe(_cardEl, { attributes: true, attributeFilter: ['style'] });
 })();
 
 // ── Strategic Advisor ──────────────────────────────────────────

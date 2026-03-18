@@ -621,3 +621,203 @@ button.ghost {
     padding-top: 0;
   }
 }
+
+/* ═══════════════════════════════════════════════
+   FOUNDATION OS UI
+   ═══════════════════════════════════════════════ */
+
+/* 시간 블록 배너 */
+#fdnBlockBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 16px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  transition: background 300ms ease-out;
+  min-height: 28px;
+}
+#fdnBlockBanner.block1  { background: rgba(0,113,227,0.12); color: #0057B3; }
+#fdnBlockBanner.block2  { background: rgba(52,199,89,0.12); color: #1A7F37; }
+#fdnBlockBanner.block3a { background: rgba(255,149,0,0.12); color: #a05800; }
+#fdnBlockBanner.block3b { background: rgba(255,59,48,0.12); color: #B00020; }
+#fdnBlockBanner.block3c { background: rgba(175,82,222,0.12); color: #6B2FA0; }
+#fdnBlockBanner.lunch   { background: rgba(142,142,147,0.1); color: #6E6E73; }
+#fdnBlockBanner.pre     { background: rgba(0,0,0,0.05); color: #6E6E73; }
+#fdnBlockBanner.done    { background: rgba(0,0,0,0.03); color: #aaa; }
+.fdn-block-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0;
+}
+.fdn-block-time { font-weight: 400; opacity: 0.7; margin-left: 4px; }
+
+/* Stack 뱃지 */
+.fdn-stack {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 980px;
+  margin-right: 4px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.fdn-stack.revenue { background: #E8F8EC; color: #1A7F37; }
+.fdn-stack.growth  { background: #E8F0FB; color: #0057B3; }
+.fdn-stack.experiment { background: #FFF3E0; color: #C25A00; }
+
+/* FKC 버튼 */
+.fkc-row {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.fkc-btn {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 980px;
+  border: none;
+  cursor: pointer;
+  transition: opacity 150ms ease-out;
+}
+.fkc-btn:hover { opacity: 0.75; }
+.fkc-btn.fill { background: #E8F8EC; color: #1A7F37; }
+.fkc-btn.kill { background: #FDECEA; color: #B00020; }
+.fkc-btn.call { background: #FFF3E0; color: #C25A00; }
+
+/* Stack 현황 패널 */
+#fdnStackPanel {
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+.fdn-stack-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #6E6E73;
+  margin-bottom: 10px;
+}
+.fdn-stack-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+.fdn-stack-row:last-child { margin-bottom: 0; }
+.fdn-stack-row-label { min-width: 32px; font-weight: 700; }
+.fdn-stack-bar-wrap { flex: 1; height: 4px; background: #F5F5F7; border-radius: 2px; overflow: hidden; }
+.fdn-stack-bar-fill { height: 100%; border-radius: 2px; }
+.fdn-stack-count { font-size: 11px; color: #6E6E73; min-width: 28px; text-align: right; }
+.fdn-stack-over { color: #FF3B30; }
+
+/* Daily Boot 배너 */
+#fdnBootBanner {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(255,149,0,0.1);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: #a05800;
+  font-weight: 700;
+}
+#fdnBootBanner button {
+  margin-left: auto;
+  background: #FF9500;
+  color: #fff;
+  border: none;
+  border-radius: 980px;
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* 자동 판정 결과 패널 */
+#fdnJudgePanel {
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  display: none;
+}
+.fdn-judge-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  font-size: 12px;
+}
+.fdn-judge-row:last-child { border-bottom: none; }
+.fdn-judge-verdict {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  min-width: 36px;
+  text-align: center;
+}
+.fdn-judge-verdict.fill { background: #E8F8EC; color: #1A7F37; }
+.fdn-judge-verdict.kill { background: #FDECEA; color: #B00020; }
+.fdn-judge-verdict.call { background: #FFF3E0; color: #C25A00; }
+
+/* Stack 선택 pill (작업 생성) */
+.fdn-stack-picker { display: flex; gap: 6px; margin-top: 6px; }
+.fdn-stack-pick-btn {
+  flex: 1;
+  padding: 5px 0;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 980px;
+  border: 1px solid rgba(0,0,0,0.12);
+  background: #F5F5F7;
+  color: #6E6E73;
+  cursor: pointer;
+  transition: all 150ms ease-out;
+}
+.fdn-stack-pick-btn.selected.revenue { background: #E8F8EC; color: #1A7F37; border-color: #1A7F37; }
+.fdn-stack-pick-btn.selected.growth  { background: #E8F0FB; color: #0057B3; border-color: #0057B3; }
+.fdn-stack-pick-btn.selected.experiment { background: #FFF3E0; color: #C25A00; border-color: #C25A00; }
+
+/* 완료 기준 입력 */
+.fdn-criteria-input {
+  width: 100%;
+  margin-top: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 6px;
+  background: #F5F5F7;
+  color: #1D1D1F;
+  font-family: inherit;
+}
+.fdn-criteria-input:focus {
+  border-color: #000;
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.08);
+  outline: none;
+  background: #fff;
+}
+
+/* 25분 타이머 */
+.task-timer-btn {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(0,0,0,0.1);
+  background: #F5F5F7;
+  color: #6E6E73;
+  cursor: pointer;
+  font-weight: 700;
+}
+.task-timer-btn.running { background: rgba(255,59,48,0.08); color: #B00020; border-color: rgba(255,59,48,0.2); }
+

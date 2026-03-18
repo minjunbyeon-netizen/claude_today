@@ -308,6 +308,57 @@ def ensure_base_schema() -> None:
     ensure_table_column(conn, "tasks", "decision_note", "TEXT")
     ensure_table_column(conn, "requests", "project_name", "TEXT DEFAULT ''")
     ensure_table_column(conn, "requests", "description", "TEXT DEFAULT ''")
+    # ── Foundation OS 컬럼 (Phase 1) ──────────────────────────────
+    ensure_table_column(conn, "tasks", "stack", "TEXT DEFAULT ''")          # 수익/성장/실험/없음
+    ensure_table_column(conn, "tasks", "completion_criteria", "TEXT DEFAULT ''")  # 완료 기준 한 문장
+    ensure_table_column(conn, "tasks", "output_note", "TEXT DEFAULT ''")    # 완료 시 아웃풋 기록
+    ensure_table_column(conn, "tasks", "priority_quadrant", "TEXT DEFAULT ''")    # 즉시/스프린트/자동화/동결
+    # ── Foundation OS 신규 테이블 (Phase 1) ──────────────────────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS experiments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            output_criteria TEXT NOT NULL,
+            deadline TEXT NOT NULL,
+            status TEXT DEFAULT 'active',
+            output_note TEXT DEFAULT '',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS fkc_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id INTEGER,
+            verdict TEXT NOT NULL,
+            reason TEXT DEFAULT '',
+            auto INTEGER DEFAULT 0,
+            judged_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS daily_boot_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL UNIQUE,
+            yesterday_done TEXT DEFAULT '',
+            today_task_id INTEGER,
+            completion_criteria TEXT DEFAULT '',
+            start_point TEXT DEFAULT '',
+            expected_blocker TEXT DEFAULT '',
+            confirmed INTEGER DEFAULT 0,
+            confirmed_at TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS time_block_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL,
+            block TEXT NOT NULL,
+            output_note TEXT DEFAULT '',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('morning_brief_time', '09:00')")
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('workspace_watch_seeded', '0')")
     conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('workspace_backfill_completed', '0')")
@@ -2420,6 +2471,9 @@ class TaskCreate(BaseModel):
     estimated_minutes: int = 15
     priority: int = 2
     date: Optional[str] = None
+    # Foundation OS 필드
+    stack: Optional[str] = None
+    completion_criteria: Optional[str] = None
 
 
 class TaskUpdate(BaseModel):
@@ -2428,6 +2482,11 @@ class TaskUpdate(BaseModel):
     estimated_minutes: Optional[int] = None
     priority: Optional[int] = None
     notes: Optional[str] = None
+    # Foundation OS 필드
+    stack: Optional[str] = None
+    completion_criteria: Optional[str] = None
+    output_note: Optional[str] = None
+    priority_quadrant: Optional[str] = None
 
 
 class TaskDecisionRequest(BaseModel):
@@ -2834,8 +2893,9 @@ def create_task(task: TaskCreate):
         task.date = kst_today()
     conn = get_db()
     cur = conn.execute(
-        "INSERT INTO tasks (date, title, estimated_minutes, priority, updated_at) VALUES (?, ?, ?, ?, ?)",
-        (task.date, task.title, task.estimated_minutes, task.priority, kst_now()),
+        "INSERT INTO tasks (date, title, estimated_minutes, priority, updated_at, stack, completion_criteria) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (task.date, task.title, task.estimated_minutes, task.priority, kst_now(),
+         task.stack or "", task.completion_criteria or ""),
     )
     log_activity(conn, "task_create", {"id": cur.lastrowid, "title": task.title, "date": task.date})
     conn.commit()
@@ -5620,6 +5680,384 @@ def get_project_health():
     conn = get_db()
     try:
         return {"projects": compute_project_health(conn)}
+    finally:
+        conn.close()
+
+
+# ═══════════════════════════════════════════════════════════════════
+# FOUNDATION OS API  (Phase 2 + Phase 4 판정 엔진)
+# ═══════════════════════════════════════════════════════════════════
+
+STACK_LIMIT = 3  # 스택당 동시 진행 최대 3개
+
+_STACK_LABELS = {"수익": "revenue", "성장": "growth", "실험": "experiment"}
+_TIME_BLOCKS = [
+    ("block1",  "10:00", "13:00", "블록 1 — 성장 제품"),
+    ("lunch",   "13:00", "14:00", "점심 + 메시지 확인"),
+    ("block2",  "14:00", "16:00", "블록 2 — 수익 제품"),
+    ("block3a", "16:00", "17:00", "블록 3-A — 내일 도면"),
+    ("block3b", "17:00", "17:30", "블록 3-B — 자동 판정"),
+    ("block3c", "17:30", "18:00", "블록 3-C — 실험 제품"),
+]
+
+
+def _current_time_block() -> dict:
+    """현재 KST 시각 기준 활성 시간 블록 반환."""
+    now_hm = datetime.now(_KST).strftime("%H:%M")
+    for key, start, end, label in _TIME_BLOCKS:
+        if start <= now_hm < end:
+            return {"key": key, "label": label, "start": start, "end": end, "active": True}
+    if now_hm < "10:00":
+        return {"key": "pre", "label": "Daily Boot 준비 시간", "start": "00:00", "end": "10:00", "active": False}
+    return {"key": "done", "label": "하루 종료", "start": "18:00", "end": "24:00", "active": False}
+
+
+def _run_auto_judge(conn) -> list[dict]:
+    """
+    Foundation OS Section 6: 자동 판정 엔진
+    로그 → 아웃풋 → 귀속 순서로 모든 active 작업 평가.
+    결과를 fkc_log에 저장하고 리스트로 반환.
+    """
+    today = kst_today()
+    three_days_ago = (datetime.now(_KST) - timedelta(days=3)).strftime("%Y-%m-%d")
+
+    active_tasks = conn.execute(
+        "SELECT id, title, stack, output_note, updated_at, created_at FROM tasks "
+        "WHERE status != 'done' AND (task_state IS NULL OR task_state != 'split') "
+        "AND date <= ?",
+        (today,),
+    ).fetchall()
+
+    results = []
+    for t in active_tasks:
+        tid = t["id"]
+        verdict = "fill"
+        reason = ""
+
+        # STEP 1: 로그 체크 — 오늘 activity 또는 업데이트가 있는가?
+        has_today_log = bool(conn.execute(
+            "SELECT 1 FROM agent_activity WHERE created_at >= ? LIMIT 1",
+            (today,),
+        ).fetchone())
+        task_updated_today = (t["updated_at"] or "")[:10] == today
+
+        if not has_today_log and not task_updated_today:
+            verdict = "kill"
+            reason = "오늘 로그 없음"
+        else:
+            # STEP 2: 아웃풋 체크 — 3일간 output_note 기록이 있는가?
+            has_output = bool(t["output_note"] and t["output_note"].strip())
+            recent_done = conn.execute(
+                "SELECT 1 FROM tasks WHERE status='done' AND completed_at >= ? AND "
+                "(title LIKE ? OR stack = ?) LIMIT 1",
+                (three_days_ago, f"%{(t['title'] or '')[:20]}%", t["stack"] or ""),
+            ).fetchone()
+            if not has_output and not recent_done:
+                verdict = "kill"
+                reason = "3일간 아웃풋 없음"
+            else:
+                # STEP 3: 귀속 체크 — 북극성(수익/성장)에 연결되는가?
+                stack = (t["stack"] or "").strip()
+                if stack in ("수익", "성장"):
+                    verdict = "fill"
+                    reason = f"북극성 연결 ({stack} 스택)"
+                elif stack == "실험":
+                    verdict = "call"
+                    reason = "실험 스택 — 7일 데드라인 확인 필요"
+                else:
+                    verdict = "call"
+                    reason = "스택 미지정 — 북극성 연결 불명확"
+
+        # 오늘 이미 자동 판정된 경우 덮어쓰지 않음
+        already = conn.execute(
+            "SELECT 1 FROM fkc_log WHERE task_id=? AND auto=1 AND date(judged_at)=?",
+            (tid, today),
+        ).fetchone()
+        if not already:
+            conn.execute(
+                "INSERT INTO fkc_log (task_id, verdict, reason, auto) VALUES (?,?,?,1)",
+                (tid, verdict, reason),
+            )
+        results.append({"task_id": tid, "title": t["title"], "verdict": verdict, "reason": reason})
+
+    conn.commit()
+    return results
+
+
+def _auto_kill_expired_experiments(conn) -> list[dict]:
+    """실험 제품 7일 데드라인 초과 + 아웃풋 없으면 자동 KILL."""
+    today = kst_today()
+    expired = conn.execute(
+        "SELECT id, name FROM experiments WHERE status='active' AND deadline < ? AND (output_note='' OR output_note IS NULL)",
+        (today,),
+    ).fetchall()
+    killed = []
+    for exp in expired:
+        conn.execute("UPDATE experiments SET status='killed', updated_at=? WHERE id=?", (kst_now(), exp["id"]))
+        killed.append({"id": exp["id"], "name": exp["name"]})
+    if killed:
+        conn.commit()
+    return killed
+
+
+# ── API 09: 스택 현황 ──────────────────────────────────────────────
+@app.get("/api/foundation/stack-status")
+def foundation_stack_status():
+    today = kst_today()
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT stack, COUNT(*) as cnt FROM tasks "
+            "WHERE status != 'done' AND stack != '' AND stack IS NOT NULL AND date <= ?",
+            (today,),
+        ).fetchall()
+        counts = {r["stack"]: r["cnt"] for r in rows}
+        stacks = ["수익", "성장", "실험"]
+        result = []
+        for s in stacks:
+            cnt = counts.get(s, 0)
+            result.append({"stack": s, "count": cnt, "limit": STACK_LIMIT, "over": cnt >= STACK_LIMIT})
+        return {"stacks": result, "total_active": sum(counts.values())}
+    finally:
+        conn.close()
+
+
+# ── API 10: FKC 판정 저장 ──────────────────────────────────────────
+class FKCRequest(BaseModel):
+    verdict: str   # fill / kill / call
+    reason: Optional[str] = ""
+
+
+@app.post("/api/tasks/{task_id}/fkc")
+def post_task_fkc(task_id: int, body: FKCRequest):
+    if body.verdict not in ("fill", "kill", "call"):
+        raise HTTPException(400, "verdict must be fill, kill, or call")
+    conn = get_db()
+    try:
+        task = conn.execute("SELECT id, title FROM tasks WHERE id=?", (task_id,)).fetchone()
+        if not task:
+            raise HTTPException(404, "task not found")
+        conn.execute(
+            "INSERT INTO fkc_log (task_id, verdict, reason, auto) VALUES (?,?,?,0)",
+            (task_id, body.verdict, body.reason or "", ),
+        )
+        # KILL이면 작업 상태도 변경
+        if body.verdict == "kill":
+            conn.execute(
+                "UPDATE tasks SET task_state='split', decision_note=?, updated_at=? WHERE id=?",
+                (f"KILL: {body.reason}", kst_now(), task_id),
+            )
+        conn.commit()
+        return {"ok": True, "task_id": task_id, "verdict": body.verdict}
+    finally:
+        conn.close()
+
+
+# ── API 11: 자동 판정 결과 조회 ────────────────────────────────────
+@app.get("/api/foundation/auto-judge")
+def get_auto_judge():
+    today = kst_today()
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT f.task_id, f.verdict, f.reason, f.judged_at, t.title "
+            "FROM fkc_log f LEFT JOIN tasks t ON t.id=f.task_id "
+            "WHERE date(f.judged_at)=? ORDER BY f.judged_at DESC",
+            (today,),
+        ).fetchall()
+        items = [dict(r) for r in rows]
+        summary = {"fill": 0, "kill": 0, "call": 0}
+        for it in items:
+            v = it.get("verdict", "")
+            if v in summary:
+                summary[v] += 1
+        return {"date": today, "items": items, "summary": summary}
+    finally:
+        conn.close()
+
+
+# ── API 12: 자동 판정 실행 ─────────────────────────────────────────
+@app.post("/api/foundation/auto-judge/run")
+def run_auto_judge():
+    conn = get_db()
+    try:
+        results = _run_auto_judge(conn)
+        killed_exp = _auto_kill_expired_experiments(conn)
+        summary = {"fill": 0, "kill": 0, "call": 0}
+        for r in results:
+            v = r.get("verdict", "")
+            if v in summary:
+                summary[v] += 1
+        return {"ok": True, "results": results, "summary": summary, "experiments_killed": killed_exp}
+    finally:
+        conn.close()
+
+
+# ── API 13: 실험 목록 조회 ─────────────────────────────────────────
+@app.get("/api/experiments")
+def get_experiments():
+    today = kst_today()
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM experiments ORDER BY created_at DESC"
+        ).fetchall()
+        items = []
+        for r in rows:
+            d = dict(r)
+            if d.get("deadline") and d["status"] == "active":
+                try:
+                    dl = date.fromisoformat(d["deadline"])
+                    td = date.fromisoformat(today)
+                    d["days_left"] = (dl - td).days
+                except Exception:
+                    d["days_left"] = None
+            else:
+                d["days_left"] = None
+            items.append(d)
+        return {"experiments": items}
+    finally:
+        conn.close()
+
+
+# ── API 14: 실험 생성 ──────────────────────────────────────────────
+class ExperimentCreate(BaseModel):
+    name: str
+    output_criteria: str
+    deadline: Optional[str] = None   # YYYY-MM-DD, 없으면 오늘+7일
+
+
+@app.post("/api/experiments")
+def create_experiment(body: ExperimentCreate):
+    if not body.name.strip():
+        raise HTTPException(400, "name required")
+    if not body.output_criteria.strip():
+        raise HTTPException(400, "output_criteria required")
+    conn = get_db()
+    try:
+        deadline = body.deadline or (
+            datetime.now(_KST) + timedelta(days=7)
+        ).strftime("%Y-%m-%d")
+        cur = conn.execute(
+            "INSERT INTO experiments (name, output_criteria, deadline) VALUES (?,?,?)",
+            (body.name.strip(), body.output_criteria.strip(), deadline),
+        )
+        conn.commit()
+        return {"ok": True, "id": cur.lastrowid, "deadline": deadline}
+    finally:
+        conn.close()
+
+
+# ── API 15: 실험 액션 (complete / kill / promote) ──────────────────
+class ExperimentAction(BaseModel):
+    action: str       # complete / kill / promote
+    output_note: Optional[str] = ""
+
+
+@app.post("/api/experiments/{exp_id}/action")
+def experiment_action(exp_id: int, body: ExperimentAction):
+    if body.action not in ("complete", "kill", "promote"):
+        raise HTTPException(400, "action must be complete, kill, or promote")
+    conn = get_db()
+    try:
+        exp = conn.execute("SELECT * FROM experiments WHERE id=?", (exp_id,)).fetchone()
+        if not exp:
+            raise HTTPException(404, "experiment not found")
+        now = kst_now()
+        if body.action == "complete":
+            conn.execute(
+                "UPDATE experiments SET status='completed', output_note=?, updated_at=? WHERE id=?",
+                (body.output_note or "", now, exp_id),
+            )
+        elif body.action == "kill":
+            conn.execute("UPDATE experiments SET status='killed', updated_at=? WHERE id=?", (now, exp_id))
+        elif body.action == "promote":
+            conn.execute("UPDATE experiments SET status='promoted', updated_at=? WHERE id=?", (now, exp_id))
+        conn.commit()
+        return {"ok": True, "id": exp_id, "action": body.action}
+    finally:
+        conn.close()
+
+
+# ── API 16: Daily Boot 오늘 조회 ───────────────────────────────────
+@app.get("/api/daily-boot/today")
+def get_daily_boot_today():
+    today = kst_today()
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT * FROM daily_boot_log WHERE date=?", (today,)).fetchone()
+        if not row:
+            return {"date": today, "confirmed": False, "record": None}
+        return {"date": today, "confirmed": bool(row["confirmed"]), "record": dict(row)}
+    finally:
+        conn.close()
+
+
+# ── API 17: Daily Boot 저장 ────────────────────────────────────────
+class DailyBootCreate(BaseModel):
+    yesterday_done: Optional[str] = ""
+    today_task_id: Optional[int] = None
+    completion_criteria: str
+    start_point: Optional[str] = ""
+    expected_blocker: Optional[str] = ""
+
+
+@app.post("/api/daily-boot")
+def post_daily_boot(body: DailyBootCreate):
+    if not body.completion_criteria.strip():
+        raise HTTPException(400, "completion_criteria required")
+    today = kst_today()
+    now = kst_now()
+    conn = get_db()
+    try:
+        conn.execute(
+            """INSERT OR REPLACE INTO daily_boot_log
+               (date, yesterday_done, today_task_id, completion_criteria,
+                start_point, expected_blocker, confirmed, confirmed_at)
+               VALUES (?,?,?,?,?,?,1,?)""",
+            (today, body.yesterday_done or "", body.today_task_id,
+             body.completion_criteria.strip(), body.start_point or "",
+             body.expected_blocker or "", now),
+        )
+        conn.commit()
+        return {"ok": True, "date": today}
+    finally:
+        conn.close()
+
+
+# ── API 18: 현재 시간 블록 ─────────────────────────────────────────
+@app.get("/api/foundation/time-block/current")
+def get_current_time_block():
+    block = _current_time_block()
+    now_str = datetime.now(_KST).strftime("%H:%M")
+    return {**block, "now": now_str}
+
+
+# ── API 19: 내일 도면 저장 ─────────────────────────────────────────
+class TomorrowBlueprint(BaseModel):
+    today_task_id: Optional[int] = None
+    completion_criteria: str
+    start_point: Optional[str] = ""
+    expected_blocker: Optional[str] = ""
+
+
+@app.post("/api/foundation/tomorrow-blueprint")
+def post_tomorrow_blueprint(body: TomorrowBlueprint):
+    if not body.completion_criteria.strip():
+        raise HTTPException(400, "completion_criteria required")
+    # 내일 날짜로 daily_boot_log에 미리 저장
+    tomorrow = (datetime.now(_KST) + timedelta(days=1)).strftime("%Y-%m-%d")
+    conn = get_db()
+    try:
+        conn.execute(
+            """INSERT OR REPLACE INTO daily_boot_log
+               (date, today_task_id, completion_criteria, start_point, expected_blocker, confirmed)
+               VALUES (?,?,?,?,?,0)""",
+            (tomorrow, body.today_task_id, body.completion_criteria.strip(),
+             body.start_point or "", body.expected_blocker or ""),
+        )
+        conn.commit()
+        return {"ok": True, "date": tomorrow}
     finally:
         conn.close()
 
