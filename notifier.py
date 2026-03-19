@@ -301,6 +301,9 @@ def maybe_run_auto_judge() -> None:
         if killed_exp:
             names = ", ".join(e["name"] for e in killed_exp)
             msg += f"\n실험 자동 KILL: {names}"
+            # #50 — 실험 KILL 즉시 별도 Telegram 알림
+            kill_msg = f"[실험 자동 KILL]\n{names}\n7일 데드라인 초과 + 아웃풋 없음으로 종료 처리"
+            _try_telegram_send(kill_msg)
 
         _foundation_notify("Foundation OS — 17:00 자동 판정", msg, send_telegram=True)
         _LAST_AUTO_JUDGE_DATE = today
