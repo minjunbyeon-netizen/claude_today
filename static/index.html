@@ -314,6 +314,37 @@ body {
 .proj-cat-arrow { font-size: 9px; color: rgba(255,255,255,.45); transition: transform .15s; }
 .proj-cat-body { padding-left: 8px; }
 .proj-item.cat-item { padding-left: 16px; }
+/* 폴더 서브 아이템 */
+.proj-folder-list { margin: 0 0 2px 0; }
+.proj-folder-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background .12s;
+}
+.proj-folder-item:hover { background: rgba(255,255,255,.07); }
+.proj-folder-item.active { background: rgba(255,255,255,.1); }
+.proj-folder-item.active .proj-folder-name { color: rgba(255,255,255,.9); font-weight: 700; }
+.proj-folder-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.25);
+  flex-shrink: 0;
+}
+.proj-folder-dot.live { background: #0071E3; }
+.proj-folder-name {
+  font-size: 11px;
+  font-weight: 400;
+  color: rgba(255,255,255,.45);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -.01em;
+}
 /* 폴더 아이템 */
 .proj-item {
   display: flex;
@@ -3820,11 +3851,24 @@ function _buildProjItem(g, tasks, indented) {
   const folderSet = new Set(g.folders || []);
   const hasTasks  = tasks.some(t => { const m = t.title.match(/^\[([^\]]+)\]/); return m && folderSet.has(normalizeProject(m[1])); });
   const cls = [isActive?'active':'', liveCnt?'live-item':'', hasTasks?'has-tasks':'', indented?'cat-item':''].filter(Boolean).join(' ');
+
+  // 폴더 서브 아이템
+  const folderItems = (g.folders || []).map(f => {
+    const isLive = liveProjects.has(f);
+    const isSel  = currentProject === f;
+    const folderCls = ['proj-folder-item', isLive ? 'live-item' : '', isSel ? 'active' : ''].filter(Boolean).join(' ');
+    return `<div class="${folderCls}" onclick="event.stopPropagation();selectProject('${esc(f)}')" title="${esc(f)}">
+      ${isLive ? '<span class="proj-folder-dot live"></span>' : '<span class="proj-folder-dot"></span>'}
+      <span class="proj-folder-name">${esc(f)}</span>
+    </div>`;
+  }).join('');
+
   return `<div class="proj-item ${cls}" onclick="selectGroup('${esc(g.id)}')">
     <div class="proj-item-dot"></div>
     <span class="proj-item-name">${esc(g.name)}</span>
     ${folderCnt ? `<span class="proj-item-count">${folderCnt}</span>` : ''}
-  </div>`;
+  </div>
+  ${folderItems ? `<div class="proj-folder-list">${folderItems}</div>` : ''}`;
 }
 
 function toggleCat(catName) {
