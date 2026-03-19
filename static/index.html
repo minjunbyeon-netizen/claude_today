@@ -3096,7 +3096,18 @@ body {
       <span id="watchSummary" style="display:none"></span>
       <div id="watchAlerts" style="display:none"></div>
 
-      <div class="morning-card collapsible-card" id="morningCard">
+      <!-- 자동 판정 결과 (작업 탭에서 이동) -->
+      <div class="sessions-card collapsible-card" id="fdnJudgePanel" style="display:none">
+        <div class="sessions-title collapsible-header" onclick="toggleCard('judge')">
+          <span>오늘의 자동 판정 결과</span>
+          <span class="collapse-arrow" id="judgeArrow">▼</span>
+        </div>
+        <div class="collapsible-body" id="judgeBody" style="padding:4px 0 8px">
+          <div id="fdnJudgeRows"></div>
+        </div>
+      </div>
+
+      <div class="morning-card collapsible-card" id="morningCard" style="display:none">
         <div class="morning-top collapsible-header" onclick="toggleCard('morning')">
           <div class="morning-top-left">
             <span class="sec-title">아침 보드</span>
@@ -3278,12 +3289,6 @@ body {
       <div id="fdnBootBanner">
         <span>Daily Boot 미완료</span>
         <button onclick="openDailyBootModal()">시작하기</button>
-      </div>
-
-      <!-- 자동 판정 결과 패널 (17:00 이후 표시) -->
-      <div id="fdnJudgePanel">
-        <div class="fdn-stack-title" style="margin-bottom:8px">오늘의 자동 판정 결과</div>
-        <div id="fdnJudgeRows"></div>
       </div>
 
       <!-- 내일 도면 패널 — 16:00 이후 표시 (#44) -->
@@ -4955,21 +4960,18 @@ async function loadFoundationStatus() {
   } catch (_) {}
 
   try {
-    // 자동 판정 결과 (17:00 이후)
-    const now = new Date();
-    if (now.getHours() >= 17) {
-      const judge = await fetch(appUrl('api/foundation/auto-judge')).then(r => r.json());
-      const panel = document.getElementById('fdnJudgePanel');
-      const rows = document.getElementById('fdnJudgeRows');
-      if (panel && rows && judge.items && judge.items.length > 0) {
-        panel.style.display = '';
-        rows.innerHTML = judge.items.slice(0,10).map(it => `
-          <div class="fdn-judge-row">
-            <span class="fdn-judge-verdict ${it.verdict}">${(it.verdict||'').toUpperCase()}</span>
-            <span style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.title||'')}</span>
-            <span style="font-size:10px;color:#6E6E73">${esc(it.reason||'')}</span>
-          </div>`).join('');
-      }
+    // 자동 판정 결과 (보고 탭 상단)
+    const judge = await fetch(appUrl('api/foundation/auto-judge')).then(r => r.json());
+    const panel = document.getElementById('fdnJudgePanel');
+    const rows = document.getElementById('fdnJudgeRows');
+    if (panel && rows && judge.items && judge.items.length > 0) {
+      panel.style.display = '';
+      rows.innerHTML = judge.items.slice(0,10).map(it => `
+        <div class="fdn-judge-row">
+          <span class="fdn-judge-verdict ${it.verdict}">${(it.verdict||'').toUpperCase()}</span>
+          <span style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.title||'')}</span>
+          <span style="font-size:10px;color:#6E6E73">${esc(it.reason||'')}</span>
+        </div>`).join('');
     }
   } catch (_) {}
 
@@ -5310,7 +5312,7 @@ async function loadLastLog() {
 // --- End Last Log ---
 
 // --- Collapsible Cards ---
-const _cardDefaults = { sessions: false, morning: false, health: false, eod: false, telegram: false };
+const _cardDefaults = { sessions: false, morning: false, health: false, eod: false, telegram: false, judge: true };
 function _cardOpen(name) {
   const states = getUiPref('card_states', {});
   return name in states ? states[name] : (_cardDefaults[name] || false);
@@ -5322,8 +5324,8 @@ function toggleCard(name) {
   _applyCard(name, !isOpen);
 }
 function _applyCard(name, open) {
-  const bodyIds = { sessions: 'sessionsList', morning: 'morningBody', health: 'healthBody', eod: 'eodBody', telegram: 'telegramBody' };
-  const arrowIds = { sessions: 'sessionsArrow', morning: 'morningArrow', health: 'healthArrow', eod: 'eodArrow', telegram: 'telegramArrow' };
+  const bodyIds = { sessions: 'sessionsList', morning: 'morningBody', health: 'healthBody', eod: 'eodBody', telegram: 'telegramBody', judge: 'judgeBody' };
+  const arrowIds = { sessions: 'sessionsArrow', morning: 'morningArrow', health: 'healthArrow', eod: 'eodArrow', telegram: 'telegramArrow', judge: 'judgeArrow' };
   const body = document.getElementById(bodyIds[name]);
   const arrow = document.getElementById(arrowIds[name]);
   if (body) { body.style.display = open ? '' : 'none'; body.style.marginTop = open ? '10px' : '0'; }
