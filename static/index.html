@@ -567,6 +567,9 @@ body {
 .proj-last-log:empty { display: none; }
 .proj-last-log-item { font-size: 11px; color: var(--muted); line-height: 1.6; padding: 1px 0; }
 .proj-last-log-item::before { content: counter(proj-log-item) ". "; counter-increment: proj-log-item; }
+.last-log-item { font-size: 11px; color: var(--muted); line-height: 1.6; padding: 1px 0; }
+.last-log-item::before { content: counter(log-item) ". "; counter-increment: log-item; }
+#lastLogItems { counter-reset: log-item; }
 
 .collapsible-header { cursor: pointer; user-select: none; }
 .collapse-arrow { font-size: 10px; color: var(--muted); margin-left: auto; transition: transform .15s; flex-shrink: 0; }
@@ -3157,6 +3160,32 @@ body {
       <div id="eodContent" style="display:none"></div>
       <div id="eodSendStatus" style="display:none"></div>
 
+      <!-- BigBrother Panel -->
+      <div class="claude-card" id="bbCard" style="margin-top:16px">
+        <button class="claude-summary" type="button" onclick="toggleBbPanel()">
+          <div class="claude-summary-main">
+            <span class="claude-title">BigBrother</span>
+            <div class="claude-summary-copy">
+              <span class="claude-summary-label">마지막 스캔</span>
+              <span class="claude-summary-value" id="bbScanTime">—</span>
+            </div>
+            <div style="display:flex;gap:8px;margin-left:8px" id="bbSummaryBadges"></div>
+          </div>
+          <div class="claude-summary-toggle">
+            <button type="button" onclick="event.stopPropagation();loadBbReport()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0 8px 0 0" title="새로고침">↻</button>
+            <span id="bbToggleLabel">상세 보기</span>
+            <span id="bbToggleArrow" style="font-size:12px;margin-left:4px;transition:transform 200ms ease-out">⌄</span>
+          </div>
+        </button>
+        <div id="bbDetail" style="display:none;padding:0 16px 16px">
+          <!-- Recommendations -->
+          <div id="bbRecs" style="margin-bottom:16px"></div>
+          <!-- Project list -->
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px">프로젝트 현황</div>
+          <div id="bbProjects"></div>
+        </div>
+      </div>
+
       </div><!-- /tabReport -->
 
       <!-- TAB: 작업 -->
@@ -3169,6 +3198,10 @@ body {
       <span id="stTasks" style="display:none"></span>
       <span id="stTime" style="display:none"></span>
       <span id="stLeft" style="display:none"></span>
+      <div id="carryBanner" class="banner" style="display:none">
+        <div class="banner-txt" id="carryTxt"></div>
+        <button class="banner-btn" onclick="doCarry()">오늘로 이월</button>
+      </div>
       <span id="syncMsg" style="display:none"></span>
       <input type="file" id="logFolderInput" style="display:none" onchange="uploadLogsFromFolder(this)">
       <input id="inTitle" style="display:none">
@@ -3194,15 +3227,36 @@ body {
         <button onclick="openDailyBootModal()">시작하기</button>
       </div>
 
-      <!-- blueprint stubs for JS compat -->
-      <div id="fdnBlueprintPanel" style="display:none"></div>
-      <div id="fdnBlueprintContent" style="display:none"></div>
+      <!-- 내일 도면 패널 — 16:00 이후 표시 (#44) -->
+      <div id="fdnBlueprintPanel" style="display:none">
+        <div class="fdn-stack-title" style="margin-bottom:8px">내일 도면 (Block 3-A)</div>
+        <div id="fdnBlueprintContent">
+          <div class="fdn-blueprint-field">
+            <label>내일 Task 완료 기준 *</label>
+            <input id="bpCriteria" placeholder="예: 자동 판정 API가 17:00에 정상 실행된다">
+          </div>
+          <div class="fdn-blueprint-field">
+            <label>시작 지점</label>
+            <input id="bpStart" placeholder="예: app.py line 5715 _run_auto_judge 함수부터">
+          </div>
+          <div class="fdn-blueprint-field">
+            <label>예상 막힘</label>
+            <input id="bpBlocker" placeholder="예: DB 스키마 변경 순서 확인 필요">
+          </div>
+          <button type="button" onclick="submitBlueprint()" style="padding:7px 16px;border:none;border-radius:980px;background:#1D1D1F;color:#fff;font-size:12px;font-weight:700;cursor:pointer;width:100%">내일 도면 저장</button>
+        </div>
+      </div>
       <!-- ─────────────────────────────────────────────────── -->
 
       <!-- Project filter notice -->
       <div class="filter-bar" id="filterBar" style="display:none">
         프로젝트 필터: <span id="filterLabel"></span>
         <button class="filter-clear" onclick="clearProjectFilter()">전체 보기</button>
+      </div>
+
+      <!-- Last Log -->
+      <div id="lastLogPanel" style="display:none;margin-bottom:10px;padding:10px 14px;border-left:2px solid var(--border)">
+        <div id="lastLogItems"></div>
       </div>
 
       <!-- Group-row view (항상 표시) -->
@@ -5097,7 +5151,19 @@ async function loadProjectLog(proj) {
 }
 
 // --- Last Log ---
-async function loadLastLog() {}
+async function loadLastLog() {
+  const panel = document.getElementById('lastLogPanel');
+  const itemsEl = document.getElementById('lastLogItems');
+  if (!panel || !itemsEl) return;
+  try {
+    const r = await fetch(appUrl('api/last-log'));
+    if (!r.ok) return;
+    const d = await r.json();
+    if (!d.items || !d.items.length) return;
+    itemsEl.innerHTML = d.items.map(t => `<div class="last-log-item">${esc(t)}</div>`).join('');
+    panel.style.display = 'block';
+  } catch(e) { console.warn('loadLastLog:', e); }
+}
 // --- End Last Log ---
 
 // --- Collapsible Cards ---
@@ -5445,8 +5511,20 @@ async function delTask(id) {
   await refreshMain();
 }
 
-async function checkCarry() {}
-async function doCarry() {}
+async function checkCarry() {
+  const r = await fetch(appUrl('api/yesterday-undone'));
+  const tasks = await r.json();
+  const banner = document.getElementById('carryBanner');
+  if (tasks.length) {
+    document.getElementById('carryTxt').textContent = `어제 미완료 작업 ${tasks.length}개가 있습니다`;
+    banner.style.display = 'flex';
+  } else banner.style.display = 'none';
+}
+async function doCarry() {
+  await fetch(appUrl('api/carry-over'), {method:'POST'});
+  document.getElementById('carryBanner').style.display = 'none';
+  await refreshMain();
+}
 
 // ── Check-in ──────────────────────────────────────────────────
 function toggleCi() {
@@ -5793,6 +5871,92 @@ async function saveLimit() {
   await loadClaudeUsage();
 }
 
+// ── BigBrother Panel ──────────────────────────────────────────
+let _bbOpen = false;
+
+function toggleBbPanel() {
+  _bbOpen = !_bbOpen;
+  document.getElementById('bbDetail').style.display = _bbOpen ? '' : 'none';
+  document.getElementById('bbToggleLabel').textContent = _bbOpen ? '접기' : '상세 보기';
+  document.getElementById('bbToggleArrow').style.transform = _bbOpen ? 'rotate(180deg)' : '';
+}
+
+const _bbStatusColor = {
+  active:    '#34C759',
+  recent:    '#0071E3',
+  idle:      '#FF9500',
+  abandoned: '#FF3B30',
+  unknown:   '#8E8E93',
+};
+const _bbStatusLabel = {
+  active:    '활성',
+  recent:    '최근',
+  idle:      '휴면',
+  abandoned: '방치',
+  unknown:   '미확인',
+};
+
+function _fmtAge(h) {
+  if (h == null) return '?';
+  if (h < 24)  return h + '시간';
+  if (h < 168) return Math.floor(h / 24) + '일';
+  return Math.floor(h / 168) + '주';
+}
+
+async function loadBbReport() {
+  try {
+    const r = await fetch(appUrl('api/bigbrother-report'));
+    if (!r.ok) return;
+    const d = await r.json();
+    if (!d || d.ok === false) return;
+
+    // Header
+    document.getElementById('bbScanTime').textContent =
+      d.scanned_at ? d.scanned_at.slice(5, 16) : '—';
+
+    // Summary badges
+    const s = d.summary || {};
+    const badgeHtml = [
+      ['A', s.active || 0, '#34C759'],
+      ['R', s.recent || 0, '#0071E3'],
+      ['I', s.idle   || 0, '#FF9500'],
+      ['X', s.abandoned || 0, '#FF3B30'],
+    ].map(([lbl, cnt, clr]) =>
+      `<span style="font-size:10px;font-weight:700;color:${clr};background:${clr}18;padding:2px 6px;border-radius:4px">${lbl}:${cnt}</span>`
+    ).join('');
+    document.getElementById('bbSummaryBadges').innerHTML = badgeHtml;
+
+    // Recommendations
+    const recs = d.recommendations || [];
+    document.getElementById('bbRecs').innerHTML = recs.length
+      ? recs.map(r =>
+          `<div style="font-size:12px;color:var(--text);padding:6px 0 6px 10px;border-left:2px solid #FF9500;margin-bottom:6px">${esc(r)}</div>`
+        ).join('')
+      : '';
+
+    // Projects
+    const projects = d.projects || [];
+    const grouped = { active: [], recent: [], idle: [], abandoned: [], unknown: [] };
+    for (const p of projects) grouped[p.status]?.push(p);
+
+    const rows = projects.map(p => {
+      const clr = _bbStatusColor[p.status] || '#8E8E93';
+      const lbl = _bbStatusLabel[p.status] || p.status;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:10px;font-weight:700;color:${clr};background:${clr}18;padding:1px 5px;border-radius:3px;min-width:28px;text-align:center">${esc(lbl)}</span>
+        <span style="font-size:12px;font-weight:700;color:var(--text);min-width:140px;flex-shrink:0">${esc(p.name)}</span>
+        <span style="font-size:11px;color:var(--muted);min-width:36px">${_fmtAge(p.age_hours)}</span>
+        <span style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1">${esc(p.last_task || p.context || '')}</span>
+      </div>`;
+    }).join('');
+
+    document.getElementById('bbProjects').innerHTML = rows ||
+      '<span style="font-size:12px;color:var(--muted)">스캔 결과 없음</span>';
+  } catch (err) {
+    // silent fail
+  }
+}
+
 async function saveMorningBriefTime() {
   const input = document.getElementById('morningTimeInput');
   const time = input.value;
@@ -6061,6 +6225,10 @@ document.addEventListener('visibilitychange', () => {
 // 3) Claude 사용량 로드
 loadClaudeUsage();
 setInterval(loadClaudeUsage, 60000);
+
+// 4) BigBrother 보고 로드
+loadBbReport();
+setInterval(loadBbReport, 5 * 60 * 1000);  // 5분마다 갱신
 
 // agentUrls: project -> url (populated by loadAgentStatus)
 const agentUrls = {};
