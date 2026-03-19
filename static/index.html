@@ -3163,25 +3163,9 @@ body {
         <button onclick="openDailyBootModal()">시작하기</button>
       </div>
 
-      <!-- 내일 도면 패널 — 16:00 이후 표시 (#44) -->
-      <div id="fdnBlueprintPanel" style="display:none">
-        <div class="fdn-stack-title" style="margin-bottom:8px">내일 도면 (Block 3-A)</div>
-        <div id="fdnBlueprintContent">
-          <div class="fdn-blueprint-field">
-            <label>내일 Task 완료 기준 *</label>
-            <input id="bpCriteria" placeholder="예: 자동 판정 API가 17:00에 정상 실행된다">
-          </div>
-          <div class="fdn-blueprint-field">
-            <label>시작 지점</label>
-            <input id="bpStart" placeholder="예: app.py line 5715 _run_auto_judge 함수부터">
-          </div>
-          <div class="fdn-blueprint-field">
-            <label>예상 막힘</label>
-            <input id="bpBlocker" placeholder="예: DB 스키마 변경 순서 확인 필요">
-          </div>
-          <button type="button" onclick="submitBlueprint()" style="padding:7px 16px;border:none;border-radius:980px;background:#1D1D1F;color:#fff;font-size:12px;font-weight:700;cursor:pointer;width:100%">내일 도면 저장</button>
-        </div>
-      </div>
+      <!-- blueprint stubs for JS compat -->
+      <div id="fdnBlueprintPanel" style="display:none"></div>
+      <div id="fdnBlueprintContent" style="display:none"></div>
       <!-- ─────────────────────────────────────────────────── -->
 
       <!-- Project filter notice -->
