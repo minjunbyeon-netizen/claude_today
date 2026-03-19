@@ -5723,9 +5723,16 @@ def _find_project_folder(proj: str) -> Optional[str]:
             "SELECT folder_path FROM workspace_projects WHERE project_name = ?",
             (proj,)
         ).fetchone()
-        return row[0] if row else None
+        if row and row[0]:
+            return row[0]
     finally:
         conn.close()
+    # 마지막 fallback: REPO_SCAN_ROOTS 안에서 직접 경로 확인
+    for root in REPO_SCAN_ROOTS:
+        candidate = os.path.join(root, proj)
+        if os.path.isdir(candidate):
+            return candidate
+    return None
 
 def _find_project_html(folder: str) -> Optional[str]:
     """프로젝트 폴더에서 열 HTML 파일을 찾아 반환. index.html 우선, 없으면 최근 수정 파일."""
