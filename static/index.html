@@ -3148,50 +3148,6 @@ body {
         </div><!-- end collapsible-body -->
       </div>
 
-      <div class="ops-card">
-        <div class="ops-top">
-          <div style="display:flex;align-items:baseline;gap:8px">
-            <span class="sec-title">운영 브리프</span>
-            <span class="ops-headline" id="opsHeadline"></span>
-          </div>
-          <button class="icon-btn" onclick="refreshMain()" title="새로고침">↻</button>
-        </div>
-
-        <!-- THE COMMAND -->
-        <div class="ops-command" id="opsCommand">
-          <div class="ops-command-label">지금 할 것</div>
-          <div class="ops-command-title" id="opsCommandTitle">계산 중...</div>
-          <div class="ops-command-meta" id="opsCommandMeta"></div>
-          <div class="ops-command-actions" id="opsCommandActions"></div>
-        </div>
-
-        <!-- SEQUENCE -->
-        <div id="opsSeqWrap" style="display:none">
-          <div class="ops-sec-label">그 다음</div>
-          <div class="ops-seq" id="opsSeq"></div>
-        </div>
-
-        <!-- DECISIONS -->
-        <div id="opsDecWrap" style="display:none">
-          <div class="ops-sec-label">오늘 결정할 것</div>
-          <div class="ops-dec" id="opsDec"></div>
-        </div>
-
-        <!-- STATUS BAR -->
-        <div class="ops-status-bar" id="opsStatusBar"></div>
-
-        <!-- NOTE -->
-        <div class="ops-note" id="opsNote"></div>
-
-        <!-- legacy hidden elements for JS compat -->
-        <span id="opsObjective" style="display:none"></span>
-        <span id="opsObjectiveDetail" style="display:none"></span>
-        <span id="opsFocus" style="display:none"></span>
-        <div id="opsActions" style="display:none"></div>
-        <div id="opsQueue" style="display:none"></div>
-        <div id="opsRisks" style="display:none"></div>
-      </div>
-
       <!-- Project Health -->
       <div class="sessions-card collapsible-card" id="healthCard">
         <div class="sessions-title collapsible-header" onclick="toggleCard('health')">
@@ -4353,101 +4309,7 @@ function renderOpsList(targetId, items, emptyText) {
   }).join('');
 }
 
-function renderOpsBrief(brief) {
-  const b = brief || {};
-
-  // headline (compact)
-  document.getElementById('opsHeadline').textContent = b.headline || '';
-
-  // legacy compat
-  ['opsObjective','opsObjectiveDetail','opsFocus'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = '';
-  });
-
-  // ── THE COMMAND ──
-  const cmd = b.command;
-  const cmdTitle = document.getElementById('opsCommandTitle');
-  const cmdMeta  = document.getElementById('opsCommandMeta');
-  const cmdAct   = document.getElementById('opsCommandActions');
-  if (cmd) {
-    cmdTitle.textContent = cmd.title;
-    const projLabel = cmd.project ? `${cmd.project} · ` : '';
-    cmdMeta.textContent = projLabel + cmd.reason;
-    cmdAct.innerHTML = '';
-    if (cmd.can_launch && cmd.launch_prompt) {
-      const btn = document.createElement('button');
-      btn.className = 'ops-command-btn';
-      btn.textContent = '이어서 시작';
-      btn.onclick = () => launchBriefItem(cmd.project, cmd.launch_prompt);
-      cmdAct.appendChild(btn);
-    }
-  } else if (b.objective_title) {
-    // fallback to old fields
-    cmdTitle.textContent = b.objective_title;
-    cmdMeta.textContent = b.focus_message || '';
-    cmdAct.innerHTML = '';
-  } else {
-    cmdTitle.textContent = '오늘 작업이 없습니다';
-    cmdMeta.textContent = '작업을 추가해서 흐름을 시작하세요';
-    cmdAct.innerHTML = '';
-  }
-
-  // ── SEQUENCE ──
-  const seqWrap = document.getElementById('opsSeqWrap');
-  const seqEl   = document.getElementById('opsSeq');
-  const seq = b.sequence || [];
-  if (seq.length > 0) {
-    seqEl.innerHTML = seq.map((s, i) =>
-      `<div class="ops-seq-item">
-        <span class="ops-seq-num">${i + 1}</span>
-        <span class="ops-seq-title">${esc(s.title)}</span>
-        <span class="ops-seq-meta">${esc(s.remaining_label || '')}</span>
-      </div>`
-    ).join('');
-    seqWrap.style.display = '';
-  } else {
-    seqWrap.style.display = 'none';
-  }
-
-  // ── DECISIONS ──
-  const decWrap = document.getElementById('opsDecWrap');
-  const decEl   = document.getElementById('opsDec');
-  const decs = b.decisions || [];
-  if (decs.length > 0) {
-    decEl.innerHTML = decs.map(d =>
-      `<div class="ops-dec-item">
-        <span class="ops-dec-title">${esc(d.title)}</span>
-        <span class="ops-dec-label ${d.urgency === 'high' ? 'high' : ''}">${esc(d.label || '')}</span>
-        ${d.can_launch ? `<button class="ops-action-btn" onclick="applyTaskDecision(${d.task_id},'hold')">보류</button>` : ''}
-      </div>`
-    ).join('');
-    decWrap.style.display = '';
-  } else {
-    decWrap.style.display = 'none';
-  }
-
-  // ── STATUS BAR ──
-  const bar = document.getElementById('opsStatusBar');
-  const ts = b.time_status || {};
-  const cc = (b.cc_sessions || []).length;
-  let barParts = [];
-  if (ts.done !== undefined)
-    barParts.push(`<span class="ops-status-item"><b>${ts.done}/${ts.total}</b> 완료</span>`);
-  if (ts.remaining_task_min > 0)
-    barParts.push(`<span class="ops-status-item${ts.overload ? ' warn' : ''}">남은 <b>${formatMinLabel(ts.remaining_task_min)}</b>${ts.overload ? ' (초과)' : ''}</span>`);
-  if (ts.forecast_end)
-    barParts.push(`<span class="ops-status-item">${esc(ts.forecast_end)}</span>`);
-  if (cc > 0)
-    barParts.push(`<span class="ops-status-item">CC 세션 <b>${cc}개</b></span>`);
-  bar.innerHTML = barParts.join('');
-
-  // ── NOTE ──
-  const note = b.latest_note
-    ? `마지막 체크인 · ${b.latest_note}`
-    : '';
-  document.getElementById('opsNote').textContent = note;
-}
+function renderOpsBrief(brief) {}
 
 function formatMinLabel(min) {
   if (!min || min <= 0) return '0분';
@@ -4792,14 +4654,6 @@ async function loadTodayByDate(ds) {
     document.getElementById('watchSummary').className = 'watch-pill critical blink';
     document.getElementById('watchSummary').textContent = '새로고침 실패';
     document.getElementById('watchAlerts').innerHTML = '<span class="watch-empty">연결 상태를 다시 확인해주세요</span>';
-    document.getElementById('opsHeadline').textContent = '운영 브리프 로드 실패';
-    document.getElementById('opsObjective').textContent = '오늘의 목적 계산 실패';
-    document.getElementById('opsObjectiveDetail').textContent = '서버 연결이 안정되면 다시 계산됩니다.';
-    document.getElementById('opsFocus').textContent = '연결 상태를 다시 확인해주세요.';
-    document.getElementById('opsActions').innerHTML = '<span class="ops-empty">브리프를 다시 계산할 수 없습니다</span>';
-    document.getElementById('opsQueue').innerHTML = '<span class="ops-empty">브리프를 다시 계산할 수 없습니다</span>';
-    document.getElementById('opsRisks').innerHTML = '<span class="ops-empty">브리프를 다시 계산할 수 없습니다</span>';
-    document.getElementById('opsNote').textContent = '네트워크 또는 서버 상태를 먼저 확인해주세요.';
     document.getElementById('morningHeadline').textContent = '아침 보드 로드 실패';
     document.getElementById('morningTimePill').textContent = '아침 브리핑 불러오기 실패';
     document.getElementById('morningConfirmPill').textContent = '오늘 목표 상태 확인 불가';
