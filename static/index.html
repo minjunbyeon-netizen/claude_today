@@ -2161,17 +2161,23 @@ body {
   font-size: 12px;
   font-weight: 400;
   color: #1D1D1F;
+  flex-shrink: 0;
+}
+.grp-folder-star-input {
   flex: 1;
-}
-.grp-folder-star {
+  min-width: 0;
+  border: none;
+  border-bottom: 1px solid transparent;
+  outline: none;
   font-size: 11px;
-  font-weight: 400;
   color: #6E6E73;
-  padding: 0 16px 6px 16px;
-  line-height: 1.4;
+  background: transparent;
+  font-family: inherit;
+  padding: 0 8px;
   letter-spacing: -.01em;
-  margin-top: -4px;
 }
+.grp-folder-star-input::placeholder { color: rgba(0,0,0,.18); }
+.grp-folder-star-input:focus { border-bottom-color: rgba(0,0,0,.15); }
 .grp-folder-meta {
   display: flex;
   align-items: center;
@@ -3659,6 +3665,10 @@ function renderGrid(tasks) {
       <div class="grp-folder-hd">
         ${isLive ? '<div class="grp-folder-live-dot"></div>' : ''}
         <span class="grp-folder-name">${esc(proj)}</span>
+        <input class="grp-folder-star-input"
+          value="${escAttr(_northStar)}"
+          placeholder="북극성..."
+          onchange="setFolderNorthStarByName('${escAttr(proj)}',this.value)">
         <div class="grp-folder-meta">
           ${items.length ? `<span class="grp-folder-count">${summary.done}/${summary.total}</span>` : ''}
           <button class="grp-folder-btn${isLive?' is-live':''}" onclick="openCC('${escAttr(proj)}')" title="${isLive?'활성 CC — 이어서 열기':'CC 열기'}">CC</button>
@@ -3666,7 +3676,6 @@ function renderGrid(tasks) {
           <button class="grp-folder-btn" onclick="toggleFolderCmt('${escAttr(proj)}','${projId}')">댓글</button>
         </div>
       </div>
-      ${_northStar ? `<div class="grp-folder-star">${esc(_northStar)}</div>` : ''}
       ${shown.map(taskRow).join('')}
       ${!items.length ? buildLastActivityRows(proj) : ''}
       <div class="grp-folder-cmt-panel" id="fcmt-${projId}">
@@ -6497,6 +6506,15 @@ function setCategoryForGroup(id, cat) {
 function setFolderNorthStar(gid, folder, text) {
   const groups = getWfGroups();
   const g = groups.find(g => g.id === gid);
+  if (!g) return;
+  if (!g.folderMeta) g.folderMeta = {};
+  if (!g.folderMeta[folder]) g.folderMeta[folder] = {};
+  g.folderMeta[folder].northStar = text.trim();
+  saveWfGroups(groups);
+}
+function setFolderNorthStarByName(folder, text) {
+  const groups = getWfGroups();
+  const g = groups.find(g => (g.folders||[]).includes(folder));
   if (!g) return;
   if (!g.folderMeta) g.folderMeta = {};
   if (!g.folderMeta[folder]) g.folderMeta[folder] = {};
