@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Focus — 신규 기능 브리핑</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%231D1D1F'/><text x='8' y='23' font-size='18' fill='white'>F</text></svg>">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #F5F5F7; color: #1D1D1F; padding: 40px 24px; }
+.wrap { max-width: 860px; margin: 0 auto; }
+h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+.sub { font-size: 13px; color: #6E6E73; margin-bottom: 32px; }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 32px; }
+.card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.card-icon { width: 36px; height: 36px; background: #1D1D1F; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; }
+.card-icon svg { width: 18px; height: 18px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.card-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+.card-desc { font-size: 12px; color: #6E6E73; line-height: 1.6; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 980px; font-size: 10px; font-weight: 700; margin-top: 10px; }
+.tag.new { background: #1D1D1F; color: #fff; }
+.section-title { font-size: 11px; font-weight: 700; color: #6E6E73; letter-spacing: .08em; margin-bottom: 12px; text-transform: uppercase; }
+.api-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.api-table th { text-align: left; padding: 8px 12px; background: #F5F5F7; font-weight: 700; font-size: 11px; color: #6E6E73; }
+.api-table td { padding: 8px 12px; border-bottom: 1px solid #F0F0F0; color: #1D1D1F; vertical-align: top; }
+.api-table tr:last-child td { border-bottom: none; }
+.method { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+.method.get { background: #E3F2FD; color: #1565C0; }
+.method.post { background: #E8F5E9; color: #2E7D32; }
+.mono { font-family: 'Courier New', monospace; font-size: 11px; color: #6E6E73; }
+.flow { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-bottom: 32px; }
+.flow-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.flow-step { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; background: #1D1D1F; color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.flow-label { font-size: 12px; color: #1D1D1F; }
+.flow-muted { font-size: 11px; color: #6E6E73; }
+.score-demo { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+.score-item { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+.score-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Daily Focus — 신규 기능 브리핑</h1>
+  <div class="sub">2026-03-17 구현 완료 · Telegram 알림 + EOD 리포트 + 프로젝트 건강 점수</div>
+
+  <div class="grid">
+    <!-- Telegram -->
+    <div class="card">
+      <div class="card-icon">
+        <svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/></svg>
+      </div>
+      <div class="card-title">Telegram 알림</div>
+      <div class="card-desc">Bot Token + Chat ID 설정으로 아침 브리핑과 마감 리포트를 Telegram으로 자동 전송. 테스트 전송 버튼 포함.</div>
+      <span class="tag new">NEW</span>
+    </div>
+
+    <!-- EOD Report -->
+    <div class="card">
+      <div class="card-icon">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      </div>
+      <div class="card-title">오늘 마감 리포트</div>
+      <div class="card-desc">완료 작업, 미완료 작업, CC 세션 횟수, 작업 시간을 집계. 18:00 이후 자동으로 Telegram 전송.</div>
+      <span class="tag new">NEW</span>
+    </div>
+
+    <!-- Health Score -->
+    <div class="card">
+      <div class="card-icon">
+        <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </div>
+      <div class="card-title">프로젝트 건강 점수</div>
+      <div class="card-desc">40개 프로젝트 건강 상태를 0~100으로 표시. 최근 완료·CC 활동·유휴 기간 기반 계산.</div>
+      <span class="tag new">NEW</span>
+    </div>
+  </div>
+
+  <!-- API 엔드포인트 -->
+  <div class="flow" style="margin-bottom:24px">
+    <div class="section-title">추가된 API 엔드포인트</div>
+    <table class="api-table">
+      <thead><tr><th>Method</th><th>Path</th><th>설명</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="method get">GET</span></td>
+          <td class="mono">/api/settings/telegram</td>
+          <td>Telegram 설정 조회 (bot_token, chat_id, enabled)</td>
+        </tr>
+        <tr>
+          <td><span class="method post">POST</span></td>
+          <td class="mono">/api/settings/telegram</td>
+          <td>Telegram 설정 저장</td>
+        </tr>
+        <tr>
+          <td><span class="method post">POST</span></td>
+          <td class="mono">/api/telegram-test</td>
+          <td>테스트 메시지 전송</td>
+        </tr>
+        <tr>
+          <td><span class="method get">GET</span></td>
+          <td class="mono">/api/eod-report?d=DATE</td>
+          <td>EOD 리포트 데이터 (완료/미완료/CC세션 집계)</td>
+        </tr>
+        <tr>
+          <td><span class="method post">POST</span></td>
+          <td class="mono">/api/eod-report/send</td>
+          <td>EOD 리포트를 Telegram으로 즉시 전송</td>
+        </tr>
+        <tr>
+          <td><span class="method get">GET</span></td>
+          <td class="mono">/api/project-health</td>
+          <td>프로젝트 건강 점수 목록 (0~100, 오름차순)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Telegram 흐름 -->
+  <div class="flow" style="margin-bottom:24px">
+    <div class="section-title">자동 알림 흐름</div>
+    <div class="flow-row"><div class="flow-step">1</div><div><div class="flow-label">아침 브리핑 (09:00)</div><div class="flow-muted">notifier.py → morning-brief API → Telegram 전송</div></div></div>
+    <div class="flow-row"><div class="flow-step">2</div><div><div class="flow-label">5분 주기 모니터링</div><div class="flow-muted">maybe_send_eod_report() — 18:00 이후 하루 1회 EOD 전송</div></div></div>
+    <div class="flow-row"><div class="flow-step">3</div><div><div class="flow-label">수동 전송</div><div class="flow-muted">대시보드 보고 탭 → 오늘 마감 리포트 카드 → Telegram 전송 버튼</div></div></div>
+  </div>
+
+  <!-- Health Score 설명 -->
+  <div class="flow">
+    <div class="section-title">건강 점수 계산식</div>
+    <div style="font-size:12px;color:#1D1D1F;line-height:1.8;margin-bottom:12px">
+      기준 60점 + 최근 7일 완료(+5/개, max 25) + CC 세션(+3/회, max 15) − 밀린 작업(−8/개, max 30) − 유휴일수(−2/일, max 30)
+    </div>
+    <div class="score-demo">
+      <div class="score-item"><div class="score-dot" style="background:#34C759"></div><span>75 이상 — good</span></div>
+      <div class="score-item"><div class="score-dot" style="background:#FF9500"></div><span>45~74 — warn</span></div>
+      <div class="score-item"><div class="score-dot" style="background:#FF3B30"></div><span>44 이하 — poor</span></div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

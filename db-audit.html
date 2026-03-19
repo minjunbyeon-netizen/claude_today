@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Focus — DB 감사 리포트 2026-03-17</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%231D1D1F'/><text x='7' y='23' font-size='18' fill='white'>D</text></svg>">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #F5F5F7; color: #1D1D1F; padding: 40px 24px; letter-spacing: -0.01em; }
+.wrap { max-width: 900px; margin: 0 auto; }
+h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+.sub { font-size: 13px; color: #6E6E73; margin-bottom: 32px; }
+.section { margin-bottom: 32px; }
+.section-title { font-size: 11px; font-weight: 700; color: #6E6E73; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 12px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); overflow: hidden; }
+.card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.badge { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; font-size: 14px; flex-shrink: 0; }
+.badge.ok { background: #E8F5E9; }
+.badge.warn { background: #FFF8E1; }
+.badge.fix { background: #E8F5E9; }
+.card-title { font-size: 14px; font-weight: 700; }
+.card-sub { font-size: 11px; color: #6E6E73; margin-top: 2px; }
+.stat { font-size: 28px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+.stat.ok { color: #1D1D1F; }
+.stat.warn { color: #F57C00; }
+.stat.zero { color: #6E6E73; }
+.desc { font-size: 12px; color: #6E6E73; line-height: 1.5; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 980px; font-size: 10px; font-weight: 700; margin-top: 8px; }
+.tag.green { background: #E8F5E9; color: #2E7D32; }
+.tag.orange { background: #FFF3E0; color: #E65100; }
+.tag.blue { background: #E3F2FD; color: #1565C0; }
+.tag.fixed { background: #1D1D1F; color: #fff; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th { text-align: left; padding: 8px 12px; background: #F5F5F7; font-weight: 700; font-size: 11px; color: #6E6E73; }
+td { padding: 8px 12px; border-bottom: 1px solid #F0F0F0; color: #1D1D1F; vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+.dot-ok { color: #2E7D32; font-weight: 700; }
+.dot-warn { color: #F57C00; font-weight: 700; }
+.dot-fixed { color: #0071E3; font-weight: 700; }
+.issue-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 10px; border-left: 3px solid #E0E0E0; }
+.issue-card.fixed-card { border-left-color: #1D1D1F; }
+.issue-card.warn-card { border-left-color: #F57C00; }
+.issue-title { font-size: 13px; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.issue-body { font-size: 12px; color: #6E6E73; line-height: 1.6; }
+.issue-body code { background: #F5F5F7; padding: 1px 5px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 11px; color: #1D1D1F; }
+.bar-wrap { margin-top: 12px; }
+.bar-label { display: flex; justify-content: space-between; font-size: 11px; color: #6E6E73; margin-bottom: 4px; }
+.bar-track { background: #F0F0F0; border-radius: 4px; height: 6px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 4px; background: #1D1D1F; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>DB 감사 리포트</h1>
+  <div class="sub">daily-focus · 2026-03-17 · data/focus.db 전수 검사</div>
+
+  <!-- 요약 수치 -->
+  <div class="section">
+    <div class="section-title">데이터 현황 요약</div>
+    <div class="grid3">
+      <div class="card">
+        <div class="card-head"><div class="badge ok">T</div><div><div class="card-title">Tasks</div><div class="card-sub">전체 / 오늘 / 완료</div></div></div>
+        <div class="stat ok">419</div>
+        <div class="desc">오늘 4건 todo (carry-over)<br>완료 298건, 이월 38건</div>
+        <div class="bar-wrap"><div class="bar-label"><span>완료율</span><span>71%</span></div><div class="bar-track"><div class="bar-fill" style="width:71%"></div></div></div>
+        <span class="tag green">정상</span>
+      </div>
+      <div class="card">
+        <div class="card-head"><div class="badge ok">A</div><div><div class="card-title">CC 활동 로그</div><div class="card-sub">agent_activity</div></div></div>
+        <div class="stat ok">1,139</div>
+        <div class="desc">모든 프로젝트 CC 세션 기록<br>최근: 2026-03-16 gangseo, squad</div>
+        <span class="tag green">정상</span>
+      </div>
+      <div class="card">
+        <div class="card-head"><div class="badge ok">W</div><div><div class="card-title">workspace_projects</div><div class="card-sub">자동 감지 프로젝트</div></div></div>
+        <div class="stat ok">30</div>
+        <div class="desc">C:\work 하위 자동 발견<br>folder_path 전부 매핑됨</div>
+        <span class="tag green">정상</span>
+      </div>
+      <div class="card">
+        <div class="card-head"><div class="badge ok">S</div><div><div class="card-title">settings</div><div class="card-sub">ui_prefs · wf_groups 등</div></div></div>
+        <div class="stat ok">12</div>
+        <div class="desc">ui_prefs (216자) · wf_groups(5그룹)<br>localStorage 완전 대체됨</div>
+        <span class="tag green">localStorage 0건</span>
+      </div>
+      <div class="card">
+        <div class="card-head"><div class="badge warn">U</div><div><div class="card-title">user_activity</div><div class="card-sub">작업 이력 로그</div></div></div>
+        <div class="stat zero">0</div>
+        <div class="desc">carry_over가 log_activity 미호출<br>→ 이번에 수정 완료</div>
+        <span class="tag fixed">수정됨</span>
+      </div>
+      <div class="card">
+        <div class="card-head"><div class="badge ok">L</div><div><div class="card-title">task_learning_samples</div><div class="card-sub">AI 예측 학습 데이터</div></div></div>
+        <div class="stat ok">298</div>
+        <div class="desc">작업 완료 시 자동 기록<br>최근: 2026-03-16 다수 프로젝트</div>
+        <span class="tag green">정상</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 테이블별 상태 -->
+  <div class="section">
+    <div class="section-title">전체 테이블 상태</div>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>테이블</th><th>건수</th><th>상태</th><th>비고</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>tasks</td><td>419</td><td><span class="dot-ok">정상</span></td><td>todo 83 · done 298 · carried_over 38</td></tr>
+          <tr><td>agent_activity</td><td>1,139</td><td><span class="dot-ok">정상</span></td><td>모든 프로젝트 CC 세션 자동 기록</td></tr>
+          <tr><td>agent_status</td><td>16</td><td><span class="dot-ok">정상</span></td><td>프로젝트별 최신 CC 상태 추적</td></tr>
+          <tr><td>workspace_projects</td><td>30</td><td><span class="dot-ok">정상</span></td><td>C:\work 자동 스캔, folder_path 매핑</td></tr>
+          <tr><td>settings</td><td>12 키</td><td><span class="dot-ok">정상</span></td><td>ui_prefs · wf_groups · telegram · token limits</td></tr>
+          <tr><td>task_decisions</td><td>77</td><td><span class="dot-ok">정상</span></td><td>continue/defer/split 의사결정 이력</td></tr>
+          <tr><td>task_learning_samples</td><td>298</td><td><span class="dot-ok">정상</span></td><td>완료 태스크 실제 시간 vs 예측 학습 데이터</td></tr>
+          <tr><td>daily_goal_plans</td><td>14</td><td><span class="dot-ok">정상</span></td><td>날짜별 목표 추천·확인 상태</td></tr>
+          <tr><td>task_comments</td><td>2</td><td><span class="dot-ok">정상</span></td><td>태스크 댓글 (confirmed 포함)</td></tr>
+          <tr><td>user_activity</td><td>0</td><td><span class="dot-fixed">수정됨</span></td><td>carry_over 미기록 버그 수정 완료</td></tr>
+          <tr><td>checkins</td><td>0</td><td><span class="dot-warn">미사용</span></td><td>체크인 기능 UI 미연결 상태</td></tr>
+          <tr><td>weekly_goals</td><td>0</td><td><span class="dot-warn">미사용</span></td><td>주간 목표 기능 UI 미연결 상태</td></tr>
+          <tr><td>project_comments</td><td>0</td><td><span class="dot-ok">정상</span></td><td>아직 댓글 없음 (기능은 준비됨)</td></tr>
+          <tr><td>org_tasks / org_users</td><td>6 / 7</td><td><span class="dot-ok">정상</span></td><td>조직 관리 모듈 데이터</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- localStorage 마이그레이션 상태 -->
+  <div class="section">
+    <div class="section-title">localStorage → DB 마이그레이션 현황</div>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>키</th><th>이전 위치</th><th>현재 위치</th><th>상태</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>active_tab / active_subtab</td><td>localStorage</td><td>settings.ui_prefs</td><td><span class="dot-ok">완료</span></td></tr>
+          <tr><td>claude_open (패널 열림)</td><td>localStorage</td><td>settings.ui_prefs</td><td><span class="dot-ok">완료</span></td></tr>
+          <tr><td>acc_open (아코디언)</td><td>localStorage</td><td>settings.ui_prefs</td><td><span class="dot-ok">완료</span></td></tr>
+          <tr><td>proj_order (프로젝트 순서)</td><td>localStorage</td><td>settings.ui_prefs</td><td><span class="dot-ok">완료</span></td></tr>
+          <tr><td>card_states (카드 접힘)</td><td>localStorage</td><td>settings.ui_prefs</td><td><span class="dot-ok">완료</span></td></tr>
+          <tr><td>wf_collapsed / wfg_states</td><td>localStorage</td><td>settings.ui_prefs</td><td><span class="dot-ok">완료</span></td></tr>
+          <tr><td>wf_groups (프로젝트 폴더그룹)</td><td>localStorage</td><td>settings.wf_groups</td><td><span class="dot-ok">완료 (5그룹)</span></td></tr>
+        </tbody>
+      </table>
+      <div style="margin-top:14px;padding:12px 14px;background:#F5F5F7;border-radius:8px;">
+        <div style="font-size:12px;color:#1D1D1F;font-weight:700;">index.html localStorage 참조: <span style="color:#2E7D32">0건</span> (주석 1줄만 존재)</div>
+        <div style="font-size:12px;color:#6E6E73;margin-top:4px;">600ms 디바운스 자동저장 · 기기간 동기화 완료</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 발견 이슈 및 수정 내역 -->
+  <div class="section">
+    <div class="section-title">발견 이슈 및 조치</div>
+
+    <div class="issue-card fixed-card">
+      <div class="issue-title"><span class="tag fixed">수정 완료</span> user_activity 미기록 — carry_over 누락</div>
+      <div class="issue-body">
+        <code>POST /api/carry-over</code> 에서 태스크를 복사할 때 <code>log_activity()</code>를 호출하지 않아
+        user_activity 테이블이 비어 있었음.<br>
+        수정: <code>carry_over()</code> 루프 내에 <code>log_activity(conn, "task_carry_over", {...})</code> 추가.
+        이제 이월 태스크 생성 시 자동 기록됨.
+      </div>
+    </div>
+
+    <div class="issue-card fixed-card">
+      <div class="issue-title"><span class="tag fixed">수정 완료</span> CC 버튼 0x80070002 오류 — wt.exe 방식 제거</div>
+      <div class="issue-body">
+        <code>wt.exe new-window -d ... -- cmd /k claude.exe</code> 방식이 wt.exe 경로 문제로 실패.<br>
+        수정: <code>subprocess.Popen(['cmd', '/k', 'title CC:{proj} &amp; claude'], cwd=path, creationflags=CREATE_NEW_CONSOLE)</code><br>
+        이미 열린 창 감지: PowerShell로 <code>MainWindowTitle -like 'CC:{proj}*'</code> 탐색 후 앞으로 팝업.
+      </div>
+    </div>
+
+    <div class="issue-card warn-card">
+      <div class="issue-title"><span class="tag orange">미연결</span> checkins · weekly_goals 테이블 데이터 없음</div>
+      <div class="issue-body">
+        테이블 스키마는 존재하지만 UI에서 데이터를 입력/조회하는 화면이 연결되지 않은 상태.<br>
+        현재 서비스에 영향 없음. 추후 기능 구현 시 활성화 예정.
+      </div>
+    </div>
+
+    <div class="issue-card warn-card">
+      <div class="issue-title"><span class="tag orange">확인 필요</span> 로컬 DB ↔ 원격 서버 동기화 없음</div>
+      <div class="issue-body">
+        <code>remote_url: http://137.184.82.157/daily-focus</code> 에 별도 DB 인스턴스가 운영 중.<br>
+        로컬과 원격은 각자 독립 DB — 데이터가 분리됨.<br>
+        해결 방안: 한 곳만 사용하거나, API 기반 단방향 sync 구현.
+      </div>
+    </div>
+
+    <div class="issue-card warn-card">
+      <div class="issue-title"><span class="tag orange">미설정</span> Telegram 알림 미구성</div>
+      <div class="issue-body">
+        telegram_enabled 키가 settings에 없음 (기본값 off).<br>
+        EOD 자동 리포트, 모닝 브리핑 Telegram 전송을 원하면<br>
+        보고 탭 → 알림 설정(Telegram)에서 Bot Token + Chat ID 입력 필요.
+      </div>
+    </div>
+  </div>
+
+  <!-- 데이터 흐름 -->
+  <div class="section">
+    <div class="section-title">데이터 흐름 다이어그램</div>
+    <div class="card" style="padding:24px;">
+      <div style="display:grid;grid-template-columns:1fr 40px 1fr 40px 1fr;gap:8px;align-items:center;font-size:12px;">
+        <div style="background:#F5F5F7;border-radius:8px;padding:14px 16px;">
+          <div style="font-weight:700;margin-bottom:6px;">사용자 액션</div>
+          <div style="color:#6E6E73;line-height:1.8;">태스크 생성/완료<br>탭·패널 전환<br>WF 그룹 수정<br>CC 버튼 클릭</div>
+        </div>
+        <div style="text-align:center;color:#6E6E73;font-size:18px;">→</div>
+        <div style="background:#F5F5F7;border-radius:8px;padding:14px 16px;">
+          <div style="font-weight:700;margin-bottom:6px;">FastAPI 서버</div>
+          <div style="color:#6E6E73;line-height:1.8;">/api/tasks CRUD<br>/api/ui-prefs (600ms debounce)<br>/api/wf-groups<br>/api/open-claude</div>
+        </div>
+        <div style="text-align:center;color:#6E6E73;font-size:18px;">→</div>
+        <div style="background:#F5F5F7;border-radius:8px;padding:14px 16px;">
+          <div style="font-weight:700;margin-bottom:6px;">SQLite DB</div>
+          <div style="color:#6E6E73;line-height:1.8;">tasks (419건)<br>settings (ui_prefs, wf_groups)<br>user_activity<br>agent_activity</div>
+        </div>
+      </div>
+      <div style="margin-top:16px;padding:12px 14px;background:#F5F5F7;border-radius:8px;font-size:12px;color:#6E6E73;">
+        CC 세션 활동은 <code>report_agent_status.py</code> → <code>POST /api/agent-status</code> → agent_activity 테이블에 자동 기록
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align:center;font-size:11px;color:#6E6E73;padding:24px 0;">
+    db-audit.html · data/focus.db · 2026-03-17
+  </div>
+</div>
+</body>
+</html>

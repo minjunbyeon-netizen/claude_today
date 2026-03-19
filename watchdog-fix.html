@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Focus — Watchdog 중복 실행 버그 수정 2026-03-18</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%231D1D1F'/><text x='6' y='23' font-size='18' fill='white'>W</text></svg>">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #F5F5F7; color: #1D1D1F; padding: 40px 24px; letter-spacing: -0.01em; }
+.wrap { max-width: 960px; margin: 0 auto; }
+h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+.sub { font-size: 13px; color: #6E6E73; margin-bottom: 32px; }
+.section { margin-bottom: 40px; }
+.section-title { font-size: 11px; font-weight: 700; color: #6E6E73; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 16px; }
+.card { background: #fff; border-radius: 12px; padding: 20px 24px; box-shadow: 0 1px 4px rgba(0,0,0,.06); overflow: hidden; margin-bottom: 12px; }
+.card-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+.badge { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 28px; border-radius: 8px; font-size: 12px; font-weight: 700; flex-shrink: 0; padding: 0 8px; }
+.badge.bug { background: #FFEBEE; color: #C62828; }
+.badge.fix { background: #E8F5E9; color: #2E7D32; }
+.badge.warn { background: #FFF8E1; color: #F57C00; }
+.card-title { font-size: 14px; font-weight: 700; }
+.card-sub { font-size: 12px; color: #6E6E73; margin-top: 3px; line-height: 1.5; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.flow { display: flex; flex-direction: column; gap: 0; }
+.flow-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid #F0F0F0; }
+.flow-item:last-child { border-bottom: none; }
+.step-num { min-width: 24px; height: 24px; border-radius: 50%; background: #1D1D1F; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+.step-num.red { background: #FF3B30; }
+.step-num.green { background: #34C759; }
+.step-text { font-size: 13px; line-height: 1.6; color: #1D1D1F; }
+.step-text em { font-style: normal; font-weight: 700; color: #FF3B30; }
+.step-text strong { font-weight: 700; color: #1D1D1F; }
+.step-text .ok { color: #2E7D32; font-weight: 700; }
+code { font-family: 'Menlo', 'Consolas', monospace; font-size: 11px; background: #F0F0F2; padding: 1px 5px; border-radius: 4px; color: #1D1D1F; }
+pre { font-family: 'Menlo', 'Consolas', monospace; font-size: 12px; background: #1D1D1F; color: #E8E8ED; padding: 16px 20px; border-radius: 10px; overflow-x: auto; line-height: 1.6; }
+pre .add { color: #34C759; }
+pre .ctx { color: #8E8E93; }
+pre .label { color: #FF9F0A; font-weight: 700; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 980px; font-size: 10px; font-weight: 700; }
+.tag.red { background: #FFEBEE; color: #C62828; }
+.tag.green { background: #E8F5E9; color: #2E7D32; }
+.tag.gray { background: #F0F0F2; color: #6E6E73; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th { text-align: left; padding: 8px 12px; background: #F5F5F7; font-weight: 700; font-size: 11px; color: #6E6E73; }
+td { padding: 10px 12px; border-bottom: 1px solid #F0F0F0; vertical-align: top; line-height: 1.5; }
+tr:last-child td { border-bottom: none; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; flex-shrink: 0; }
+.dot.red { background: #FF3B30; }
+.dot.green { background: #34C759; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Watchdog 중복 실행 버그 수정</h1>
+  <p class="sub">daily-focus / 2026-03-18 — 터미널 창 깜빡임 + uvicorn 크래시 루프 근본 원인 분석 및 수정</p>
+
+  <!-- ROOT CAUSE -->
+  <div class="section">
+    <div class="section-title">근본 원인 분석</div>
+    <div class="card">
+      <div class="section-title" style="margin-bottom:12px">3개 프로세스의 관계도</div>
+      <div class="flow">
+        <div class="flow-item">
+          <div class="step-num red">1</div>
+          <div class="step-text">
+            <strong>keepalive.py 2개</strong> — 두 번 실행됐으나 <code>Global\DailyFocusKeepalive</code> 뮤텍스 있음.
+            두 번째는 즉시 종료. <span class="ok">자체 방어됨</span>
+          </div>
+        </div>
+        <div class="flow-item">
+          <div class="step-num red">2</div>
+          <div class="step-text">
+            <strong>watchdog.py 2개</strong> — <em>뮤텍스 없음.</em> 레지스트리 Task (venv python) + 다른 경로 (system python) 둘 다 살아있음.
+            60초마다 포트 체크 → 둘 다 동시에 <code>restart()</code> 호출
+          </div>
+        </div>
+        <div class="flow-item">
+          <div class="step-num red">3</div>
+          <div class="step-text">
+            <strong>uvicorn 2개 동시 바인딩</strong> — 두 watchdog가 각각 <code>uvicorn app:app --port 8001</code> 실행.
+            하나만 성공, 하나는 크래시 → keepalive/watchdog가 "죽었다" 감지 → 다시 restart → <em>무한 루프</em>
+          </div>
+        </div>
+        <div class="flow-item">
+          <div class="step-num red">4</div>
+          <div class="step-text">
+            <strong>터미널 창 깜빡임</strong> — 두 watchdog가 레이스 컨디션으로 동시에 <code>netstat</code> + <code>taskkill</code> 실행.
+            <code>CREATE_NO_WINDOW</code>가 있어도 두 프로세스 타이밍 충돌 시 창 노출
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WHAT WAS MISSING -->
+  <div class="section">
+    <div class="section-title">파일별 싱글턴 보호 상태</div>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>파일</th>
+            <th>뮤텍스 이름</th>
+            <th>수정 전</th>
+            <th>수정 후</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>keepalive.py</code></td>
+            <td><code>Global\DailyFocusKeepalive</code></td>
+            <td><span class="tag green">있음</span></td>
+            <td><span class="tag gray">변경 없음</span></td>
+          </tr>
+          <tr>
+            <td><code>run.py</code></td>
+            <td><code>Global\DailyFocusRun</code></td>
+            <td><span class="tag green">있음</span></td>
+            <td><span class="tag gray">변경 없음</span></td>
+          </tr>
+          <tr>
+            <td><strong>watchdog.py</strong></td>
+            <td><code>Global\DailyFocusWatchdog</code></td>
+            <td><span class="tag red">없음 (버그)</span></td>
+            <td><span class="tag green">추가됨 (수정)</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- WHAT CHANGED -->
+  <div class="section">
+    <div class="section-title">watchdog.py 변경 내용 (3가지)</div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-head">
+          <span class="badge fix">FIX 1</span>
+          <div>
+            <div class="card-title">Windows 뮤텍스 싱글턴</div>
+            <div class="card-sub">두 번째 watchdog.py 실행 시 즉시 sys.exit(0)<br>레지스트리 Task + 수동 실행 어디서 시작해도 하나만 생존</div>
+          </div>
+        </div>
+        <pre><span class="add">+ def acquire_singleton() -> object | None:</span>
+<span class="add">+     handle = ctypes.windll.kernel32\</span>
+<span class="add">+         .CreateMutexW(None, False,</span>
+<span class="add">+         "Global\\DailyFocusWatchdog")</span>
+<span class="add">+     if GetLastError() == 183:  # EXISTS</span>
+<span class="add">+         return None</span>
+<span class="add">+     return handle</span></pre>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="badge fix">FIX 2</span>
+          <div>
+            <div class="card-title">restart() 내부 Lock</div>
+            <div class="card-sub">같은 프로세스 내 동시 restart() 호출 차단<br>non-blocking acquire 실패 시 중복 호출 무시</div>
+          </div>
+        </div>
+        <pre><span class="add">+ _restart_lock = threading.Lock()</span>
+
+  def restart() -> None:
+<span class="add">+     if not _restart_lock.acquire(</span>
+<span class="add">+             blocking=False):</span>
+<span class="add">+         log("restart in progress")</span>
+<span class="add">+         return</span>
+      try:
+          ...
+<span class="add">+     finally:</span>
+<span class="add">+         _restart_lock.release()</span></pre>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="badge fix">FIX 3</span>
+          <div>
+            <div class="card-title">Grace Period 강화</div>
+            <div class="card-sub">시작 후 10초 대기 → 포트 첫 체크<br>restart 후 15초 대기 (기존 5초) → 오탐 방지</div>
+          </div>
+        </div>
+        <pre><span class="ctx">RESTART_GRACE = 15  # was 5</span>
+
+  mutex = acquire_singleton()
+  if mutex is None:
+      sys.exit(0)      <span class="label"># NEW: exit if dup</span>
+
+<span class="add">+ time.sleep(10)  # startup grace</span>
+
+  while True:
+      if not is_alive(PORT):
+          restart()
+          time.sleep(RESTART_GRACE)  <span class="label"># 15s</span></pre>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="badge fix">FIX 4</span>
+          <div>
+            <div class="card-title">venv Python 안전 폴백</div>
+            <div class="card-sub">venv가 없으면 sys.executable로 폴백<br>시스템 Python / venv 경로 불일치 오류 방지</div>
+          </div>
+        </div>
+        <pre>  venv_py = os.path.join(ROOT,
+      ".venv", "Scripts", "python.exe")
+<span class="add">+ PYTHON = (venv_py</span>
+<span class="add">+     if os.path.isfile(venv_py)</span>
+<span class="add">+     else sys.executable)</span>  <span class="label"># fallback</span>
+
+<span class="ctx">  # was: PYTHON = venv_py (no check)</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESTART STEPS -->
+  <div class="section">
+    <div class="section-title">지금 해야 할 것 — 기존 프로세스 정리</div>
+    <div class="card">
+      <div class="flow">
+        <div class="flow-item">
+          <div class="step-num green">1</div>
+          <div class="step-text">
+            작업 관리자 또는 PowerShell에서 <strong>현재 실행 중인 watchdog.py 프로세스 모두 종료</strong><br>
+            <code>Get-Process python | Where CommandLine -like '*watchdog*' | Stop-Process</code>
+          </div>
+        </div>
+        <div class="flow-item">
+          <div class="step-num green">2</div>
+          <div class="step-text">
+            <strong>watchdog_silent.vbs 한 번만 실행</strong> (Task Scheduler가 자동으로 하거나 수동으로)<br>
+            이제 두 번째 실행해도 즉시 종료됨
+          </div>
+        </div>
+        <div class="flow-item">
+          <div class="step-num green">3</div>
+          <div class="step-text">
+            <code>log/watchdog.log</code> 확인 — <strong>"watchdog started"</strong> 가 1번만 찍히면 정상
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p style="font-size:11px; color:#6E6E73; margin-top: 8px;">daily-focus / watchdog-fix.html / 2026-03-18</p>
+</div>
+</body>
+</html>

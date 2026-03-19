@@ -43,7 +43,14 @@ if os.path.exists(_env_path):
                 os.environ.setdefault(_k.strip(), _v.strip())
 
 # --- Auth Config ---
-SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_hex(32))
+# codeteam fix: token_hex(32) 기본값은 재시작마다 새 키 생성 → 세션 무효화.
+# .env 또는 환경변수에 SECRET_KEY가 없으면 즉시 종료하여 운영자가 반드시 설정하도록 강제.
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "SECRET_KEY is not set. Add SECRET_KEY=<64-char hex> to your .env file. "
+        "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+    )
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "")
 ALLOWED_GITHUB_USERS = set(
@@ -53,7 +60,8 @@ BASE_URL = os.getenv("BASE_URL", "http://localhost:8001")
 from urllib.parse import urlparse as _urlparse
 _BASE_PATH = _urlparse(BASE_URL).path.rstrip("/")  # "" locally, "/daily-focus" on droplet
 
-_AUTH_PUBLIC_PATHS = {"/login", "/auth/github", "/auth/callback", "/logout", "/health"}
+_AUTH_PUBLIC_PATHS = {"/login", "/auth/github", "/auth/callback", "/logout", "/health",
+                      "/api/agent-status", "/api/coding-report", "/api/coding-reports"}
 
 
 @app.middleware("http")
@@ -69,10 +77,19 @@ async def auth_middleware(request: Request, call_next):
     return await call_next(request)
 DB_PATH = "data/focus.db"
 AI_SPEED_FACTOR = 0.42
-REPO_SCAN_ROOTS = [r"C:\work", r"C:\Users\USER\Desktop"]
+# codeteam fix: 하드코딩된 Windows 절대경로 및 사용자명을 환경변수로 대체
+#   REPO_SCAN_ROOTS: 쉼표 구분 경로 목록. 기본값 = ~/work, ~/Desktop
+#   WORKSPACE_WATCH_ROOT: 단일 경로. 기본값 = ~/work
+_default_work = str(Path.home() / "work")
+_default_desktop = str(Path.home() / "Desktop")
+REPO_SCAN_ROOTS = [
+    p.strip()
+    for p in os.getenv("REPO_SCAN_ROOTS", f"{_default_work},{_default_desktop}").split(",")
+    if p.strip()
+]
 REPO_SCAN_MAX_DEPTH = 2
 REPO_SCAN_SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__"}
-WORKSPACE_WATCH_ROOT = r"C:\work"
+WORKSPACE_WATCH_ROOT = os.getenv("WORKSPACE_WATCH_ROOT", _default_work)
 WORKSPACE_SCAN_SKIP_DIRS = {
     ".git",
     ".venv",
@@ -175,6 +192,16 @@ def init_db():
             status TEXT NOT NULL,
             url TEXT DEFAULT '',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS coding_reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            team        TEXT NOT NULL,
+            session_id  TEXT NOT NULL,
+            project     TEXT DEFAULT '',
+            issues_count INTEGER DEFAULT 0,
+            fixed_count  INTEGER DEFAULT 0,
+            report_text  TEXT DEFAULT '',
+            created_at   TEXT DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE IF NOT EXISTS task_learning_samples (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1024,7 +1051,7 @@ def ensure_workspace_inbox_task(conn, project_name: str, folder_path: str) -> bo
     today = kst_today()
     now = kst_now()
     title = workspace_discovery_task_title(project_name)
-    note = f"자동 감지된 C:\\work 폴더: {folder_path}"
+    note = f"자동 감지된 작업 폴더: {folder_path}"  # codeteam fix: 하드코딩된 경로 문자열 제거
     conn.execute(
         """
         INSERT INTO tasks (
@@ -6058,6 +6085,54 @@ def post_tomorrow_blueprint(body: TomorrowBlueprint):
         )
         conn.commit()
         return {"ok": True, "date": tomorrow}
+    finally:
+        conn.close()
+
+
+class CodingReportPayload(BaseModel):
+    team: str          # "codingteam1" | "codingteam2"
+    session_id: str
+    project: Optional[str] = ""
+    issues_count: int = 0
+    fixed_count: int = 0
+    report_text: str = ""
+
+
+@app.post("/api/coding-report")
+def post_coding_report(body: CodingReportPayload):
+    """코딩1팀/2팀이 야간 작업 완료 후 최종 보고서를 전송하는 웹훅 엔드포인트."""
+    conn = get_db()
+    try:
+        conn.execute(
+            """INSERT INTO coding_reports (team, session_id, project, issues_count, fixed_count, report_text, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, datetime('now','localtime'))""",
+            (body.team, body.session_id, body.project, body.issues_count, body.fixed_count, body.report_text),
+        )
+        # agent_status도 done으로 업데이트
+        conn.execute(
+            """INSERT INTO agent_status (project, task, status, url, updated_at)
+               VALUES (?, ?, 'done', '', datetime('now','localtime'))
+               ON CONFLICT(project) DO UPDATE SET
+                  task=excluded.task, status='done', updated_at=excluded.updated_at""",
+            (body.team, f"night run done — {body.fixed_count} fixed / {body.issues_count} issues"),
+        )
+        conn.commit()
+        return {"ok": True}
+    finally:
+        conn.close()
+
+
+@app.get("/api/coding-reports")
+def get_coding_reports(limit: int = 20):
+    """최근 코딩팀 보고서 목록 반환."""
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            """SELECT id, team, session_id, project, issues_count, fixed_count, created_at
+               FROM coding_reports ORDER BY id DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
     finally:
         conn.close()
 
