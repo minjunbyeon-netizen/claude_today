@@ -531,9 +531,6 @@ body {
   margin-bottom: 12px;
   box-shadow: 0 1px 4px rgba(0,0,0,.08);
 }
-.last-log-item { font-size: 11px; color: var(--muted); line-height: 1.6; padding: 1px 0; }
-.last-log-item::before { content: counter(log-item) ". "; counter-increment: log-item; }
-#lastLogItems { counter-reset: log-item; }
 .proj-comment-panel { padding: 8px 14px 10px; border-top: 1px solid var(--border); margin-top: 4px; }
 .proj-last-log { counter-reset: proj-log-item; padding: 6px 14px 8px 58px; margin-bottom: 4px; }
 .proj-last-log:empty { display: none; }
@@ -3262,10 +3259,6 @@ body {
       <span id="stTasks" style="display:none"></span>
       <span id="stTime" style="display:none"></span>
       <span id="stLeft" style="display:none"></span>
-      <div id="carryBanner" class="banner" style="display:none">
-        <div class="banner-txt" id="carryTxt"></div>
-        <button class="banner-btn" onclick="doCarry()">오늘로 이월</button>
-      </div>
       <span id="syncMsg" style="display:none"></span>
       <input type="file" id="logFolderInput" style="display:none" onchange="uploadLogsFromFolder(this)">
       <input id="inTitle" style="display:none">
@@ -3316,11 +3309,6 @@ body {
       <div class="filter-bar" id="filterBar" style="display:none">
         프로젝트 필터: <span id="filterLabel"></span>
         <button class="filter-clear" onclick="clearProjectFilter()">전체 보기</button>
-      </div>
-
-      <!-- Last Log -->
-      <div id="lastLogPanel" style="display:none;margin-bottom:10px;padding:10px 14px;border-left:2px solid var(--border)">
-        <div id="lastLogItems"></div>
       </div>
 
       <!-- Group-row view (항상 표시) -->
@@ -5296,19 +5284,7 @@ async function loadProjectLog(proj) {
 }
 
 // --- Last Log ---
-async function loadLastLog() {
-  const panel = document.getElementById('lastLogPanel');
-  const itemsEl = document.getElementById('lastLogItems');
-  if (!panel || !itemsEl) return;
-  try {
-    const r = await fetch(appUrl('api/last-log'));
-    if (!r.ok) return;
-    const d = await r.json();
-    if (!d.items || !d.items.length) return;
-    itemsEl.innerHTML = d.items.map(t => `<div class="last-log-item">${esc(t)}</div>`).join('');
-    panel.style.display = 'block';
-  } catch(e) { console.warn('loadLastLog:', e); }
-}
+async function loadLastLog() {}
 // --- End Last Log ---
 
 // --- Collapsible Cards ---
@@ -5656,20 +5632,8 @@ async function delTask(id) {
   await refreshMain();
 }
 
-async function checkCarry() {
-  const r = await fetch(appUrl('api/yesterday-undone'));
-  const tasks = await r.json();
-  const banner = document.getElementById('carryBanner');
-  if (tasks.length) {
-    document.getElementById('carryTxt').textContent = `어제 미완료 작업 ${tasks.length}개가 있습니다`;
-    banner.style.display = 'flex';
-  } else banner.style.display = 'none';
-}
-async function doCarry() {
-  await fetch(appUrl('api/carry-over'), {method:'POST'});
-  document.getElementById('carryBanner').style.display = 'none';
-  await refreshMain();
-}
+async function checkCarry() {}
+async function doCarry() {}
 
 // ── Check-in ──────────────────────────────────────────────────
 function toggleCi() {
