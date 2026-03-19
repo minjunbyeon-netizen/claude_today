@@ -3213,23 +3213,10 @@ body {
         <button onclick="openDailyBootModal()">시작하기</button>
       </div>
 
-      <!-- Stack 현황 패널 -->
-      <div id="fdnStackPanel" style="display:none">
-        <div class="fdn-stack-title">PRODUCT STACK 현황</div>
-        <div id="fdnStackRows"></div>
-      </div>
-
       <!-- 자동 판정 결과 패널 (17:00 이후 표시) -->
       <div id="fdnJudgePanel">
         <div class="fdn-stack-title" style="margin-bottom:8px">오늘의 자동 판정 결과</div>
         <div id="fdnJudgeRows"></div>
-      </div>
-
-      <!-- 실험 제품 트래커 패널 (#42) -->
-      <div id="fdnExpPanel" style="display:none">
-        <div class="fdn-stack-title" style="margin-bottom:8px">실험 제품 트래커</div>
-        <div id="fdnExpRows"></div>
-        <button type="button" class="fdn-exp-add" onclick="openAddExperimentModal()">+ 실험 등록</button>
       </div>
 
       <!-- 내일 도면 패널 — 16:00 이후 표시 (#44) -->
@@ -4842,11 +4829,7 @@ const _BLOCK_LABELS = {
   pre: 'Daily Boot 준비', done: '하루 종료'
 };
 
-function _fdnStackBadge(stack) {
-  if (!stack) return '';
-  const cls = _STACK_CLASS[stack] || '';
-  return cls ? `<span class="fdn-stack ${cls}">${stack}</span>` : '';
-}
+function _fdnStackBadge(stack) { return ''; }
 
 function _fdnFkcRow(t) {
   // Stale/Critical 작업에만 FKC 버튼 표시
@@ -4885,26 +4868,6 @@ async function loadFoundationStatus() {
   } catch (_) {}
 
   try {
-    // Stack 현황
-    const st = await fetch(appUrl('api/foundation/stack-status')).then(r => r.json());
-    const panel = document.getElementById('fdnStackPanel');
-    const rows = document.getElementById('fdnStackRows');
-    if (panel && rows && st.stacks) {
-      const hasAny = st.stacks.some(s => s.count > 0);
-      panel.style.display = hasAny ? '' : 'none';
-      const colors = { '수익': '#1A7F37', '성장': '#0057B3', '실험': '#C25A00' };
-      rows.innerHTML = st.stacks.map(s => `
-        <div class="fdn-stack-row">
-          <span class="fdn-stack-row-label" style="color:${colors[s.stack]||'#6E6E73'}">${s.stack}</span>
-          <div class="fdn-stack-bar-wrap">
-            <div class="fdn-stack-bar-fill" style="width:${Math.min(100,s.count/s.limit*100)}%;background:${colors[s.stack]||'#6E6E73'}"></div>
-          </div>
-          <span class="fdn-stack-count ${s.over?'fdn-stack-over':''}">${s.count}/${s.limit}</span>
-        </div>`).join('');
-    }
-  } catch (_) {}
-
-  try {
     // Daily Boot 배너
     const boot = await fetch(appUrl('api/daily-boot/today')).then(r => r.json());
     const bootBanner = document.getElementById('fdnBootBanner');
@@ -4932,33 +4895,6 @@ async function loadFoundationStatus() {
             <span style="font-size:10px;color:#6E6E73">${esc(it.reason||'')}</span>
           </div>`).join('');
       }
-    }
-  } catch (_) {}
-
-  try {
-    // 실험 제품 트래커 (#42)
-    const expData = await fetch(appUrl('api/experiments')).then(r => r.json());
-    const expPanel = document.getElementById('fdnExpPanel');
-    const expRows = document.getElementById('fdnExpRows');
-    if (expPanel && expRows) {
-      const active = (expData.experiments || []).filter(e => e.status === 'active');
-      expPanel.style.display = '';
-      const today = new Date(); today.setHours(0,0,0,0);
-      expRows.innerHTML = active.length === 0
-        ? '<div style="font-size:11px;color:#6E6E73;padding:4px 0">등록된 실험 없음</div>'
-        : active.map(e => {
-            const dl = e.deadline ? new Date(e.deadline) : null;
-            const diff = dl ? Math.ceil((dl - today) / 86400000) : null;
-            let ddayClass = 'normal', ddayText = diff !== null ? `D-${diff}` : '-';
-            if (diff !== null && diff <= 0) { ddayClass='dead'; ddayText='만료'; }
-            else if (diff !== null && diff <= 2) ddayClass='urgent';
-            return `<div class="fdn-exp-row">
-              <span class="fdn-exp-name">${esc(e.name||'')}</span>
-              <span class="fdn-exp-dday ${ddayClass}">${ddayText}</span>
-              <button type="button" class="fdn-exp-btn output" onclick="expAction(${e.id},'complete')">아웃풋</button>
-              <button type="button" class="fdn-exp-btn kill" onclick="expAction(${e.id},'kill')">KILL</button>
-            </div>`;
-          }).join('');
     }
   } catch (_) {}
 
@@ -5135,34 +5071,8 @@ async function submitDailyBoot() {
   } catch (_) {}
 }
 
-// Stack 선택 (작업 생성 폼에 주입)
-function _initFdnAddTaskExtras() {
-  // addTaskCard 내부에 stack picker + criteria 필드 주입
-  const card = document.getElementById('addTaskCard');
-  if (!card || card.querySelector('.fdn-stack-picker')) return;  // 이미 있으면 스킵
-  const extras = document.createElement('div');
-  extras.innerHTML = `
-    <div style="margin-top:8px">
-      <div style="font-size:10px;font-weight:700;color:#6E6E73;margin-bottom:4px">STACK</div>
-      <div class="fdn-stack-picker">
-        <button class="fdn-stack-pick-btn" onclick="_pickStack(this,'수익')">수익</button>
-        <button class="fdn-stack-pick-btn" onclick="_pickStack(this,'성장')">성장</button>
-        <button class="fdn-stack-pick-btn" onclick="_pickStack(this,'실험')">실험</button>
-      </div>
-      <div style="font-size:10px;font-weight:700;color:#6E6E73;margin-top:8px;margin-bottom:2px">완료 기준</div>
-      <input id="inCriteria" class="fdn-criteria-input" placeholder="이 작업이 완료되면 어떤 상태인가? (한 문장)">
-    </div>`;
-  card.appendChild(extras);
-}
-
-function _pickStack(btn, stack) {
-  _fdnSelectedStack = stack;
-  const cls = _STACK_CLASS[stack] || '';
-  document.querySelectorAll('.fdn-stack-pick-btn').forEach(b => {
-    b.classList.remove('selected', 'revenue', 'growth', 'experiment');
-  });
-  btn.classList.add('selected', cls);
-}
+function _initFdnAddTaskExtras() { /* stack picker removed */ }
+function _pickStack() {}
 
 // 작업 완료 시 output_note 입력 요청 (toggleTask 후 호출)
 async function _fdnPromptOutput(taskId) {
