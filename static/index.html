@@ -3985,11 +3985,10 @@ function selectDate(ds) {
   loadTodayByDate(ds);
 
   if (isPast) {
-    // 과거 날짜: 작업탭 → 작업 서브탭 유지 (renderPastDayView가 accList에 렌더)
+    // 과거 날짜: 작업탭 → LOG 서브탭으로 이동
     _setFutureMode(false);
     switchTab('work');
-    switchSubTab('work');
-    loadCheckins(ds);
+    switchSubTab('log'); // 내부에서 loadCheckins(currentViewDate) 자동 호출
   } else if (isFuture) {
     // 미래 날짜: 보고탭 전환, 모든 콘텐츠 숨기고 알람 화면만 표시
     switchTab('report');
