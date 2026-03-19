@@ -2009,6 +2009,38 @@ body {
   display: flex;
   gap: 6px;
 }
+/* 북극성 — 설정 모달 폴더 리스트 */
+.wf-folder-list { display: flex; flex-direction: column; padding: 4px 12px 6px; gap: 0; }
+.wf-folder-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(0,0,0,.05);
+}
+.wf-folder-list-item:last-child { border-bottom: none; }
+.wf-folder-list-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1D1D1F;
+  min-width: 72px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wf-folder-list-star {
+  flex: 1;
+  font-size: 11px;
+  color: #6E6E73;
+  border: none;
+  border-bottom: 1px solid transparent;
+  outline: none;
+  padding: 2px 0;
+  background: none;
+  font-family: inherit;
+}
+.wf-folder-list-star::placeholder { color: rgba(0,0,0,.25); }
+.wf-folder-list-star:focus { border-bottom-color: var(--accent); }
 .wf-folder-select {
   flex: 1;
   background: #FFFFFF;
@@ -2130,6 +2162,15 @@ body {
   font-weight: 400;
   color: #1D1D1F;
   flex: 1;
+}
+.grp-folder-star {
+  font-size: 11px;
+  font-weight: 400;
+  color: #6E6E73;
+  padding: 0 16px 6px 16px;
+  line-height: 1.4;
+  letter-spacing: -.01em;
+  margin-top: -4px;
 }
 .grp-folder-meta {
   display: flex;
@@ -3612,6 +3653,7 @@ function renderGrid(tasks) {
     };
 
     const projId = proj.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const _northStar = (() => { for (const g of wfGroups) { const s = ((g.folderMeta||{})[proj]||{}).northStar; if (s) return s; } return ''; })();
     return `<div class="grp-folder-row ${isLive?'is-live':''}">
       ${items.length ? `<div class="grp-folder-prog"><div class="grp-folder-prog-fill" style="width:${summary.pct}%"></div></div>` : ''}
       <div class="grp-folder-hd">
@@ -3624,6 +3666,7 @@ function renderGrid(tasks) {
           <button class="grp-folder-btn" onclick="toggleFolderCmt('${escAttr(proj)}','${projId}')">댓글</button>
         </div>
       </div>
+      ${_northStar ? `<div class="grp-folder-star">${esc(_northStar)}</div>` : ''}
       ${shown.map(taskRow).join('')}
       ${!items.length ? buildLastActivityRows(proj) : ''}
       <div class="grp-folder-cmt-panel" id="fcmt-${projId}">
@@ -6366,9 +6409,13 @@ function renderWfSettings() {
           onchange="setCategoryForGroup('${g.id}', this.value)">
         <button class="wf-del-group" onclick="deleteWfGroup('${g.id}')" title="그룹 삭제">✕</button>
       </div>
-      <div class="wf-folder-chips" id="chips-${g.id}">
-        ${(g.folders||[]).map(f => `<div class="wf-chip">
-          ${esc(f)}
+      <div class="wf-folder-list" id="chips-${g.id}">
+        ${(g.folders||[]).map(f => `<div class="wf-folder-list-item">
+          <span class="wf-folder-list-name" title="${escAttr(f)}">${esc(f)}</span>
+          <input class="wf-folder-list-star"
+            value="${escAttr(((g.folderMeta||{})[f]||{}).northStar||'')}"
+            placeholder="북극성 한 줄..."
+            onchange="setFolderNorthStar('${g.id}','${esc(f)}',this.value)">
           <button class="wf-chip-rm" onclick="removeFolderFromGroup('${g.id}','${esc(f)}')">✕</button>
         </div>`).join('')}
       </div>
@@ -6446,6 +6493,15 @@ function setCategoryForGroup(id, cat) {
   const groups = getWfGroups();
   const g = groups.find(g => g.id === id);
   if (g) { g.category = cat.trim(); saveWfGroups(groups); }
+}
+function setFolderNorthStar(gid, folder, text) {
+  const groups = getWfGroups();
+  const g = groups.find(g => g.id === gid);
+  if (!g) return;
+  if (!g.folderMeta) g.folderMeta = {};
+  if (!g.folderMeta[folder]) g.folderMeta[folder] = {};
+  g.folderMeta[folder].northStar = text.trim();
+  saveWfGroups(groups);
 }
 
 // 4) 세션 현황 로드
