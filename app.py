@@ -5713,30 +5713,35 @@ def get_project_health():
 
 _HTML_CANDIDATES = ["index.html", "index.htm"]
 
-@app.get("/api/project-html")
-def get_project_html(proj: str):
-    """프로젝트 폴더의 index.html 경로를 file:// URL로 반환."""
+def _find_project_folder(proj: str) -> Optional[str]:
     snapshot = find_repo_for_project(proj)
-    folder = snapshot.get("path") if snapshot else None
-    if not folder:
-        # workspace_projects 에서도 찾기
-        conn = get_db()
-        try:
-            row = conn.execute(
-                "SELECT folder_path FROM workspace_projects WHERE project_name = ? AND active = 1",
-                (proj,)
-            ).fetchone()
-            if row:
-                folder = row[0]
-        finally:
-            conn.close()
+    if snapshot:
+        return snapshot.get("path")
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT folder_path FROM workspace_projects WHERE project_name = ?",
+            (proj,)
+        ).fetchone()
+        return row[0] if row else None
+    finally:
+        conn.close()
+
+@app.post("/api/open-project-html")
+def open_project_html(proj: str):
+    """프로젝트 폴더의 index.html을 OS 기본 브라우저로 열기."""
+    import subprocess
+    folder = _find_project_folder(proj)
     if not folder:
         raise HTTPException(status_code=404, detail="project folder not found")
     for name in _HTML_CANDIDATES:
         candidate = os.path.join(folder, name)
         if os.path.isfile(candidate):
-            file_url = "file:///" + candidate.replace("\\", "/")
-            return {"file_url": file_url, "path": candidate}
+            try:
+                os.startfile(candidate)
+            except AttributeError:
+                subprocess.Popen(["xdg-open", candidate])
+            return {"ok": True, "path": candidate}
     raise HTTPException(status_code=404, detail="index.html not found in project folder")
 
 

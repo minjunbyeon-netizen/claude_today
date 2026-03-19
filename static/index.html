@@ -5849,14 +5849,12 @@ async function deleteWeeklyGoal(goalId) {
 function openView(proj) {
   const raw = agentUrls[proj] || '';
   // 유효한 URL 판별: 포트나 경로가 있어야 함 (http://localhost: 등 불완전 URL 제외)
-  const isValid = raw && !/^https?:\/\/[^/]*(:\s*)?$/.test(raw.trim());
+  const isValid = raw && !/^https?:\/\/[^/:]*:?\s*$/.test(raw.trim());
   if (isValid) { window.open(raw.trim(), '_blank'); return; }
-  // fallback: 프로젝트 폴더의 index.html 자동 오픈
-  fetch(appUrl(`api/project-html?proj=${encodeURIComponent(proj)}`))
-    .then(r => r.ok ? r.json() : null)
-    .then(d => {
-      if (d && d.file_url) { window.open(d.file_url, '_blank'); }
-      else { showUrlInput(proj); }
+  // fallback: 서버에서 index.html을 OS 기본 브라우저로 열기
+  fetch(appUrl(`api/open-project-html?proj=${encodeURIComponent(proj)}`), { method: 'POST' })
+    .then(r => {
+      if (!r.ok) showUrlInput(proj);
     })
     .catch(() => showUrlInput(proj));
 }
