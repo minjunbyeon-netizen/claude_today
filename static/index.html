@@ -1947,6 +1947,15 @@ body {
   outline: none;
 }
 .wf-group-input:focus { border-bottom: 1px solid var(--accent); }
+.wf-cat-section { margin-bottom: 16px; }
+.wf-cat-section-hd {
+  font-size: 10px;
+  font-weight: 700;
+  color: #6E6E73;
+  padding: 0 2px 6px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
 .wf-cat-input {
   background: none;
   border: none;
@@ -6435,11 +6444,9 @@ function renderWfSettings() {
   const groups = getWfGroups();
   const allFolders = _lastWfRows.map(r => r.project);
   const assigned = new Set(groups.flatMap(g => g.folders || []));
-  const unassigned = allFolders.filter(f => !assigned.has(f));
 
-  document.getElementById('wfSettingsBody').innerHTML = groups.map((g, gi) => {
-    const unassignedForGroup = allFolders.filter(f => !assigned.has(f) || (g.folders||[]).includes(f));
-    const available = allFolders.filter(f => !(g.folders||[]).includes(f) && (!assigned.has(f)));
+  function buildGroupBlock(g) {
+    const available = allFolders.filter(f => !(g.folders||[]).includes(f) && !assigned.has(f));
     return `<div class="wf-group-block">
       <div class="wf-group-block-hd">
         <input class="wf-group-input" value="${escAttr(g.name)}" placeholder="그룹 이름"
@@ -6463,7 +6470,31 @@ function renderWfSettings() {
         <button class="wf-add-btn" onclick="addFolderToGroup('${g.id}')">추가</button>
       </div>` : ''}
     </div>`;
-  }).join('');
+  }
+
+  // 카테고리별 묶음
+  const catMap = new Map();
+  const uncategorized = [];
+  groups.forEach(g => {
+    const cat = (g.category || '').trim();
+    if (cat) {
+      if (!catMap.has(cat)) catMap.set(cat, []);
+      catMap.get(cat).push(g);
+    } else {
+      uncategorized.push(g);
+    }
+  });
+
+  let html = '';
+  catMap.forEach((catGroups, cat) => {
+    html += `<div class="wf-cat-section">
+      <div class="wf-cat-section-hd">${esc(cat)}</div>
+      ${catGroups.map(buildGroupBlock).join('')}
+    </div>`;
+  });
+  html += uncategorized.map(buildGroupBlock).join('');
+
+  document.getElementById('wfSettingsBody').innerHTML = html;
 }
 
 function addWfGroup() {
