@@ -2938,29 +2938,16 @@ body {
         </div>
       </div>
 
-      <!-- Strategic Advisor Panel -->
-      <div class="strategic-panel" id="strategicPanel">
-        <div class="strategic-col">
-          <div class="strategic-col-label">어제</div>
-          <div class="strategic-col-main" id="sAdvisorYesterday">불러오는 중...</div>
-          <div class="strategic-col-sub" id="sAdvisorYesterdaySub"></div>
-        </div>
-        <div class="strategic-divider"></div>
-        <div class="strategic-col">
-          <div class="strategic-col-label">오늘 남은 것</div>
-          <div class="strategic-col-main" id="sAdvisorToday">불러오는 중...</div>
-          <div class="strategic-col-sub" id="sAdvisorTodaySub"></div>
-        </div>
-        <div class="strategic-divider"></div>
-        <div class="strategic-col">
-          <div class="strategic-col-label">지금 할 것</div>
-          <div class="strategic-col-main" id="sAdvisorNow">불러오는 중...</div>
-          <div class="strategic-col-sub" id="sAdvisorNowSub"></div>
-          <button class="strategic-start-btn" id="sAdvisorStartBtn" style="display:none" onclick="strategicCopyCommand()">이어서 시작</button>
-        </div>
-      </div>
-      <!-- Strategic toast -->
-      <div class="strategic-toast" id="strategicToast">클립보드에 복사됨</div>
+      <!-- strategic stubs for JS compat -->
+      <div id="strategicPanel" style="display:none"></div>
+      <div id="strategicToast" style="display:none"></div>
+      <span id="sAdvisorYesterday" style="display:none"></span>
+      <span id="sAdvisorYesterdaySub" style="display:none"></span>
+      <span id="sAdvisorToday" style="display:none"></span>
+      <span id="sAdvisorTodaySub" style="display:none"></span>
+      <span id="sAdvisorNow" style="display:none"></span>
+      <span id="sAdvisorNowSub" style="display:none"></span>
+      <button id="sAdvisorStartBtn" style="display:none"></button>
 
       <!-- Claude Usage (compact) -->
       <div class="claude-card">
@@ -3093,115 +3080,51 @@ body {
       <span id="watchSummary" style="display:none"></span>
       <div id="watchAlerts" style="display:none"></div>
 
-      <!-- 자동 판정 결과 (작업 탭에서 이동) -->
-      <div class="sessions-card collapsible-card" id="fdnJudgePanel" style="display:none">
-        <div class="sessions-title collapsible-header" onclick="toggleCard('judge')">
-          <span>오늘의 자동 판정 결과</span>
-          <span class="collapse-arrow" id="judgeArrow">▼</span>
-        </div>
-        <div class="collapsible-body" id="judgeBody" style="padding:4px 0 8px">
-          <div id="fdnJudgeRows"></div>
-        </div>
-      </div>
+      <!-- judge stubs for JS compat -->
+      <div id="fdnJudgePanel" style="display:none"></div>
+      <span id="judgeArrow" style="display:none"></span>
+      <div id="judgeBody" style="display:none"></div>
+      <div id="fdnJudgeRows" style="display:none"></div>
 
-      <div class="morning-card collapsible-card" id="morningCard" style="display:none">
-        <div class="morning-top collapsible-header" onclick="toggleCard('morning')">
-          <div class="morning-top-left">
-            <span class="sec-title">아침 보드</span>
-            <span class="morning-headline" id="morningHeadline">프로젝트별 어제 완료 / 오늘 남은 작업</span>
-            <span class="morning-pill info" id="morningTimePill">매일 09:00</span>
-            <span class="morning-pill warn" id="morningConfirmPill">오늘 목표 확정 필요</span>
-            <span class="morning-pill ok" id="morningWeekPill">이번 주 0/0</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:6px">
-            <button class="icon-btn" onclick="event.stopPropagation();refreshMain();loadMorningProjectBoard()" title="새로고침">↻</button>
-            <span class="collapse-arrow" id="morningArrow">▶</span>
-          </div>
-        </div>
+      <!-- morning stubs for JS compat -->
+      <div id="morningCard" style="display:none"></div>
+      <span id="morningHeadline" style="display:none"></span>
+      <span id="morningTimePill" style="display:none"></span>
+      <span id="morningConfirmPill" style="display:none"></span>
+      <span id="morningWeekPill" style="display:none"></span>
+      <span id="morningArrow" style="display:none"></span>
+      <div id="morningBody" style="display:none"></div>
+      <div id="morningProjectBoard" style="display:none"></div>
+      <span id="morningGoalQuestion" style="display:none"></span>
+      <span id="morningGoalRecommended" style="display:none"></span>
+      <span id="morningGoalState" style="display:none"></span>
+      <span id="morningGoalMeta" style="display:none"></span>
+      <span id="morningGoalEffective" style="display:none"></span>
+      <span id="morningGoalWeeklyHint" style="display:none"></span>
+      <span id="morningGoalConfirmedWrap" style="display:none"></span>
+      <textarea id="morningGoalInput" style="display:none"></textarea>
+      <button id="acceptRecommendedGoalBtn" style="display:none"></button>
+      <span id="morningTimeStatus" style="display:none"></span>
+      <input id="morningTimeInput" type="time" style="display:none">
+      <span id="weekGoalMetric" style="display:none"></span>
+      <div id="weekGoalFill" style="display:none"></div>
+      <span id="weekTaskMetric" style="display:none"></span>
+      <div id="weekTaskFill" style="display:none"></div>
+      <span id="weekGoalList" style="display:none"></span>
+      <input id="weekGoalInput" style="display:none">
+      <span id="weekGoalHint" style="display:none"></span>
+      <span id="morningPrompt" style="display:none"></span>
 
-        <div class="collapsible-body" id="morningBody" style="display:none">
-        <!-- 프로젝트별 어제/오늘 현황 -->
-        <div id="morningProjectBoard" style="margin-bottom:10px">
-          <div style="font-size:12px;color:var(--muted)">프로젝트 현황을 불러오는 중입니다...</div>
-        </div>
-
-        <!-- hidden elements for JS compat -->
-        <span id="morningGoalQuestion" style="display:none"></span>
-        <span id="morningGoalRecommended" style="display:none"></span>
-        <span id="morningGoalState" style="display:none"></span>
-        <span id="morningGoalMeta" style="display:none"></span>
-        <span id="morningGoalEffective" style="display:none"></span>
-        <span id="morningGoalWeeklyHint" style="display:none"></span>
-        <span id="morningGoalConfirmedWrap" style="display:none"></span>
-        <textarea id="morningGoalInput" style="display:none"></textarea>
-        <button id="acceptRecommendedGoalBtn" style="display:none" onclick="acceptRecommendedGoal()"></button>
-        <span id="morningTimeStatus" style="display:none"></span>
-        <input id="morningTimeInput" type="time" style="display:none">
-        <span id="weekGoalMetric" style="display:none"></span>
-        <div id="weekGoalFill" style="display:none"></div>
-        <span id="weekTaskMetric" style="display:none"></span>
-        <div id="weekTaskFill" style="display:none"></div>
-        <span id="weekGoalList" style="display:none"></span>
-        <input id="weekGoalInput" style="display:none">
-        <span id="weekGoalHint" style="display:none"></span>
-        <span id="morningPrompt" style="display:none"></span>
-        </div><!-- end collapsible-body -->
-      </div>
-
-      <!-- Project Health -->
-      <div class="sessions-card collapsible-card" id="healthCard">
-        <div class="sessions-title collapsible-header" onclick="toggleCard('health')">
-          <span>프로젝트 현황</span>
-          <span class="collapse-arrow" id="healthArrow">▶</span>
-        </div>
-        <div class="collapsible-body" id="healthBody" style="display:none;padding:12px 0 4px">
-          <div id="healthList" style="font-size:12px;color:var(--muted)">불러오는 중...</div>
-        </div>
-      </div>
-
-      <!-- EOD Report -->
-      <div class="sessions-card collapsible-card" id="eodCard">
-        <div class="sessions-title collapsible-header" onclick="toggleCard('eod')">
-          <span>오늘 마감 리포트</span>
-          <span class="collapse-arrow" id="eodArrow">▶</span>
-        </div>
-        <div class="collapsible-body" id="eodBody" style="display:none;padding:12px 0 4px">
-          <div id="eodContent" style="font-size:12px;color:var(--muted)">불러오는 중...</div>
-          <button type="button" onclick="sendEodTelegram()" style="margin-top:10px;padding:6px 14px;font-size:12px;background:#000;color:#fff;border:none;border-radius:980px;cursor:pointer">Telegram 전송</button>
-          <div id="eodSendStatus" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
-        </div>
-      </div>
-
-      <!-- Telegram Settings -->
-      <div class="sessions-card collapsible-card" id="telegramCard">
-        <div class="sessions-title collapsible-header" onclick="toggleCard('telegram')">
-          <span>알림 설정 (Telegram)</span>
-          <span class="collapse-arrow" id="telegramArrow">▶</span>
-        </div>
-        <div class="collapsible-body" id="telegramBody" style="display:none;padding:12px 0 4px">
-          <div style="display:flex;flex-direction:column;gap:10px;max-width:480px">
-            <div>
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px">Bot Token</div>
-              <input id="tgTokenInput" type="text" placeholder="1234567890:AAF..." style="width:100%;padding:7px 10px;font-size:12px;border:1px solid #e0e0e0;border-radius:6px;box-sizing:border-box">
-            </div>
-            <div>
-              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px">Chat ID</div>
-              <input id="tgChatInput" type="text" placeholder="-1001234567890" style="width:100%;padding:7px 10px;font-size:12px;border:1px solid #e0e0e0;border-radius:6px;box-sizing:border-box">
-            </div>
-            <div style="display:flex;align-items:center;gap:8px">
-              <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
-                <input type="checkbox" id="tgEnabledInput" style="width:14px;height:14px">
-                <span>활성화</span>
-              </label>
-            </div>
-            <div style="display:flex;gap:8px">
-              <button type="button" onclick="saveTelegramSettings()" style="padding:6px 14px;font-size:12px;background:#000;color:#fff;border:none;border-radius:980px;cursor:pointer">저장</button>
-              <button type="button" onclick="testTelegram()" style="padding:6px 14px;font-size:12px;background:none;border:1px solid #000;border-radius:980px;cursor:pointer">테스트 전송</button>
-            </div>
-            <div id="tgStatus" style="font-size:11px;color:var(--muted)"></div>
-          </div>
-        </div>
-      </div>
+      <!-- health / eod stubs for JS compat -->
+      <div id="healthCard" style="display:none"></div>
+      <span id="healthArrow" style="display:none"></span>
+      <div id="healthBody" style="display:none"></div>
+      <div id="healthList" style="display:none"></div>
+      <div id="eodCard" style="display:none"></div>
+      <span id="eodArrow" style="display:none"></span>
+      <div id="eodBody" style="display:none"></div>
+      <div id="eodContent" style="display:none"></div>
+      <div id="eodSendStatus" style="display:none"></div>
 
       </div><!-- /tabReport -->
 
@@ -3296,6 +3219,37 @@ body {
 
       </div><!-- /subTabLog -->
 
+      <!-- Telegram Settings -->
+      <div class="sessions-card collapsible-card" id="telegramCard" style="margin-top:16px">
+        <div class="sessions-title collapsible-header" onclick="toggleCard('telegram')">
+          <span>알림 설정 (Telegram)</span>
+          <span class="collapse-arrow" id="telegramArrow">▶</span>
+        </div>
+        <div class="collapsible-body" id="telegramBody" style="display:none;padding:12px 0 4px">
+          <div style="display:flex;flex-direction:column;gap:10px;max-width:480px">
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px">Bot Token</div>
+              <input id="tgTokenInput" type="text" placeholder="1234567890:AAF..." style="width:100%;padding:7px 10px;font-size:12px;border:1px solid #e0e0e0;border-radius:6px;box-sizing:border-box">
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px">Chat ID</div>
+              <input id="tgChatInput" type="text" placeholder="-1001234567890" style="width:100%;padding:7px 10px;font-size:12px;border:1px solid #e0e0e0;border-radius:6px;box-sizing:border-box">
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+                <input type="checkbox" id="tgEnabledInput" style="width:14px;height:14px">
+                <span>활성화</span>
+              </label>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button type="button" onclick="saveTelegramSettings()" style="padding:6px 14px;font-size:12px;background:#000;color:#fff;border:none;border-radius:980px;cursor:pointer">저장</button>
+              <button type="button" onclick="testTelegram()" style="padding:6px 14px;font-size:12px;background:none;border:1px solid #000;border-radius:980px;cursor:pointer">테스트 전송</button>
+            </div>
+            <div id="tgStatus" style="font-size:11px;color:var(--muted)"></div>
+          </div>
+        </div>
+      </div>
+
       </div><!-- /tabWork -->
 
     </div>
@@ -3367,24 +3321,10 @@ function switchSubTab(sub, noSave) {
   }
 }
 
-// 보고 탭에서 알림설정 카드를 최상단으로 이동
-function _moveNotifSettingToTop() {
-  const tabReport = document.getElementById('tabReport');
-  const telegramCard = document.getElementById('telegramCard');
-  if (!tabReport || !telegramCard) return;
-  // mainHd 다음, 즉 tabReport의 두 번째 자식 위치에 삽입
-  const anchor = tabReport.children[1]; // strategicPanel 위치
-  if (anchor && anchor !== telegramCard) {
-    tabReport.insertBefore(telegramCard, anchor);
-  }
-}
-
 // ── 미래 날짜 뷰 전환 ──────────────────────────────────────────────
 // normalIds: 미래 모드에서 숨길 카드 목록
 const _REPORT_NORMAL_IDS = [
-  'reportMainHd','strategicPanel','strategicToast',
-  'claude-card-wrap','sessionsCard','morningCard','ops-card-wrap',
-  'healthCard','eodCard','telegramCard',
+  'reportMainHd','sessionsCard',
 ];
 function _setFutureMode(on, ds) {
   const futureView = document.getElementById('futureView');
@@ -3394,15 +3334,8 @@ function _setFutureMode(on, ds) {
   // 숨기거나 표시할 실제 카드 요소 목록 (class 기반도 지원)
   const hideEls = [
     document.getElementById('reportMainHd'),
-    document.getElementById('strategicPanel'),
-    document.getElementById('strategicToast'),
     document.querySelector('.claude-card'),
     document.getElementById('sessionsCard'),
-    document.getElementById('morningCard'),
-    document.querySelector('.ops-card'),
-    document.getElementById('healthCard'),
-    document.getElementById('eodCard'),
-    document.getElementById('telegramCard'),
   ].filter(Boolean);
 
   if (on) {
@@ -3994,10 +3927,9 @@ function selectDate(ds) {
     switchTab('report');
     _setFutureMode(true, ds);
   } else {
-    // 금일: 보고탭 전환 + 알림설정 최상단 이동
+    // 금일: 보고탭 전환
     _setFutureMode(false);
     switchTab('report');
-    _moveNotifSettingToTop();
     loadTodayAlarms();
   }
 }
