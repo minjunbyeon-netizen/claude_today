@@ -5727,22 +5727,42 @@ def _find_project_folder(proj: str) -> Optional[str]:
     finally:
         conn.close()
 
+def _find_project_html(folder: str) -> Optional[str]:
+    """프로젝트 폴더에서 열 HTML 파일을 찾아 반환. index.html 우선, 없으면 최근 수정 파일."""
+    # 1순위: index.html / index.htm
+    for name in _HTML_CANDIDATES:
+        candidate = os.path.join(folder, name)
+        if os.path.isfile(candidate):
+            return candidate
+    # 2순위: 폴더 루트의 .html 파일 중 가장 최근 수정된 것
+    try:
+        html_files = [
+            os.path.join(folder, f)
+            for f in os.listdir(folder)
+            if f.lower().endswith(".html") and os.path.isfile(os.path.join(folder, f))
+        ]
+        if html_files:
+            return max(html_files, key=os.path.getmtime)
+    except OSError:
+        pass
+    return None
+
+
 @app.post("/api/open-project-html")
 def open_project_html(proj: str):
-    """프로젝트 폴더의 index.html을 OS 기본 브라우저로 열기."""
+    """프로젝트 폴더의 HTML 파일을 OS 기본 브라우저로 열기."""
     import subprocess
     folder = _find_project_folder(proj)
     if not folder:
         raise HTTPException(status_code=404, detail="project folder not found")
-    for name in _HTML_CANDIDATES:
-        candidate = os.path.join(folder, name)
-        if os.path.isfile(candidate):
-            try:
-                os.startfile(candidate)
-            except AttributeError:
-                subprocess.Popen(["xdg-open", candidate])
-            return {"ok": True, "path": candidate}
-    raise HTTPException(status_code=404, detail="index.html not found in project folder")
+    target = _find_project_html(folder)
+    if not target:
+        raise HTTPException(status_code=404, detail="no HTML file found in project folder")
+    try:
+        os.startfile(target)
+    except AttributeError:
+        subprocess.Popen(["xdg-open", target])
+    return {"ok": True, "path": target}
 
 
 # ═══════════════════════════════════════════════════════════════════
