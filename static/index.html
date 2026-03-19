@@ -306,14 +306,14 @@ body {
 }
 .proj-cat-hd:first-child { margin-top: 0; }
 .proj-cat-label {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
-  color: rgba(255,255,255,.35);
-  text-transform: uppercase;
-  letter-spacing: .06em;
+  color: rgba(255,255,255,.92);
+  letter-spacing: -.01em;
 }
-.proj-cat-arrow { font-size: 9px; color: rgba(255,255,255,.35); }
-.proj-cat-body { padding-left: 4px; }
+.proj-cat-arrow { font-size: 9px; color: rgba(255,255,255,.45); transition: transform .15s; }
+.proj-cat-body { padding-left: 8px; }
+.proj-item.cat-item { padding-left: 16px; }
 /* 폴더 아이템 */
 .proj-item {
   display: flex;
@@ -1947,6 +1947,19 @@ body {
   outline: none;
 }
 .wf-group-input:focus { border-bottom: 1px solid var(--accent); }
+.wf-cat-input {
+  background: none;
+  border: none;
+  border-bottom: 1px solid transparent;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+  outline: none;
+  width: 96px;
+  padding: 2px 0;
+}
+.wf-cat-input::placeholder { color: rgba(0,0,0,.3); }
+.wf-cat-input:focus { border-bottom: 1px solid var(--accent); }
 .wf-del-group {
   background: none;
   border: none;
@@ -3861,13 +3874,33 @@ function normalizeProject(name) {
 }
 
 // ── Project List (sidebar) — groups only ─────────────────────
+let _collapsedCats = new Set();
+
+function _buildProjItem(g, tasks, indented) {
+  const isActive  = currentGroupId === g.id;
+  const liveCnt   = (g.folders || []).filter(f => liveProjects.has(f)).length;
+  const folderCnt = (g.folders || []).length;
+  const folderSet = new Set(g.folders || []);
+  const hasTasks  = tasks.some(t => { const m = t.title.match(/^\[([^\]]+)\]/); return m && folderSet.has(normalizeProject(m[1])); });
+  const cls = [isActive?'active':'', liveCnt?'live-item':'', hasTasks?'has-tasks':'', indented?'cat-item':''].filter(Boolean).join(' ');
+  return `<div class="proj-item ${cls}" onclick="selectGroup('${esc(g.id)}')">
+    <div class="proj-item-dot"></div>
+    <span class="proj-item-name">${esc(g.name)}</span>
+    ${folderCnt ? `<span class="proj-item-count">${folderCnt}</span>` : ''}
+  </div>`;
+}
+
+function toggleCat(catName) {
+  if (_collapsedCats.has(catName)) _collapsedCats.delete(catName);
+  else _collapsedCats.add(catName);
+  renderProjectList(allTasks);
+}
+
 function renderProjectList(tasks) {
   const groups = getWfGroups();
   const el = document.getElementById('projList');
 
-  // 전체 태스크 수
   const totalTasks = tasks.length;
-
   const anyLive = groups.some(g => (g.folders||[]).some(f => liveProjects.has(f)));
   const allCls  = ['all-item', currentGroupId===null?'active':'', anyLive?'live-item':totalTasks?'has-tasks':''].filter(Boolean).join(' ');
   let html = `<div class="proj-item ${allCls}" onclick="selectGroup(null)">
@@ -3877,19 +3910,29 @@ function renderProjectList(tasks) {
   </div>`;
 
   if (groups.length) {
-    html += groups.map(g => {
-      const isActive   = currentGroupId === g.id;
-      const liveCnt    = (g.folders || []).filter(f => liveProjects.has(f)).length;
-      const folderCnt  = (g.folders || []).length;
-      const folderSet  = new Set(g.folders || []);
-      const hasTasks   = tasks.some(t => { const m = t.title.match(/^\[([^\]]+)\]/); return m && folderSet.has(normalizeProject(m[1])); });
-      const cls = [isActive?'active':'', liveCnt?'live-item':'', hasTasks?'has-tasks':''].filter(Boolean).join(' ');
-      return `<div class="proj-item ${cls}" onclick="selectGroup('${esc(g.id)}')">
-        <div class="proj-item-dot"></div>
-        <span class="proj-item-name">${esc(g.name)}</span>
-        ${folderCnt ? `<span class="proj-item-count">${folderCnt}</span>` : ''}
+    // 카테고리 없는 그룹 먼저 (flat)
+    const uncategorized = groups.filter(g => !(g.category||'').trim());
+    html += uncategorized.map(g => _buildProjItem(g, tasks, false)).join('');
+
+    // 카테고리별 묶음
+    const catMap = new Map();
+    groups.filter(g => (g.category||'').trim()).forEach(g => {
+      const cat = g.category.trim();
+      if (!catMap.has(cat)) catMap.set(cat, []);
+      catMap.get(cat).push(g);
+    });
+    catMap.forEach((catGroups, cat) => {
+      const collapsed = _collapsedCats.has(cat);
+      html += `<div class="proj-cat-hd" onclick="toggleCat('${esc(cat)}')">
+        <span class="proj-cat-label">${esc(cat)}</span>
+        <span class="proj-cat-arrow">${collapsed ? '▶' : '▼'}</span>
       </div>`;
-    }).join('');
+      if (!collapsed) {
+        html += `<div class="proj-cat-body">` +
+          catGroups.map(g => _buildProjItem(g, tasks, true)).join('') +
+          `</div>`;
+      }
+    });
   } else {
     html += `<div style="font-size:11px;color:var(--muted);padding:6px 8px">
       ⚙ 설정에서 그룹을 추가하세요
@@ -6438,6 +6481,9 @@ function renderWfSettings() {
       <div class="wf-group-block-hd">
         <input class="wf-group-input" value="${escAttr(g.name)}" placeholder="그룹 이름"
           onchange="renameWfGroup('${g.id}', this.value)">
+        <input class="wf-cat-input" value="${escAttr(g.category||'')}" placeholder="카테고리"
+          title="카테고리 입력 시 사이드바에서 그룹화됩니다"
+          onchange="setCategoryForGroup('${g.id}', this.value)">
         <button class="wf-del-group" onclick="deleteWfGroup('${g.id}')" title="그룹 삭제">✕</button>
       </div>
       <div class="wf-folder-chips" id="chips-${g.id}">
@@ -6491,6 +6537,11 @@ function removeFolderFromGroup(gid, folder) {
     saveWfGroups(groups);
     renderWfSettings();
   }
+}
+function setCategoryForGroup(id, cat) {
+  const groups = getWfGroups();
+  const g = groups.find(g => g.id === id);
+  if (g) { g.category = cat.trim(); saveWfGroups(groups); }
 }
 
 // 4) 세션 현황 로드
