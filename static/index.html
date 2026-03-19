@@ -3900,14 +3900,7 @@ function renderProjectList(tasks) {
   const groups = getWfGroups();
   const el = document.getElementById('projList');
 
-  const totalTasks = tasks.length;
-  const anyLive = groups.some(g => (g.folders||[]).some(f => liveProjects.has(f)));
-  const allCls  = ['all-item', currentGroupId===null?'active':'', anyLive?'live-item':totalTasks?'has-tasks':''].filter(Boolean).join(' ');
-  let html = `<div class="proj-item ${allCls}" onclick="selectGroup(null)">
-    <div class="proj-item-dot"></div>
-    <span class="proj-item-name">전체</span>
-    ${totalTasks ? `<span class="proj-item-count">${totalTasks}</span>` : ''}
-  </div>`;
+  let html = '';
 
   if (groups.length) {
     // 카테고리 없는 그룹 먼저 (flat)
@@ -6409,40 +6402,10 @@ function renderWfList(rows) {
     </div>`;
   };
 
-  // 구과장님 그룹은 사이드바 최상단 독립 섹션으로 분리됨 — wfList에서 제외
-  const regularGroups = groups.filter(g => !(g.name && (g.name.includes('구과장') || g.name.includes('협업 요청'))));
-
-  let html = '';
-
-  regularGroups.forEach(g => {
-    const gFolders = (g.folders || []).filter(f => rowMap[f]);
-    const collapsed = (getUiPref('wfg_states', {}))[g.id] === true;
-    html += `<div class="wf-group-header" onclick="toggleWfGroup('${esc(g.id)}')">
-      <span class="wf-group-name">${esc(g.name)}</span>
-      <span class="wf-group-arrow" id="wfga-${esc(g.id)}">${collapsed ? '▶' : '▼'}</span>
-    </div>
-    <div class="wf-group-body" id="wfgb-${esc(g.id)}" style="${collapsed ? 'display:none' : ''}">
-      ${gFolders.length ? gFolders.map(f => folderItem(rowMap[f])).join('') : '<div style="font-size:11px;color:var(--muted);padding:4px 6px">폴더 없음</div>'}
-    </div>`;
-  });
-
-  // 미분류
+  // 작업 폴더 섹션: 어느 그룹에도 속하지 않은 폴더만 표시
   const ungrouped = rows.filter(r => !assigned.has(r.project))
                         .sort((a,b) => a.project.localeCompare(b.project));
-  if (ungrouped.length) {
-    if (groups.length) {
-      const collapsed = (getUiPref('wfg_states', {})).__ung === true;
-      html += `<div class="wf-group-header" onclick="toggleWfGroup('__ung')">
-        <span class="wf-group-name" style="color:var(--muted)">미분류</span>
-        <span class="wf-group-arrow" id="wfga-__ung">${collapsed ? '▶' : '▼'}</span>
-      </div>
-      <div class="wf-group-body" id="wfgb-__ung" style="${collapsed ? 'display:none' : ''}">
-        ${ungrouped.map(folderItem).join('')}
-      </div>`;
-    } else {
-      html += ungrouped.map(folderItem).join('');
-    }
-  }
+  let html = ungrouped.length ? ungrouped.map(folderItem).join('') : '<span style="font-size:12px;color:var(--muted)">미분류 폴더 없음</span>';
   wfEl.innerHTML = html;
 }
 
