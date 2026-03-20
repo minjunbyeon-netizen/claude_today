@@ -2961,16 +2961,11 @@ body {
         <div id="futureAlarmList"></div>
       </div>
 
-      <!-- Main Header -->
-      <div class="main-hd" id="reportMainHd">
-        <div class="main-hd-left">
-          <div class="main-hd-title" id="mainTitle"></div>
-          <div class="main-hd-sub" id="mainSub"></div>
-        </div>
-        <div class="main-hd-right" style="display:flex;align-items:center;gap:12px">
-          <div class="next-ci" id="nextCi"></div>
-        </div>
-      </div>
+      <!-- header stubs for JS compat -->
+      <div id="reportMainHd" style="display:none"></div>
+      <span id="mainTitle" style="display:none"></span>
+      <span id="mainSub" style="display:none"></span>
+      <span id="nextCi" style="display:none"></span>
 
       <!-- strategic stubs for JS compat -->
       <div id="strategicPanel" style="display:none"></div>
@@ -2983,8 +2978,8 @@ body {
       <span id="sAdvisorNowSub" style="display:none"></span>
       <button id="sAdvisorStartBtn" style="display:none"></button>
 
-      <!-- Claude Usage (compact) -->
-      <div class="claude-card">
+      <!-- claude stubs for JS compat -->
+      <div class="claude-card" style="display:none">
         <button class="claude-summary" type="button" onclick="toggleClaudePanel()">
           <div class="claude-summary-main">
             <span class="claude-title">CC / VIEW</span>
@@ -3095,17 +3090,11 @@ body {
         <span id="limitHint" style="display:none"></span>
       </div>
 
-      <!-- Agent Sessions -->
-      <div class="sessions-card collapsible-card" id="sessionsCard">
-        <div class="sessions-title collapsible-header" onclick="toggleCard('sessions')">
-          <span>CC / VIEW Sessions</span>
-          <span id="sessionsTime" style="font-size:10px;font-weight:400;color:var(--muted);font-family:'Courier New',monospace"></span>
-          <span class="collapse-arrow" id="sessionsArrow">▶</span>
-        </div>
-        <div class="sessions-list collapsible-body" id="sessionsList" style="display:none">
-          <span class="sessions-empty">연결된 세션 없음</span>
-        </div>
-      </div>
+      <!-- sessions stubs for JS compat -->
+      <div id="sessionsCard" style="display:none"></div>
+      <span id="sessionsTime" style="display:none"></span>
+      <span id="sessionsArrow" style="display:none"></span>
+      <div id="sessionsList" style="display:none"></div>
 
       <!-- 자동감시 카드 제거 — inline으로 CC 헤더에 통합됨 -->
       <span id="watchDot" style="display:none"></span>
@@ -3212,7 +3201,7 @@ body {
       <div id="addTaskCard" style="display:none"></div>
 
       <!-- Work Sub-tabs -->
-      <div class="main-tabs" style="margin-bottom:20px">
+      <div class="main-tabs" style="margin-top:8px;margin-bottom:20px">
         <button class="main-tab-btn active" id="subBtnWork" onclick="switchSubTab('work')">작업</button>
         <button class="main-tab-btn" id="subBtnLog" onclick="switchSubTab('log')">LOG</button>
       </div>
