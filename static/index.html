@@ -407,6 +407,7 @@ body {
   width: 100%;
   margin: 0 auto;
 }
+#subTabWork { width: 1192px; max-width: 100%; box-sizing: border-box; }
 #gridView { width: 100%; }
 .grp-wrapper { width: 100%; }
 
@@ -3163,9 +3164,9 @@ body {
             <div style="display:flex;gap:8px;margin-left:8px" id="bbSummaryBadges"></div>
           </div>
           <div class="claude-summary-toggle">
-            <button type="button" onclick="event.stopPropagation();loadBbReport()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0 8px 0 0" title="새로고침">↻</button>
             <span id="bbToggleLabel">접기</span>
             <span id="bbToggleArrow" style="font-size:12px;margin-left:4px;transition:transform 200ms ease-out;transform:rotate(180deg)">⌄</span>
+            <button type="button" onclick="event.stopPropagation();loadBbReport()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0 0 0 10px;border-left:1px solid var(--border);margin-left:8px" title="새로고침">↻</button>
           </div>
         </button>
         <div id="bbDetail" style="padding:0 16px 16px">
@@ -3576,6 +3577,7 @@ function renderGrid(tasks) {
           <button class="grp-folder-btn${isLive?' is-live':''}" onclick="openCC('${escAttr(proj)}')" title="${isLive?'활성 CC — 이어서 열기':'CC 열기'}">CC</button>
           <button class="grp-folder-btn" onclick="openView('${escAttr(proj)}')" title="브라우저에서 열기">VIEW</button>
           <button class="grp-folder-btn" onclick="toggleFolderCmt('${escAttr(proj)}','${projId}')">댓글</button>
+          <button class="grp-folder-star-save" onclick="saveFolderNorthStar('${escAttr(proj)}','${projId}')">저장</button>
         </div>
       </div>
       <div class="grp-folder-star-row">
@@ -3583,7 +3585,6 @@ function renderGrid(tasks) {
           value="${escAttr(_northStar)}"
           placeholder="북극성..."
           onkeydown="if(event.key==='Enter'){saveFolderNorthStar('${escAttr(proj)}','${projId}');event.preventDefault();}">
-        <button class="grp-folder-star-save" onclick="saveFolderNorthStar('${escAttr(proj)}','${projId}')">저장</button>
       </div>
       ${shown.map(taskRow).join('')}
       ${!items.length ? buildLastActivityRows(proj) : ''}
@@ -5852,20 +5853,20 @@ async function loadBbReport() {
     // Summary badges
     const s = d.summary || {};
     const badgeHtml = [
-      ['A', s.active || 0, '#34C759'],
-      ['R', s.recent || 0, '#0071E3'],
-      ['I', s.idle   || 0, '#FF9500'],
-      ['X', s.abandoned || 0, '#FF3B30'],
-    ].map(([lbl, cnt, clr]) =>
-      `<span style="font-size:10px;font-weight:700;color:${clr};background:${clr}18;padding:2px 6px;border-radius:4px">${lbl}:${cnt}</span>`
-    ).join('');
+      ['활성', s.active || 0],
+      ['최근', s.recent || 0],
+      ['휴면', s.idle   || 0],
+      ['방치', s.abandoned || 0],
+    ].filter(([,cnt]) => cnt > 0).map(([lbl, cnt]) =>
+      `<span style="font-size:10px;color:var(--muted);padding:0 4px">${lbl} ${cnt}</span>`
+    ).join('<span style="color:var(--border)">·</span>');
     document.getElementById('bbSummaryBadges').innerHTML = badgeHtml;
 
     // Recommendations
     const recs = d.recommendations || [];
     document.getElementById('bbRecs').innerHTML = recs.length
       ? recs.map(r =>
-          `<div style="font-size:12px;color:var(--text);padding:6px 0 6px 10px;border-left:2px solid #FF9500;margin-bottom:6px">${esc(r)}</div>`
+          `<div style="font-size:12px;color:var(--muted);padding:5px 0;border-bottom:1px solid var(--border)">${esc(r)}</div>`
         ).join('')
       : '';
 
@@ -5875,10 +5876,9 @@ async function loadBbReport() {
     for (const p of projects) grouped[p.status]?.push(p);
 
     const rows = projects.map(p => {
-      const clr = _bbStatusColor[p.status] || '#8E8E93';
       const lbl = _bbStatusLabel[p.status] || p.status;
       return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
-        <span style="font-size:10px;font-weight:700;color:${clr};background:${clr}18;padding:1px 5px;border-radius:3px;min-width:28px;text-align:center">${esc(lbl)}</span>
+        <span style="font-size:10px;color:var(--muted);min-width:28px">${esc(lbl)}</span>
         <span style="font-size:12px;font-weight:700;color:var(--text);min-width:140px;flex-shrink:0">${esc(p.name)}</span>
         <span style="font-size:11px;color:var(--muted);min-width:36px">${_fmtAge(p.age_hours)}</span>
         <span style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1">${esc(p.last_task || p.context || '')}</span>

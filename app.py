@@ -1,9 +1,18 @@
 import sys
-sys.path.insert(0, "C:/work/setting")
-from workspace_paths import (
-    SQUAD_LOGS, OVERMIND_DIR,
-    SQUAD_TEAM_DIR, CODDING_DIR,
-)
+import os as _os
+from pathlib import Path as _Path
+_here = _Path(__file__).resolve().parent
+try:
+    sys.path.insert(0, str(_here.parents[1] / "setting"))
+    from workspace_paths import (
+        SQUAD_LOGS, OVERMIND_DIR,
+        SQUAD_TEAM_DIR, CODDING_DIR,
+    )
+except (IndexError, ImportError):
+    OVERMIND_DIR   = _os.getenv("OVERMIND_DIR",    str(_here.parent))
+    SQUAD_TEAM_DIR = _os.getenv("SQUAD_TEAM_DIR",  str(_here.parent / "eud/agents/squad-team"))
+    SQUAD_LOGS     = _os.getenv("SQUAD_LOGS",      str(_here.parent / "eud/agents/squad-team/logs"))
+    CODDING_DIR    = _os.getenv("CODDING_DIR",     str(_here.parent / "eud/agents/codding"))
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse, JSONResponse, HTMLResponse
