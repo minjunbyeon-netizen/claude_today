@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Focus — 프로세스 생존 시나리오 감사 2026-03-19</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%231D1D1F'/><text x='7' y='23' font-size='18' fill='white'>P</text></svg>">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #F5F5F7; color: #1D1D1F; padding: 40px 24px; letter-spacing: -0.01em; }
+.wrap { max-width: 960px; margin: 0 auto; }
+h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+.sub { font-size: 13px; color: #6E6E73; margin-bottom: 32px; }
+
+/* summary bar */
+.summary-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 40px; }
+.stat-card { background: #fff; border-radius: 12px; padding: 20px 24px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+.stat-num { font-size: 32px; font-weight: 700; }
+.stat-num.pass { color: #34C759; }
+.stat-num.fail { color: #FF3B30; }
+.stat-num.warn { color: #FF9500; }
+.stat-label { font-size: 12px; color: #6E6E73; margin-top: 4px; }
+
+/* arch */
+.arch { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 40px; }
+.arch h2 { font-size: 13px; font-weight: 700; color: #6E6E73; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 16px; }
+.arch-row { display: flex; align-items: flex-start; gap: 16px; padding: 12px 0; border-bottom: 1px solid #F0F0F0; }
+.arch-row:last-child { border-bottom: none; }
+.arch-tag { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; flex-shrink: 0; min-width: 80px; text-align: center; }
+.arch-tag.active { background: #E8F5E9; color: #2E7D32; }
+.arch-tag.deleted { background: #FDECEA; color: #C62828; text-decoration: line-through; }
+.arch-body .title { font-size: 14px; font-weight: 700; }
+.arch-body .desc { font-size: 12px; color: #6E6E73; margin-top: 3px; line-height: 1.5; }
+
+/* section */
+.section { margin-bottom: 40px; }
+.section-title { font-size: 11px; font-weight: 700; color: #6E6E73; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 16px; }
+
+/* scenario card */
+.card { background: #fff; border-radius: 12px; padding: 20px 24px; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 8px; overflow: hidden; }
+.card-head { display: flex; align-items: flex-start; gap: 12px; }
+.badge { display: inline-flex; align-items: center; justify-content: center; height: 28px; border-radius: 8px; font-size: 11px; font-weight: 700; flex-shrink: 0; padding: 0 10px; white-space: nowrap; }
+.badge.pass { background: #E8F5E9; color: #2E7D32; }
+.badge.fail { background: #FDECEA; color: #C62828; }
+.badge.warn { background: #FFF3E0; color: #E65100; }
+.card-num { font-size: 11px; font-weight: 700; color: #6E6E73; min-width: 20px; flex-shrink: 0; margin-top: 6px; }
+.card-body { flex: 1; }
+.card-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+.card-detail { font-size: 12px; color: #6E6E73; line-height: 1.6; }
+.chain { font-family: 'Courier New', monospace; font-size: 11px; background: #F5F5F7; padding: 8px 12px; border-radius: 8px; margin-top: 8px; color: #1D1D1F; line-height: 1.8; }
+.chain .ok { color: #2E7D32; }
+.chain .ng { color: #C62828; }
+
+/* fix section */
+.fix-card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 8px; }
+.fix-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+.fix-card p { font-size: 13px; color: #444; line-height: 1.6; }
+.fix-card code { font-family: 'Courier New', monospace; font-size: 11px; background: #F5F5F7; padding: 2px 6px; border-radius: 4px; }
+.priority-tag { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-left: 8px; vertical-align: middle; }
+.priority-tag.crit { background: #FDECEA; color: #C62828; }
+.priority-tag.high { background: #FFF3E0; color: #E65100; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Daily Focus — 프로세스 생존 시나리오 감사</h1>
+  <div class="sub">2026-03-19 · keepalive.py / watchdog.py 삭제 후 · PM2 단독 운영 체제 검증</div>
+
+  <!-- 요약 -->
+  <div class="summary-bar">
+    <div class="stat-card">
+      <div class="stat-num pass">6</div>
+      <div class="stat-label">PASS — PM2 자동 복구됨</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num warn">2</div>
+      <div class="stat-label">WARN — 조건부 복구 (모니터링 필요)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num fail">7</div>
+      <div class="stat-label">FAIL — 자동 복구 불가 (수동 개입 필요)</div>
+    </div>
+  </div>
+
+  <!-- 현재 아키텍처 -->
+  <div class="arch">
+    <h2>현재 프로세스 아키텍처</h2>
+    <div class="arch-row">
+      <div class="arch-tag active">ACTIVE</div>
+      <div class="arch-body">
+        <div class="title">PM2 Daemon (PID 26184) — autorestart, max_restarts: 10, restart_delay: 3s</div>
+        <div class="desc">venv Python으로 uvicorn 직접 실행 · windowsHide: true · 현재 1449회 재시작 이력 (keepalive 충돌 당시)</div>
+      </div>
+    </div>
+    <div class="arch-row">
+      <div class="arch-tag deleted">DELETED</div>
+      <div class="arch-body">
+        <div class="title">keepalive.py — 30초 헬스체크 루프</div>
+        <div class="desc">background_start.bat + Windows Startup VBS로 자동 시작 · run.py → sys.executable uvicorn 이중 실행 원인</div>
+      </div>
+    </div>
+    <div class="arch-row">
+      <div class="arch-tag deleted">DELETED</div>
+      <div class="arch-body">
+        <div class="title">watchdog.py — 60초 포트 감시 재시작</div>
+        <div class="desc">taskkill + Popen으로 uvicorn 재시작 · PM2 autorestart와 경쟁 · 터미널 창 flashing 주범</div>
+      </div>
+    </div>
+    <div class="arch-row" style="background:#FDECEA; border-radius:8px; padding:12px; border:none; margin-top:8px;">
+      <div class="arch-tag fail" style="background:#FDECEA; color:#C62828; border:none;">GAP</div>
+      <div class="arch-body">
+        <div class="title" style="color:#C62828;">PM2 부팅 자동 시작 미등록</div>
+        <div class="desc">pm2 startup → "Init system not found" · Task Scheduler 없음 · Windows 재부팅 시 PM2 자체가 켜지지 않음</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 시나리오 목록 -->
+  <div class="section">
+    <div class="section-title">15개 생존 시나리오</div>
+
+    <!-- 1 -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-num">01</div>
+        <div class="card-body">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            <div class="card-title">Windows 정상 재부팅 (시작 → 다시 시작)</div>
+            <div class="badge fail">FAIL</div>
+          </div>
+          <div class="card-detail">PM2 startup 미등록 → 재부팅 후 PM2 Daemon 자체가 켜지지 않음 → daily-focus 오프라인</div>
+          <div class="chain"><span class="ng">재부팅 → PM2 없음 → daily-focus 없음 → http://localhost:8001 응답 없음</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-num">02</div>
+        <div class="card-body">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            <div class="card-title">전원 강제 차단 (플러그 뽑기 / 배터리 방전)</div>
+            <div class="badge fail">FAIL</div>
+          </div>
+          <div class="card-detail">#1과 동일. PM2 미등록으로 부팅 후 아무것도 켜지지 않음. SQLite WAL 파일 손상 가능성 추가.</div>
+          <div class="chain"><span class="ng">강제 종료 → 재부팅 → PM2 없음 → DB WAL 잠금 잔류 가능</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-num">03</div>
+        <div class="card-body">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            <div class="card-title">Windows 업데이트 자동 재시작 (새벽 3시)</div>
+            <div class="badge fail">FAIL</div>
+          </div>
+          <div class="card-detail">업데이트 완료 후 자동 재시작 = 재부팅. #1과 동일하게 PM2 없음. 자는 사이에 발생하면 아침까지 서버 오프라인.</div>
+          <div class="chain"><span class="ng">자동 재시작 → 아침 출근 → http://localhost:8001 오프라인 → 수동 pm2 start</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4 -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-num">04</div>
+        <div class="card-body">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            <div class="card-title">사용자 로그아웃 후 재로그인</div>
+            <div class="badge fail">FAIL</div>
+          </div>
+          <div class="card-detail">PM2 Daemon은 사용자 세션(USER)에서 실행 중. 로그아웃 시 세션 종료 → PM2 포함 모든 프로세스 종료. 재로그인해도 PM2 자동 시작 없음.</div>
+          <div class="chain"><span class="ng">로그아웃 → PM2 종료 → 재로그인 → Startup 폴더에 PM2 항목 없음 → 수동 시작 필요</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5 -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-num">05</div>
+        <div class="card-body">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            <div class="card-title">화면 잠금 (Win+L) 후 복귀</div>
+            <div class="badge pass">PASS</div>
+          </div>
+          <div class="card-detail">Lock Screen은 프로세스를 종료하지 않음. PM2와 uvicorn 모두 백그라운드에서 계속 실행. 복귀 후 즉시 사용 가능.</div>
+          <div class="chain"><span class="ok">Win+L → 화면 잠금 → PM2/uvicorn 계속 실행 → 잠금 해제 → 정상 접속</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6 -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-num">06</div>
+        <div class="card-body">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            <div class="card-title">절전 모드 (Sleep) 후 복귀</div>
+            <div class="badge warn">WARN</div>
+          </div>
+          <div class="card-detail">Sleep 복귀 시 PM2는 살아있지만 uvicorn TCP 연결이 끊겼을 수 있음. 첫 요청에서 응답 없으면 PM2 autorestart 트리거. 약 3~6초 다운타임.</div>
+          <div class="chain"><span class="ok">Sleep → 복귀 → PM2 살아있음</span> → <span class="ng">uvicorn 첫 요청 타임아웃</span> → <span class="ok">PM2 autorestart 3초 후 복구</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7 -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-num">07</div>
+        <div class="card-body">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            <div class="card-title">uvicorn 프로세스 수동 taskkill (작업 관리자에서 종료)</div>
+            <div class="badge pass">PASS</div>
+          </div>
+          <div class="card-detail">PM2 autorestart=true가 프로세스 종료를 감지하고 restart_delay 3초 후 재시작. 완전 자동 복구.</div>
+          <div class="chain"><span class="ng">taskkill /F uvicorn</span> → <span class="ok">PM2 감지 → 3초 후 재시작 → 정상</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 8 -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-num">08</div>
+        <div class="card-body">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            <div class="card-title">포트 8001을 다른 프로그램이 점유</div>
+            <div class="badge fail">FAIL</div>
+          </div>
+          <div class="card-detail">uvicorn이 포트 점유 오류로 즉시 종료. PM2가 재시작 시도하지만 매번 실패. max_restarts(10) 초과 후 PM2 errored 상태 진입. 수동 개입 필요.</div>
+          <div class="chain"><span class="ng">포트 점유 → uvicorn 종료 → PM2 재시작 x10 → errored → 수동 pm2 restart 필요</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 9 -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-num">09</div>
+        <div class="card-body">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            <div class="card-title">크래시 루프로 max_restarts(10) 초과</div>
+            <div class="badge fail">FAIL</div>
+          </div>
+          <div class="card-detail">어떤 이유로든 10회 연속 빠른 재시작 실패 시 PM2가 스스로 errored 상태로 전환하고 재시작 중단. 알림 수단 없음 (Telegram 미연동).</div>
+          <div class="chain"><span class="ng">10회 재시작 실패 → PM2 errored → 알림 없음 → 모름 → 오랫동안 오프라인</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 10 -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-num">10</div>
+        <div class="card-body">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            <div class="card-title">.env 파일 삭제 / SECRET_KEY 누락</div>
+            <div class="badge fail">FAIL</div>
+          </div>
+          <div class="card-detail">app.py 48번 줄: SECRET_KEY 없으면 RuntimeError → uvicorn 즉시 종료. PM2가 10회 재시작 후 errored. .env가 복구되지 않는 한 영구 오프라인.</div>
+          <div class="chain"><span class="ng">.env 없음 → RuntimeError → uvicorn 종료 → PM2 x10 → errored</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 11 -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-num">11</div>
+        <div class="card-body">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            <div class="card-title">SQLite DB 파일 잠금 (다른 프로세스가 점유)</div>
+            <div class="badge pass">PASS</div>
+          </div>
+          <div class="card-detail">SQLite WAL 모드는 동시 읽기를 허용. 쓰기 잠금이 발생해도 uvicorn은 오류 응답만 반환하고 프로세스는 살아있음. PM2 재시작 트리거 없음.</div>
+          <div class="chain"><span class="ok">DB 잠금 → uvicorn 생존 → 해당 API 오류 반환 → 잠금 해제 후 자동 정상화</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 12 -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-num">12</div>
+        <div class="card-body">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            <div class="card-title">메모리 부족 (OOM — 32GB 이하에서 무거운 작업)</div>
+            <div class="badge warn">WARN</div>
+          </div>
+          <div class="card-detail">OOM으로 uvicorn 종료 시 PM2 autorestart 작동. 하지만 OOM 원인이 해소되지 않으면 재시작 후 즉시 다시 OOM → max_restarts 초과 가능.</div>
+          <div class="chain"><span class="ng">OOM → 종료</span> → <span class="ok">PM2 재시작</span> → <span class="ng">OOM 계속 시 루프 → errored 위험</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 13 -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-num">13</div>
+        <div class="card-body">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            <div class="card-title">venv Python 실행 파일 손상 (.venv/Scripts/python.exe)</div>
+            <div class="badge fail">FAIL</div>
+          </div>
+          <div class="card-detail">PM2 script 경로가 venv Python으로 고정. 실행 파일 손상/삭제 시 즉시 "executable not found" → 10회 재시작 후 errored. venv 재구성 필요.</div>
+          <div class="chain"><span class="ng">venv 손상 → PM2 script 실행 불가 → x10 → errored → pip install -r requirements 필요</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 14 -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-num">14</div>
+        <div class="card-body">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            <div class="card-title">PM2 Daemon 자체 크래시 (node.exe 종료)</div>
+            <div class="badge fail">FAIL</div>
+          </div>
+          <div class="card-detail">PM2 Daemon이 종료되면 daily-focus uvicorn은 orphan 상태로 계속 실행되지만 감시자가 없어짐. uvicorn이 이후 죽으면 아무도 재시작하지 않음. PM2 재시작 필요.</div>
+          <div class="chain"><span class="ng">PM2 크래시 → uvicorn orphan (실행 중)</span> → <span class="ng">uvicorn 이후 죽으면 복구 불가</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 15 -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-num">15</div>
+        <div class="card-body">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            <div class="card-title">사용자가 직접 <code>pm2 stop daily-focus</code> 실행</div>
+            <div class="badge pass">PASS</div>
+          </div>
+          <div class="card-detail">의도적 중지. autorestart는 비정상 종료에만 트리거. pm2 stop은 정상 종료로 처리 → 재시작 없음. 원할 때 pm2 start daily-focus로 재개.</div>
+          <div class="chain"><span class="ok">pm2 stop → 정상 중지 → autorestart 비활성 → pm2 start daily-focus로 재개</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 핵심 문제 & 수정 -->
+  <div class="section">
+    <div class="section-title">발견된 Gap 및 조치</div>
+
+    <div class="fix-card">
+      <h3>GAP 1 — PM2 부팅 자동 시작 미등록 <span class="priority-tag crit">CRITICAL</span></h3>
+      <p>재부팅/로그아웃/Windows 업데이트 시 PM2가 자동으로 켜지지 않음 (시나리오 1,2,3,4). <code>pm2 startup</code>이 Windows에서 "Init system not found" 오류 발생. <code>pm2-windows-startup</code> npm 패키지 또는 Task Scheduler 등록이 필요함.</p>
+      <div class="chain" style="margin-top:12px;">npm install -g pm2-windows-startup<br>pm2-windows-startup install<br>pm2 save   # 현재 프로세스 목록 저장</div>
+    </div>
+
+    <div class="fix-card">
+      <h3>GAP 2 — max_restarts 10회 초과 시 알림 없음 <span class="priority-tag high">HIGH</span></h3>
+      <p>시나리오 8,9,10,13에서 PM2 errored 상태 진입 후 사용자에게 알림이 없음. zombie-watchdog(runner.py)이 PM2 상태를 감시하므로 연동 가능. 또는 <code>max_restarts</code>를 높이고 <code>min_uptime</code>을 설정해 정상 기동 후 카운터 리셋.</p>
+      <div class="chain" style="margin-top:12px;">// ecosystem.config.js 수정 권장<br>max_restarts: 50,   // 10 → 50<br>min_uptime: "10s",  // 10초 이상 살면 정상 기동으로 카운터 리셋</div>
+    </div>
+  </div>
+
+  <div style="font-size:11px; color:#6E6E73; margin-top:40px; padding-top:24px; border-top:1px solid #E5E5E7;">
+    2026-03-19 · daily-focus process audit · keepalive/watchdog 삭제 후 PM2 단독 운영 검증
+  </div>
+</div>
+</body>
+</html>

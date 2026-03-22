@@ -1,0 +1,12 @@
+# Railway 배포 설정 — daily-focus (일간 대시보드)
+# rootDirectory: overmind/daily-focus
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10
