@@ -23,7 +23,7 @@ SMOKE_WEEK_START = "2099-12-28"
 SMOKE_WEEK_GOAL = "[smoke-test] weekly goal"
 SMOKE_DISCOVERY_PROJECT = "smoke-discovery-workspace"
 SMOKE_DISCOVERY_TASK = f"[{SMOKE_DISCOVERY_PROJECT}] 새 폴더 감지 - 목표와 첫 작업 정의"
-SMOKE_DISCOVERY_PATH = Path(r"C:\work") / SMOKE_DISCOVERY_PROJECT
+SMOKE_DISCOVERY_PATH = Path(__file__).resolve().parents[2] / SMOKE_DISCOVERY_PROJECT
 SMOKE_SPLIT_TITLES = [
     "[smoke-test] split child 1",
     "[smoke-test] split child 2",

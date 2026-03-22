@@ -149,78 +149,18 @@ def maybe_notify_morning_brief() -> None:
         message += f"\n{weekly.get('recommended_week_goal')}"
 
     notify_message("Daily Focus - Morning Brief", message.strip())
-    # Telegram 전송 시도 (실패해도 무시)
-    try:
-        _try_telegram_send(message.strip())
-    except Exception:
-        pass
     _LAST_MORNING_BRIEF_DATE = target_date
 
 
-def _try_telegram_send(text: str) -> None:
-    """Telegram 설정이 있으면 메시지 전송."""
-    try:
-        url = f"{get_base_url()}/api/settings/telegram"
-        with urllib.request.urlopen(url, timeout=3) as resp:
-            cfg = json.loads(resp.read())
-    except Exception:
-        return
-    if not (cfg.get("enabled") and cfg.get("bot_token") and cfg.get("chat_id")):
-        return
-    token = cfg["bot_token"]
-    chat_id = cfg["chat_id"]
-    data = json.dumps({"chat_id": chat_id, "text": text}).encode("utf-8")
-    req = urllib.request.Request(
-        f"https://api.telegram.org/bot{token}/sendMessage",
-        data=data,
-        headers={"Content-Type": "application/json"},
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=8):
-            pass
-    except Exception:
-        pass
-
-
-_LAST_EOD_DATE = ""
-
-
-def maybe_send_eod_report() -> None:
-    """18:00 이후 하루 1회 EOD 리포트를 Telegram으로 전송."""
-    global _LAST_EOD_DATE
-    today = datetime.now().date().isoformat()
-    if _LAST_EOD_DATE == today:
-        return
-    now_label = datetime.now().strftime("%H:%M")
-    if now_label < "18:00":
-        return
-    try:
-        url = f"{get_base_url()}/api/eod-report/send"
-        req = urllib.request.Request(
-            url,
-            data=b"{}",
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=10):
-            pass
-        _LAST_EOD_DATE = today
-    except Exception:
-        pass
 
 
 # ══════════════════════════════════════════════════════════════════
 # FOUNDATION OS 웹훅 (Phase 3)
 # ══════════════════════════════════════════════════════════════════
 
-def _foundation_notify(title: str, message: str, send_telegram: bool = True) -> None:
-    """윈도우 알림 + Telegram 동시 전송."""
+def _foundation_notify(title: str, message: str) -> None:
+    """윈도우 알림 전송."""
     notify_message(title, message)
-    if send_telegram:
-        try:
-            _try_telegram_send(f"[{title}]\n{message}")
-        except Exception:
-            pass
 
 
 def _get_stack_status() -> str:
@@ -271,7 +211,7 @@ def maybe_foundation_block_notify() -> None:
         stack_info = _get_stack_status()
         if stack_info:
             msg += f"\n스택 현황: {stack_info}"
-        _foundation_notify(f"Foundation OS — {title}", msg, send_telegram=True)
+        _foundation_notify(f"Foundation OS — {title}", msg)
         _LAST_BLOCK_NOTIFIED = key
 
 
@@ -301,11 +241,8 @@ def maybe_run_auto_judge() -> None:
         if killed_exp:
             names = ", ".join(e["name"] for e in killed_exp)
             msg += f"\n실험 자동 KILL: {names}"
-            # #50 — 실험 KILL 즉시 별도 Telegram 알림
-            kill_msg = f"[실험 자동 KILL]\n{names}\n7일 데드라인 초과 + 아웃풋 없음으로 종료 처리"
-            _try_telegram_send(kill_msg)
 
-        _foundation_notify("Foundation OS — 17:00 자동 판정", msg, send_telegram=True)
+        _foundation_notify("Foundation OS — 17:00 자동 판정", msg)
         _LAST_AUTO_JUDGE_DATE = today
     except Exception as e:
         print(f"[auto-judge failed] {e}")
@@ -323,7 +260,7 @@ def maybe_gtreview_notify() -> None:
         return
 
     msg = "구태우 리뷰 세션 (30분)\n[10분] 이번 주 만든 것 시연\n[15분] 사용자 관점 피드백\n[5분] 반영/버림 즉시 판정"
-    _foundation_notify("Foundation OS — 구태우 리뷰", msg, send_telegram=True)
+    _foundation_notify("Foundation OS — 구태우 리뷰", msg)
     _LAST_GTREVIEW_DATE = today
 
 
@@ -351,7 +288,7 @@ def maybe_monthly_retro_notify() -> None:
         kill_suffix = ""
 
     msg = f"월간 회고 시간 (1시간)\n이번 달 시스템화 목록 확인\n여전히 수작업으로 남은 것 점검\nKILL 확정 + 다음 달 북극성 재확인{kill_suffix}"
-    _foundation_notify("Foundation OS — 월간 회고", msg, send_telegram=True)
+    _foundation_notify("Foundation OS — 월간 회고", msg)
     _LAST_MONTHLY_DATE = today
 
 
@@ -360,7 +297,6 @@ def run() -> None:
         schedule.every().day.at(check_time).do(notify)
     schedule.every(MONITOR_INTERVAL_MINUTES).minutes.do(monitor_attention)
     schedule.every(1).minutes.do(maybe_notify_morning_brief)
-    schedule.every(5).minutes.do(maybe_send_eod_report)
     # ── Foundation OS 스케줄러 (Phase 3) ──────────────────────────
     schedule.every(1).minutes.do(maybe_foundation_block_notify)  # 시간 블록 전환
     schedule.every(1).minutes.do(maybe_run_auto_judge)           # 17:00 자동 판정

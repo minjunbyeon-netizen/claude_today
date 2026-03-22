@@ -1,3 +1,9 @@
+import sys
+sys.path.insert(0, "C:/work/setting")
+from workspace_paths import (
+    SQUAD_LOGS, OVERMIND_DIR,
+    SQUAD_TEAM_DIR, CODDING_DIR,
+)
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse, JSONResponse, HTMLResponse
@@ -61,7 +67,8 @@ from urllib.parse import urlparse as _urlparse
 _BASE_PATH = _urlparse(BASE_URL).path.rstrip("/")  # "" locally, "/daily-focus" on droplet
 
 _AUTH_PUBLIC_PATHS = {"/login", "/auth/github", "/auth/callback", "/logout", "/health",
-                      "/api/agent-status", "/api/coding-report", "/api/coding-reports"}
+                      "/api/agent-status", "/api/coding-report", "/api/coding-reports",
+                      "/api/bigbrother-report"}
 
 
 @app.middleware("http")
@@ -202,6 +209,15 @@ def init_db():
             fixed_count  INTEGER DEFAULT 0,
             report_text  TEXT DEFAULT '',
             created_at   TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS bigbrother_reports (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            scanned_at  TEXT NOT NULL,
+            total       INTEGER DEFAULT 0,
+            summary     TEXT DEFAULT '{}',
+            projects    TEXT DEFAULT '[]',
+            recommendations TEXT DEFAULT '[]',
+            created_at  TEXT DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE IF NOT EXISTS task_learning_samples (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2526,10 +2542,6 @@ class MorningBriefTimeRequest(BaseModel):
     time: str
 
 
-class TelegramSettingsRequest(BaseModel):
-    bot_token: str
-    chat_id: str
-    enabled: Optional[bool] = True
 
 
 class TodayGoalUpdate(BaseModel):
@@ -2646,7 +2658,7 @@ def get_project_last_log(proj: str):
     import re
     if not re.match(r'^[\w\-\.]+$', proj):
         return {"items": [], "file": ""}
-    handoff_dir = os.path.join(r"C:\work", proj, "handoff")
+    handoff_dir = os.path.join(str(__import__('pathlib').Path(__file__).resolve().parents[2]), proj, "handoff")
     if not os.path.isdir(handoff_dir):
         return {"items": [], "file": ""}
     return _parse_handoff_completed(handoff_dir)
@@ -3281,7 +3293,7 @@ def sync_logs(logs_path: Optional[str] = None):
     - *_todo.md의 - [ ] 항목: DB에 없으면 todo로 추가, 있으면 스킵 (수동 체크 보존)
     """
     if not logs_path:
-        logs_path = r"C:\work\squad-team\logs"
+        logs_path = SQUAD_LOGS
 
     today = kst_today()
     results = {"imported": [], "updated": [], "skipped": [], "project": None, "error": None}
@@ -5038,7 +5050,22 @@ def get_agent_status():
     # C:/work에 실제 존재하는 폴더만 대상으로 함 (삭제된 폴더 제외)
     try:
         projects_dir = os.path.expanduser("~/.claude/projects")
-        work_folders = set(os.listdir("C:/work"))
+        # overmind 구조 스캔: overmind 직속 3개 + eud 하위 그룹 프로젝트 전체
+        _ovm = Path(OVERMIND_DIR)
+        _all_proj_dirs = []
+        for d in _ovm.iterdir():
+            if d.is_dir() and d.name != "eud":
+                _all_proj_dirs.append(d.name)
+        for _group in ("agents", "service", "web", "app"):
+            _g = _ovm / "eud" / _group
+            if _g.exists():
+                for d in _g.iterdir():
+                    if d.is_dir():
+                        _all_proj_dirs.append(d.name)
+        for d in (_ovm / "eud").iterdir():
+            if d.is_dir() and d.name not in ("agents", "service", "web", "app"):
+                _all_proj_dirs.append(d.name)
+        work_folders = set(_all_proj_dirs)
         work_folders_norm = {_re.sub(r'[-_]', '', f).lower(): f for f in work_folders}
         cutoff = _dt.now() - _td(hours=24)
         live_cutoff = _dt.now() - _td(minutes=10)  # 10분 이내 = is_live
@@ -5107,17 +5134,25 @@ def get_agent_status():
     except Exception:
         pass
 
-    # C:/work 폴더 직접 스캔 — DB/JSONL에 없는 폴더도 전부 표시
+    # overmind 전체 폴더 직접 스캔 — DB/JSONL에 없는 프로젝트도 전부 표시
     try:
-        work_dir = "C:/work"
+        _ovm2 = Path(OVERMIND_DIR)
+        _scan_dirs = []
+        for d in _ovm2.iterdir():
+            if d.is_dir() and d.name != "eud":
+                _scan_dirs.append((d.name, str(d)))
+        for _grp in ("agents", "service", "web", "app"):
+            _gd = _ovm2 / "eud" / _grp
+            if _gd.exists():
+                for d in _gd.iterdir():
+                    if d.is_dir():
+                        _scan_dirs.append((d.name, str(d)))
+        for d in (_ovm2 / "eud").iterdir():
+            if d.is_dir() and d.name not in ("agents", "service", "web", "app"):
+                _scan_dirs.append((d.name, str(d)))
         already = {_re.sub(r'[-_]', '', r['project']).lower() for r in result}
         skip = {'log', 'setting', 'config', 'data', 'tools'}
-        for entry in os.listdir(work_dir):
-            if entry.upper() == "CLAUDE.MD":
-                continue
-            full = os.path.join(work_dir, entry)
-            if not os.path.isdir(full):
-                continue
+        for entry, full in _scan_dirs:
             if entry.lower() in skip:
                 continue
             entry_norm = _re.sub(r'[-_]', '', entry).lower()
@@ -5455,67 +5490,6 @@ def save_wf_groups(payload: WfGroupsRequest):
         conn.close()
 
 
-# ─────────────────────────────────────────────────────────────
-# Telegram helper
-# ─────────────────────────────────────────────────────────────
-
-def send_telegram_message(token: str, chat_id: str, text: str) -> bool:
-    """Send a plain-text message via Telegram Bot API. Returns True on success."""
-    import urllib.request as _ur
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    data = json.dumps({"chat_id": chat_id, "text": text}).encode("utf-8")
-    req = _ur.Request(url, data=data, headers={"Content-Type": "application/json"})
-    try:
-        with _ur.urlopen(req, timeout=8) as resp:
-            return resp.status == 200
-    except Exception:
-        return False
-
-
-# ─────────────────────────────────────────────────────────────
-# Telegram settings API
-# ─────────────────────────────────────────────────────────────
-
-@app.get("/api/settings/telegram")
-def get_telegram_settings():
-    conn = get_db()
-    try:
-        return {
-            "bot_token": get_setting(conn, "telegram_bot_token", ""),
-            "chat_id": get_setting(conn, "telegram_chat_id", ""),
-            "enabled": get_setting(conn, "telegram_enabled", "0") == "1",
-        }
-    finally:
-        conn.close()
-
-
-@app.post("/api/settings/telegram")
-def update_telegram_settings(payload: TelegramSettingsRequest):
-    conn = get_db()
-    try:
-        set_setting(conn, "telegram_bot_token", payload.bot_token.strip())
-        set_setting(conn, "telegram_chat_id", payload.chat_id.strip())
-        set_setting(conn, "telegram_enabled", "1" if payload.enabled else "0")
-        conn.commit()
-        return {"ok": True}
-    finally:
-        conn.close()
-
-
-@app.post("/api/telegram-test")
-def test_telegram_send():
-    conn = get_db()
-    try:
-        token = get_setting(conn, "telegram_bot_token", "")
-        chat_id = get_setting(conn, "telegram_chat_id", "")
-    finally:
-        conn.close()
-    if not token or not chat_id:
-        raise HTTPException(400, "Telegram bot_token / chat_id not configured")
-    ok = send_telegram_message(token, chat_id, "[Daily Focus] Telegram 연결 테스트 성공")
-    if not ok:
-        raise HTTPException(502, "Telegram send failed — check token and chat_id")
-    return {"ok": True}
 
 
 # ─────────────────────────────────────────────────────────────
@@ -5568,22 +5542,6 @@ def build_eod_report(conn, target_date: str) -> dict:
     }
 
 
-def format_eod_telegram(report: dict) -> str:
-    lines = [f"[Daily Focus] {report['date']} 마감 리포트"]
-    if report.get("goal"):
-        lines.append(f"오늘 목표: {report['goal']}")
-    lines.append(f"완료: {report['done_count']}개 ({report['done_minutes']}분)")
-    if report.get("remaining_tasks"):
-        lines.append(f"미완료: {report['todo_count']}개")
-        for t in report["remaining_tasks"][:3]:
-            lines.append(f"  - {t['title']}")
-        if report["todo_count"] > 3:
-            lines.append(f"  ... 외 {report['todo_count'] - 3}개")
-    if report.get("cc_sessions_count"):
-        lines.append(f"CC 세션: {report['cc_sessions_count']}회")
-    return "\n".join(lines)
-
-
 @app.get("/api/eod-report")
 def get_eod_report(d: Optional[str] = None):
     target_date = d or kst_today()
@@ -5592,25 +5550,6 @@ def get_eod_report(d: Optional[str] = None):
         return build_eod_report(conn, target_date)
     finally:
         conn.close()
-
-
-@app.post("/api/eod-report/send")
-def send_eod_report():
-    conn = get_db()
-    try:
-        token = get_setting(conn, "telegram_bot_token", "")
-        chat_id = get_setting(conn, "telegram_chat_id", "")
-        enabled = get_setting(conn, "telegram_enabled", "0") == "1"
-        if not (enabled and token and chat_id):
-            raise HTTPException(400, "Telegram not configured or disabled")
-        report = build_eod_report(conn, kst_today())
-    finally:
-        conn.close()
-    text = format_eod_telegram(report)
-    ok = send_telegram_message(token, chat_id, text)
-    if not ok:
-        raise HTTPException(502, "Telegram send failed")
-    return {"ok": True, "text": text}
 
 
 # ─────────────────────────────────────────────────────────────
@@ -6194,6 +6133,68 @@ def get_coding_reports(limit: int = 20):
             (limit,),
         ).fetchall()
         return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+# ─────────────────────────────────────────────────────────────
+# BigBrother — C:/work 전체 스캐너 수신
+# ─────────────────────────────────────────────────────────────
+
+@app.post("/api/bigbrother-report")
+def post_bigbrother_report(body: dict):
+    conn = get_db()
+    try:
+        conn.execute(
+            """INSERT INTO bigbrother_reports (scanned_at, total, summary, projects, recommendations, created_at)
+               VALUES (?, ?, ?, ?, ?, datetime('now','localtime'))""",
+            (
+                body.get("scanned_at", ""),
+                body.get("total", 0),
+                json.dumps(body.get("summary", {}), ensure_ascii=False),
+                json.dumps(body.get("projects", []), ensure_ascii=False),
+                json.dumps(body.get("recommendations", []), ensure_ascii=False),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True}
+
+
+@app.get("/api/bigbrother-report")
+def get_bigbrother_report():
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT * FROM bigbrother_reports ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        if not row:
+            return {"ok": False, "message": "No scan yet"}
+        r = dict(row)
+        r["summary"] = json.loads(r["summary"])
+        r["projects"] = json.loads(r["projects"])
+        r["recommendations"] = json.loads(r["recommendations"])
+        return r
+    finally:
+        conn.close()
+
+
+@app.get("/api/bigbrother-history")
+def get_bigbrother_history(limit: int = 10):
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT id, scanned_at, total, summary, recommendations, created_at FROM bigbrother_reports ORDER BY id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        result = []
+        for row in rows:
+            r = dict(row)
+            r["summary"] = json.loads(r["summary"])
+            r["recommendations"] = json.loads(r["recommendations"])
+            result.append(r)
+        return result
     finally:
         conn.close()
 
