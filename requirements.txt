@@ -4,3 +4,4 @@ schedule
 plyer
 httpx
 itsdangerous
+python-multipart
