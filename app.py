@@ -82,7 +82,8 @@ _BASE_PATH = _urlparse(BASE_URL).path.rstrip("/")  # "" locally, "/daily-focus" 
 
 _AUTH_PUBLIC_PATHS = {"/login", "/auth/github", "/auth/callback", "/logout", "/health",
                       "/api/agent-status", "/api/coding-report", "/api/coding-reports",
-                      "/api/bigbrother-report"}
+                      "/api/bigbrother-report", "/api/pending-actions",
+                      "/insight", "/api/insight"}
 
 
 @app.middleware("http")
@@ -6263,6 +6264,242 @@ def get_bigbrother_history(limit: int = 10):
         return result
     finally:
         conn.close()
+
+
+# ── Overmind-3 승인대기 큐 ──────────────────────────────────────────────────
+
+_pending_actions: list[dict] = []  # in-memory queue (재시작 시 초기화 — 의도적)
+
+@app.post("/api/pending-actions")
+def post_pending_actions(body: dict):
+    """Overmind-3가 confidence 50~79 액션을 캐리건 승인 대기로 올림."""
+    actions = body.get("actions", [])
+    for a in actions:
+        a["queued_at"] = datetime.now().isoformat()
+        a["status"]    = "pending"
+    _pending_actions.extend(actions)
+    # 최대 20개 유지
+    if len(_pending_actions) > 20:
+        _pending_actions[:] = _pending_actions[-20:]
+    return {"ok": True, "queued": len(actions), "total_pending": len(_pending_actions)}
+
+@app.get("/api/pending-actions")
+def get_pending_actions():
+    """캐리건이 승인 대기 목록 조회."""
+    return {"ok": True, "actions": _pending_actions}
+
+@app.post("/api/pending-actions/{idx}/decide")
+def decide_pending_action(idx: int, body: dict):
+    """캐리건이 승인(approve)/거절(reject)/수정(modify) 결정."""
+    if idx < 0 or idx >= len(_pending_actions):
+        raise HTTPException(status_code=404, detail="action not found")
+    choice = body.get("choice", "")  # approve / reject / modify
+    note   = body.get("note", "")
+    _pending_actions[idx]["status"]   = choice
+    _pending_actions[idx]["decided_at"] = datetime.now().isoformat()
+    _pending_actions[idx]["note"]     = note
+    # World Model에 캐리건 결정 기록
+    try:
+        import urllib.request as _req
+        wm_payload = json.dumps({
+            "context_type":    "overmind3_action",
+            "proposed":        _pending_actions[idx].get("action", ""),
+            "kerrigan_choice": choice,
+            "note":            note,
+        }).encode("utf-8")
+        _req.urlopen(_req.Request(
+            "http://localhost:8007/api/kerrigan-decision",
+            data=wm_payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        ), timeout=2)
+    except Exception:
+        pass
+    return {"ok": True, "idx": idx, "choice": choice}
+
+
+@app.get("/api/insight")
+def get_insight_data():
+    """World Model /api/daily 프록시 — insight 페이지용"""
+    import urllib.request as _req
+    try:
+        with _req.urlopen("http://localhost:8007/api/daily", timeout=5) as r:
+            return JSONResponse(json.loads(r.read()))
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=503)
+
+
+@app.get("/insight")
+def insight_page():
+    html = """<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daily Insight</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, sans-serif; font-weight: 400; background: #fff; color: #000; padding: 40px 48px; }
+h1 { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+.meta { color: #6E6E73; font-size: 13px; margin-bottom: 48px; }
+h2 { font-size: 16px; font-weight: 700; margin-bottom: 16px; border-bottom: 1px solid #000; padding-bottom: 6px; }
+section { margin-bottom: 48px; }
+.row { display: flex; gap: 16px; align-items: baseline; padding: 10px 0; border-bottom: 1px solid #e5e5e7; font-size: 14px; }
+.row:last-child { border-bottom: none; }
+.label { color: #6E6E73; min-width: 160px; font-size: 12px; }
+.val { flex: 1; line-height: 1.5; }
+.badge { display: inline-block; background: #000; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 7px; margin-right: 4px; }
+.badge.hi { background: #0071E3; }
+.badge.lo { background: #6E6E73; }
+.conf { font-size: 12px; color: #6E6E73; margin-left: 8px; }
+.ts { color: #6E6E73; font-size: 12px; min-width: 80px; }
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 24px; }
+.stat { }
+.stat-num { font-size: 32px; font-weight: 700; line-height: 1; }
+.stat-lbl { font-size: 12px; color: #6E6E73; margin-top: 4px; }
+#refresh-info { position: fixed; top: 16px; right: 48px; font-size: 12px; color: #6E6E73; }
+.err { color: #000; background: #f5f5f7; padding: 16px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div id="refresh-info">갱신 중...</div>
+<h1>Daily Insight</h1>
+<div class="meta" id="meta">로딩 중...</div>
+
+<section id="stats-sec">
+<h2>오늘 활동 요약</h2>
+<div id="stats"></div>
+</section>
+
+<section id="patterns-sec">
+<h2>Kerrigan 패턴 (학습된 것)</h2>
+<div id="patterns"></div>
+</section>
+
+<section id="defiler-sec">
+<h2>오늘 완료된 작업 (Defiler)</h2>
+<div id="defiler"></div>
+</section>
+
+<section id="decisions-sec">
+<h2>오늘 결정 로그 (최근 20)</h2>
+<div id="decisions"></div>
+</section>
+
+<section id="timeline-sec">
+<h2>오늘 이벤트 타임라인</h2>
+<div id="timeline"></div>
+</section>
+
+<script>
+function fmtTs(ts) {
+  if (!ts) return '';
+  try {
+    const d = new Date(ts);
+    return d.toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit', hour12:false});
+  } catch { return ts.slice(11,16); }
+}
+
+function render(data) {
+  document.getElementById('meta').textContent =
+    data.date + '  |  마지막 갱신: ' + new Date().toLocaleTimeString('ko-KR', {hour12:false});
+
+  // stats
+  const counts = data.event_counts || [];
+  const total = counts.reduce((s, c) => s + (c.cnt||0), 0);
+  const instances = (data.instances || []).length;
+  const defilerDone = (data.defiler_resolved || []).length;
+  const overrides = data.kerrigan_overrides || 0;
+  const patterns = (data.patterns || []).length;
+
+  document.getElementById('stats').innerHTML = `
+    <div class="stat-grid">
+      <div class="stat"><div class="stat-num">${total}</div><div class="stat-lbl">전체 이벤트</div></div>
+      <div class="stat"><div class="stat-num">${instances}</div><div class="stat-lbl">인스턴스 기동</div></div>
+      <div class="stat"><div class="stat-num">${defilerDone}</div><div class="stat-lbl">Defiler 완료</div></div>
+      <div class="stat"><div class="stat-num">${patterns}</div><div class="stat-lbl">Kerrigan 패턴</div></div>
+      <div class="stat"><div class="stat-num">${overrides}</div><div class="stat-lbl">Kerrigan 개입</div></div>
+    </div>`;
+
+  // kerrigan patterns
+  const pats = (data.patterns || []).sort((a,b) => (b.confidence||0)-(a.confidence||0));
+  document.getElementById('patterns').innerHTML = pats.length ? pats.map(p => {
+    const conf = p.confidence ? Math.round(p.confidence*100) : 0;
+    const badgeCls = conf >= 90 ? 'badge hi' : conf >= 80 ? 'badge' : 'badge lo';
+    return `<div class="row">
+      <span class="ts">${fmtTs(p.ts)}</span>
+      <span class="val">
+        <strong>${p.context_type || ''}</strong>
+        ${p.kerrigan_choice ? ' &rarr; ' + p.kerrigan_choice : ''}
+        ${p.inferred_principle ? '<br><span style="color:#6E6E73;font-size:12px;">' + p.inferred_principle + '</span>' : ''}
+      </span>
+      <span class="${badgeCls}">${conf}%</span>
+    </div>`;
+  }).join('') : '<div style="color:#6E6E73;font-size:13px;">데이터 없음</div>';
+
+  // defiler resolved
+  const defi = data.defiler_resolved || [];
+  document.getElementById('defiler').innerHTML = defi.length ? defi.map(d => {
+    let summary = '';
+    try {
+      const p = JSON.parse(d.payload||'{}');
+      summary = (p.result_summary || p.summary || '').slice(0, 120);
+    } catch {}
+    return `<div class="row">
+      <span class="ts">${fmtTs(d.ts)}</span>
+      <span class="label">${d.project || d.team || ''}</span>
+      <span class="val">${summary || '완료'}</span>
+    </div>`;
+  }).join('') : '<div style="color:#6E6E73;font-size:13px;">데이터 없음</div>';
+
+  // decisions
+  const decs = data.decisions || [];
+  document.getElementById('decisions').innerHTML = decs.length ? decs.map(d => {
+    const override = d.kerrigan_override ? '<span class="badge hi">Kerrigan</span>' : '';
+    return `<div class="row">
+      <span class="ts">${fmtTs(d.ts)}</span>
+      <span class="label">${d.decided_by || ''}</span>
+      <span class="val">${override}${(d.decision||'').slice(0,100)}</span>
+    </div>`;
+  }).join('') : '<div style="color:#6E6E73;font-size:13px;">데이터 없음</div>';
+
+  // timeline
+  const evts = data.events || [];
+  document.getElementById('timeline').innerHTML = evts.length ? evts.map(e => {
+    return `<div class="row">
+      <span class="ts">${fmtTs(e.ts)}</span>
+      <span class="label">${e.event_type||''}</span>
+      <span class="val">${e.team||''} ${e.project ? '/ ' + e.project : ''}</span>
+    </div>`;
+  }).join('') : '<div style="color:#6E6E73;font-size:13px;">데이터 없음</div>';
+}
+
+let countdown = 300;
+function updateTimer() {
+  const m = Math.floor(countdown/60), s = countdown%60;
+  document.getElementById('refresh-info').textContent =
+    `다음 갱신: ${m}:${String(s).padStart(2,'0')}`;
+  countdown--;
+  if (countdown < 0) { load(); countdown = 300; }
+}
+
+async function load() {
+  try {
+    const r = await fetch('/api/insight');
+    const data = await r.json();
+    if (data.ok) render(data);
+    else document.body.innerHTML = '<div class="err">데이터 로드 실패: ' + (data.error||'') + '</div>';
+  } catch(e) {
+    document.getElementById('meta').textContent = '연결 실패: ' + e.message;
+  }
+}
+
+load();
+setInterval(updateTimer, 1000);
+</script>
+</body>
+</html>"""
+    return HTMLResponse(html)
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
