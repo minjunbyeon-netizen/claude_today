@@ -3170,8 +3170,16 @@ body {
           </div>
         </button>
         <div id="bbDetail" style="padding:0 16px 16px">
+          <!-- Analysis Insights -->
+          <div id="bbInsights" style="margin-bottom:12px"></div>
+          <!-- Anomalies -->
+          <div id="bbAnomalies" style="margin-bottom:12px"></div>
+          <!-- Neglected -->
+          <div id="bbNeglected" style="margin-bottom:12px"></div>
           <!-- Recommendations -->
           <div id="bbRecs" style="margin-bottom:16px"></div>
+          <!-- Pending Actions (Overmind-3 승인 대기) -->
+          <div id="bbPending" style="margin-bottom:16px"></div>
           <!-- Project list -->
           <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px">프로젝트 현황</div>
           <div id="bbProjects"></div>
@@ -5862,34 +5870,153 @@ async function loadBbReport() {
     ).join('<span style="color:var(--border)">·</span>');
     document.getElementById('bbSummaryBadges').innerHTML = badgeHtml;
 
+    // Analysis Insights (patterns)
+    const analysis = s.analysis || {};
+    const patterns = analysis.patterns || {};
+    let insightHtml = '';
+    if (patterns.insight || patterns.focus_score != null) {
+      const score = patterns.focus_score != null ? patterns.focus_score : '—';
+      const scoreColor = score >= 70 ? 'var(--success)' : score >= 40 ? 'var(--warning)' : 'var(--danger)';
+      insightHtml += `<div style="display:flex;align-items:center;gap:12px;padding:8px 10px;background:var(--soft);border-radius:8px;margin-bottom:6px">`;
+      if (patterns.focus_score != null) {
+        insightHtml += `<div style="text-align:center;flex-shrink:0"><div style="font-size:18px;font-weight:700;color:${scoreColor}">${score}</div><div style="font-size:9px;color:var(--muted)">집중도</div></div>`;
+      }
+      if (patterns.insight) {
+        insightHtml += `<div style="font-size:12px;color:var(--text);flex:1">${esc(patterns.insight)}</div>`;
+      }
+      const meta = [];
+      if (patterns.top_project) meta.push(`핵심: <b>${esc(patterns.top_project)}</b>`);
+      if (patterns.peak_hour)   meta.push(`집중 시간대: ${esc(patterns.peak_hour)}`);
+      if (meta.length) insightHtml += `<div style="font-size:10px;color:var(--muted);line-height:1.6">${meta.join('<br>')}</div>`;
+      insightHtml += `</div>`;
+    }
+    document.getElementById('bbInsights').innerHTML = insightHtml;
+
+    // Anomalies
+    const anomalies = analysis.anomalies || {};
+    let anomalyHtml = '';
+    if (anomalies.has_anomaly && anomalies.issues && anomalies.issues.length) {
+      const sevColor = anomalies.severity === 'high' ? 'var(--danger)' : 'var(--warning)';
+      anomalyHtml = `<div style="padding:8px 10px;border-left:3px solid ${sevColor};background:var(--soft);border-radius:0 6px 6px 0;margin-bottom:6px">
+        <div style="font-size:11px;font-weight:700;color:${sevColor};margin-bottom:4px">이상 감지 (${esc(anomalies.severity || '')})</div>
+        ${anomalies.issues.map(i => `<div style="font-size:11px;color:var(--text);padding:2px 0">${esc(typeof i === 'string' ? i : i.description || JSON.stringify(i))}</div>`).join('')}
+      </div>`;
+    }
+    document.getElementById('bbAnomalies').innerHTML = anomalyHtml;
+
+    // Neglected projects
+    const neglected = analysis.neglected || {};
+    let neglectedHtml = '';
+    const resume = neglected.resume_candidates || [];
+    const archive = neglected.archive_candidates || [];
+    if (resume.length || archive.length) {
+      neglectedHtml = `<div style="padding:8px 10px;background:var(--soft);border-radius:8px;margin-bottom:6px">
+        <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:6px">방치 프로젝트</div>`;
+      if (resume.length) neglectedHtml += `<div style="font-size:10px;color:var(--muted);margin-bottom:4px">재개 추천: ${resume.map(p => `<b style="color:var(--accent)">${esc(p)}</b>`).join(', ')}</div>`;
+      if (archive.length) neglectedHtml += `<div style="font-size:10px;color:var(--muted)">보관 후보: ${archive.map(p => `<span>${esc(p)}</span>`).join(', ')}</div>`;
+      neglectedHtml += `</div>`;
+    }
+    document.getElementById('bbNeglected').innerHTML = neglectedHtml;
+
     // Recommendations
     const recs = d.recommendations || [];
     document.getElementById('bbRecs').innerHTML = recs.length
-      ? recs.map(r =>
-          `<div style="font-size:12px;color:var(--muted);padding:5px 0;border-bottom:1px solid var(--border)">${esc(r)}</div>`
-        ).join('')
+      ? `<div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:6px">권장 액션</div>` +
+        recs.map(r => {
+          const txt = typeof r === 'string' ? r : r.action || JSON.stringify(r);
+          const reason = typeof r === 'object' ? r.reason || '' : '';
+          return `<div style="font-size:12px;color:var(--text);padding:5px 0;border-bottom:1px solid var(--border)">
+            <span>${esc(txt)}</span>${reason ? `<span style="font-size:10px;color:var(--muted);margin-left:6px">${esc(reason)}</span>` : ''}
+          </div>`;
+        }).join('')
       : '';
 
     // Projects
     const projects = d.projects || [];
-    const grouped = { active: [], recent: [], idle: [], abandoned: [], unknown: [] };
-    for (const p of projects) grouped[p.status]?.push(p);
-
     const rows = projects.map(p => {
       const lbl = _bbStatusLabel[p.status] || p.status;
+      const detail = p.last_task || p.context || '';
       return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
         <span style="font-size:10px;color:var(--muted);min-width:28px">${esc(lbl)}</span>
         <span style="font-size:12px;font-weight:700;color:var(--text);min-width:140px;flex-shrink:0">${esc(p.name)}</span>
         <span style="font-size:11px;color:var(--muted);min-width:36px">${_fmtAge(p.age_hours)}</span>
-        <span style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1">${esc(p.last_task || p.context || '')}</span>
+        <span style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1">${esc(detail)}</span>
       </div>`;
     }).join('');
 
     document.getElementById('bbProjects').innerHTML = rows ||
       '<span style="font-size:12px;color:var(--muted)">스캔 결과 없음</span>';
+
+    // Pending Actions 로드
+    await loadPendingActions();
   } catch (err) {
     // silent fail
   }
+}
+
+// ── Pending Actions (Overmind-3 승인 대기 큐) ──────────────────
+async function loadPendingActions() {
+  try {
+    const r = await fetch(appUrl('api/pending-actions'));
+    if (!r.ok) return;
+    const d = await r.json();
+    renderPendingActions(d.actions || []);
+  } catch (_) {}
+}
+
+function renderPendingActions(actions) {
+  const el = document.getElementById('bbPending');
+  if (!el) return;
+  const pending = actions.filter(a => a.status === 'pending');
+  if (!pending.length) {
+    el.innerHTML = '';
+    return;
+  }
+  const cards = pending.map((a, idx) => {
+    const confRaw = a.confidence != null ? Math.round(a.confidence) : null;
+    const confText = confRaw != null ? confRaw : '--';
+    const confColor = confRaw == null ? 'var(--muted)' : confRaw >= 70 ? 'var(--success)' : confRaw >= 50 ? 'var(--warning)' : 'var(--muted)';
+    return `<div style="padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--soft)">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+        <span style="font-size:12px;font-weight:700;color:${confColor};background:#fff;border:1px solid ${confColor};border-radius:4px;padding:1px 6px;flex-shrink:0">${confText}</span>
+        <div style="font-size:13px;color:var(--text);font-weight:600;line-height:1.4">${esc(a.action || '')}</div>
+      </div>
+      ${a.reason ? `<div style="font-size:11px;color:var(--muted);margin-bottom:10px;padding-left:2px">${esc(a.reason)}</div>` : '<div style="margin-bottom:10px"></div>'}
+      <div style="display:flex;gap:8px">
+        <button onclick="decidePending(${idx},'approve')" style="flex:1;padding:7px 0;font-size:12px;font-weight:700;border-radius:6px;border:none;background:#1a7f37;color:#fff;cursor:pointer">승인</button>
+        <button onclick="decidePendingModify(${idx})" style="flex:1;padding:7px 0;font-size:12px;font-weight:400;border-radius:6px;border:1px solid var(--border);background:#fff;color:var(--text);cursor:pointer">수정</button>
+        <button onclick="decidePending(${idx},'reject')" style="flex:1;padding:7px 0;font-size:12px;font-weight:700;border-radius:6px;border:none;background:var(--danger);color:#fff;cursor:pointer">거부</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `<div style="font-size:11px;font-weight:700;color:var(--text);letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px">
+    Overmind 승인 대기 <span style="font-size:10px;color:var(--muted);font-weight:400;text-transform:none">(${pending.length}건)</span>
+  </div>${cards}`;
+}
+
+async function decidePending(idx, action, note) {
+  try {
+    const r = await fetch(appUrl(`api/pending-actions/${idx}/decide`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, note: note || '' }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      await loadPendingActions();
+    } else {
+      alert('결정 실패: ' + (d.detail || d.error || '오류'));
+    }
+  } catch (e) {
+    alert('오류: ' + e.message);
+  }
+}
+
+function decidePendingModify(idx) {
+  const note = prompt('수정 내용을 입력하세요:');
+  if (note === null) return;
+  decidePending(idx, 'modify', note);
 }
 
 async function saveMorningBriefTime() {
