@@ -5923,10 +5923,14 @@ async function loadBbReport() {
     document.getElementById('bbRecs').innerHTML = recs.length
       ? `<div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:6px">권장 액션</div>` +
         recs.map(r => {
-          const txt = typeof r === 'string' ? r : r.action || JSON.stringify(r);
-          const reason = typeof r === 'object' ? r.reason || '' : '';
-          return `<div style="font-size:12px;color:var(--text);padding:5px 0;border-bottom:1px solid var(--border)">
-            <span>${esc(txt)}</span>${reason ? `<span style="font-size:10px;color:var(--muted);margin-left:6px">${esc(reason)}</span>` : ''}
+          let txt = typeof r === 'string' ? r : r.action || JSON.stringify(r);
+          let reason = typeof r === 'object' ? r.reason || '' : '';
+          // 괄호 기술 내용·파일경로 제거 (읽기 쉽게)
+          txt = txt.replace(/\s*\([^)]{10,}\)/g, '').replace(/\S+\.\w{2,4}/g, '').replace(/\s{2,}/g, ' ').trim();
+          reason = reason.replace(/\s*\([^)]{10,}\)/g, '').replace(/\S+\.\w{2,4}/g, '').trim();
+          if (txt.length > 40) txt = txt.slice(0, 38) + '…';
+          return `<div style="font-size:12px;color:var(--text);padding:6px 0;border-bottom:1px solid var(--border);display:flex;align-items:baseline;gap:8px">
+            <span style="flex:1">${esc(txt)}</span>${reason ? `<span style="font-size:10px;color:var(--muted);flex-shrink:0">${esc(reason)}</span>` : ''}
           </div>`;
         }).join('')
       : '';
@@ -5982,10 +5986,10 @@ function renderPendingActions(actions) {
         <div style="font-size:13px;color:var(--text);font-weight:600;line-height:1.4">${esc(a.action || '')}</div>
       </div>
       ${a.reason ? `<div style="font-size:11px;color:var(--muted);margin-bottom:10px;padding-left:2px">${esc(a.reason)}</div>` : '<div style="margin-bottom:10px"></div>'}
-      <div style="display:flex;gap:8px">
-        <button onclick="decidePending(${idx},'approve')" style="flex:1;padding:7px 0;font-size:12px;font-weight:700;border-radius:6px;border:none;background:#1a7f37;color:#fff;cursor:pointer">승인</button>
-        <button onclick="decidePendingModify(${idx})" style="flex:1;padding:7px 0;font-size:12px;font-weight:400;border-radius:6px;border:1px solid var(--border);background:#fff;color:var(--text);cursor:pointer">수정</button>
-        <button onclick="decidePending(${idx},'reject')" style="flex:1;padding:7px 0;font-size:12px;font-weight:700;border-radius:6px;border:none;background:var(--danger);color:#fff;cursor:pointer">거부</button>
+      <div style="display:flex;gap:6px;justify-content:flex-end">
+        <button onclick="decidePending(${idx},'approve')" style="padding:5px 14px;font-size:12px;font-weight:700;border-radius:6px;border:none;background:#1a7f37;color:#fff;cursor:pointer">승인</button>
+        <button onclick="decidePendingModify(${idx})" style="padding:5px 14px;font-size:12px;font-weight:400;border-radius:6px;border:1px solid var(--border);background:#fff;color:var(--text);cursor:pointer">수정</button>
+        <button onclick="decidePending(${idx},'reject')" style="padding:5px 14px;font-size:12px;font-weight:700;border-radius:6px;border:none;background:var(--danger);color:#fff;cursor:pointer">거부</button>
       </div>
     </div>`;
   }).join('');
